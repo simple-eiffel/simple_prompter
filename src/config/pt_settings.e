@@ -179,6 +179,7 @@ feature {NONE} -- Implementation
 					.with_float ("head_pad", head_pad).with_float ("tail_pad", tail_pad)
 					.with_string ("sessions_root", sessions_root).with_string ("camera", camera_name)
 					.with_string ("microphone", microphone_name).with_boolean ("tracking_proven", is_tracking_proven)
+					.with_boolean ("pill_placed", has_pill_position).with_integer ("pill_x", pill_x).with_integer ("pill_y", pill_y)
 				create l_root.make
 				l_root := l_root.with_table ("prompter", l_table)
 					-- simple_toml.save_file narrows to STRING_8 (lossy); write UTF-8 through simple_file instead.
@@ -186,6 +187,27 @@ feature {NONE} -- Implementation
 			end
 		ensure
 			counted: save_count = old save_count + 1
+		end
+
+feature -- Pill placement
+
+	pill_x, pill_y: INTEGER
+			-- Top-left of the pill on the virtual screen, when `has_pill_position'.
+
+	has_pill_position: BOOLEAN
+			-- Has the reader placed the pill (Shift+drag) at least once?
+
+	set_pill_position (a_x, a_y: INTEGER)
+			-- Remember where the reader put the pill.
+		do
+			pill_x := a_x
+			pill_y := a_y
+			has_pill_position := True
+			save
+		ensure
+			set: pill_x = a_x and pill_y = a_y
+			placed: has_pill_position
+			saved: save_count = old save_count + 1
 		end
 
 feature -- Element change (review L20)
@@ -300,6 +322,12 @@ feature {NONE} -- Loading
 			end
 			if t.has ("tracking_proven") then
 				is_tracking_proven := t.boolean_item ("tracking_proven")
+			end
+			if t.has ("pill_placed") and then t.boolean_item ("pill_placed") and then t.has ("pill_x") and then t.has ("pill_y")
+				and then in_range (t.integer_item ("pill_x"), -100_000, 100_000) and then in_range (t.integer_item ("pill_y"), -100_000, 100_000) then
+				pill_x := t.integer_item ("pill_x").to_integer_32
+				pill_y := t.integer_item ("pill_y").to_integer_32
+				has_pill_position := True
 			end
 		end
 

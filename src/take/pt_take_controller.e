@@ -183,6 +183,11 @@ feature -- Commands
 				follower.hold
 				follower.set_caret (caret - 1)
 			when {PT_ACTION}.Hold then
+					-- F-01: "the prompter holds, offers you a restart point (or lets you pick
+					-- any word)" - the start of the passage being read, where Again would go.
+				if revision.word_count > 0 then
+					caret := hold_caret
+				end
 				follower.hold
 				log (create {PT_TAKE_EVENT}.make_hold (stamp, "user"))
 			when {PT_ACTION}.Go then
@@ -338,6 +343,37 @@ feature -- Commands
 		end
 
 feature {NONE} -- Implementation
+
+	hold_caret: INTEGER
+			-- Restart point offered on Hold: the start of the passage being read, or of the
+			-- next passage with words to read when that one is a cue line.
+		require
+			has_words: revision.word_count > 0
+		local
+			l_passage: INTEGER
+		do
+			l_passage := revision.passage_of (reader_position.max (1))
+			from until has_spoken_word (l_passage) or l_passage >= revision.passage_count loop
+				l_passage := l_passage + 1
+			end
+			Result := revision.passage (l_passage).first_word
+		ensure
+			in_script: Result >= 1 and Result <= revision.word_count
+			passage_start: Result = revision.passage (revision.passage_of (Result)).first_word
+		end
+
+	has_spoken_word (a_passage: INTEGER): BOOLEAN
+			-- Does passage `a_passage' hold a word that is not a cue?
+		require
+			valid: a_passage >= 1 and a_passage <= revision.passage_count
+		local
+			i: INTEGER
+		do
+			from i := revision.passage (a_passage).first_word until Result or i > revision.passage (a_passage).last_word loop
+				Result := not revision.word (i).is_cue
+				i := i + 1
+			end
+		end
 
 	Align_interval: REAL_64 = 0.25
 			-- At most four Align events per second.

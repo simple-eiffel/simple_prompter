@@ -39,6 +39,7 @@ feature {NONE} -- Initialization
 			run_attempt_alignment_tests
 			run_coverage_take_tests
 			run_coverage_core_tests
+			run_pill_tests
 			say ("%N========================%N")
 			say ("Results: " + passed.out + " passed, " + failed.out + " failed%N")
 			if failed > 0 then
@@ -351,6 +352,21 @@ feature {NONE} -- Test sets
 			run_test (agent t.test_history_ids_and_journal_status, "history_ids_and_journal_status")
 			run_test (agent t.test_event_names_and_edit_fields, "event_names_and_edit_fields")
 			run_test (agent t.test_fixed_measure_and_heard_word, "fixed_measure_and_heard_word")
+		end
+
+	run_pill_tests
+		local
+			t: TEST_PILL
+		do
+			section ("pill geometry, placement, keys (plan step 1)")
+			create t
+			run_test (agent t.test_word_positions_match_the_layout, "word_positions_match_the_layout")
+			run_test (agent t.test_hit_testing, "hit_testing")
+			run_test (agent t.test_visible_lines, "visible_lines")
+			run_test (agent t.test_hold_offers_the_passage_start, "hold_offers_the_passage_start")
+			run_test (agent t.test_hold_never_offers_a_cue, "hold_never_offers_a_cue")
+			run_test (agent t.test_pill_position_survives_a_restart, "pill_position_survives_a_restart")
+			run_test (agent t.test_all_bindings_lists_every_binding, "all_bindings_lists_every_binding")
 		end
 
 feature {NONE} -- Implementation

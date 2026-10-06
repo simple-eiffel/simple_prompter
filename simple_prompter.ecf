@@ -30,6 +30,22 @@
 		<cluster name="src" location=".\src\" recursive="true"/>
 	</target>
 
+	<!-- Plan Step 1: the GUI application (pill + control window). Effects live here,
+	     never in the library target. -->
+	<target name="simple_prompter_app" extends="simple_prompter">
+		<root class="PT_APP" feature="make"/>
+		<!-- Repeated on purpose: clusters declared in an extending target do NOT
+		     inherit the parent target's assertion options (oracle gotcha 2026-10-05). -->
+		<option warning="warning">
+			<assertions precondition="true" postcondition="true" check="true" invariant="true" loop="true" supplier_precondition="true"/>
+		</option>
+		<library name="simple_widgets" location="$SIMPLE_EIFFEL/simple_widgets/simple_widgets.ecf"/>
+		<library name="simple_cairo" location="$SIMPLE_EIFFEL/simple_cairo/simple_cairo.ecf"/>
+		<library name="simple_shell" location="$SIMPLE_EIFFEL/simple_shell/simple_shell.ecf"/>
+		<cluster name="app" location=".\app\" recursive="true"/>
+		<cluster name="runtime" location=".\runtime\" recursive="true"/>
+	</target>
+
 	<!-- Test runner. Console, so results land on stdout. Both testing libraries
 	     per ecosystem standard: ISE testing for EQA, simple_testing for TEST_SET_BASE. -->
 	<target name="simple_prompter_tests" extends="simple_prompter">

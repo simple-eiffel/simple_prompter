@@ -110,6 +110,17 @@ feature -- Access
 			bare_ignored_unless_active: (a_modifiers = 0 and not bare_keys_active) implies Result = 0
 		end
 
+	all_bindings: ARRAYED_LIST [PT_KEY_BINDING]
+			-- Every binding (a fresh list), for registering them with the system.
+		do
+			create Result.make (binding_count)
+			across bindings as ic loop
+				Result.extend (ic)
+			end
+		ensure
+			complete: Result.count = binding_count
+		end
+
 feature -- Status
 
 	is_recording: BOOLEAN
