@@ -165,7 +165,7 @@ feature -- Live aligner and followers
 			assert_true ("coasted to a stop", t.velocity = 0)
 			t.set_caret (20)
 			assert_false ("restart forgets the alignment", t.has_alignment)
-			assert_true ("constants", t.Coast_limit = 1.5 and t.Min_rate = 1.0 and t.Max_rate_factor = 1.6 and t.Steer_gain = 1.5)
+			assert_true ("constants", t.Coast_limit = 1.5 and t.Min_rate = 1.0 and t.Max_rate_factor = 3.0 and t.Steer_gain = 1.5)
 		end
 
 	test_layout_lines_and_scroll

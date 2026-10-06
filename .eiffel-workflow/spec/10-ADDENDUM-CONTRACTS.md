@@ -58,3 +58,20 @@ new session. Replaced by:
 and reads `last_probability`. `PT_SCRIPTED_VAD` implements both and counts resets for tests.
 Frozen contract lines changed: exactly one (`probability_range` moved from `Result` to
 `last_probability`). Evidence: evidence/phase4-cqs-audit.txt, evidence/cqs-contracts-after.txt.
+
+
+## A-2: PT_ALIGNER jump evidence counts spoken words (approved by Larry 2026-10-06)
+
+The read test's `[CUE: talk off-script ...]` is twelve script words never spoken. After it,
+"now a phrase" was a 15-word jump needing three anchors, so the pill waited ~2 s for more
+evidence. Approved change ("Approve the change (Recommended)"):
+
+| Feature | Kind | Contract |
+|---|---|---|
+| `spoken_distance (a_from, a_to): INTEGER` | new query | require `ordered: a_from <= a_to`, `inside: a_from >= 0 and a_to <= revision.word_count`; ensure `bounded: Result >= 0 and Result <= a_to - a_from` |
+| `update` `jump_evidence` | changed postcondition | `position > old position and then spoken_distance (old position, position) > Small_jump implies last_alignment.anchor_count >= required_anchors (spoken_distance (old position, position))` |
+
+Added without changing frozen clauses: `heard_tail` (pure query, for tests and diagnosis),
+`PT_HEARD_STABILIZER` (new class), `PT_TRACKING_FOLLOWER.Snap_lag`; tuning constants changed:
+`PT_TRACKING_FOLLOWER.Max_rate_factor` 1.6 -> 3.0 (spec 07 value; the `rate_capped` clause is
+unchanged). Evidence: evidence/steps2-3-live.txt.

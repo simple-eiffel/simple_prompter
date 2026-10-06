@@ -2,7 +2,7 @@ note
 	description: "[
 		Hotkeys and the mouse on the pill, turned into Take Studio actions.
 		Registers the keymap's chords (spec 07 section 2.14) as global hotkeys,
-		plus the app's own: speed up and down. Each hotkey becomes a PT_CONTROL,
+		plus the app's own: speed up and down, open a script, follow mode. Each hotkey becomes a PT_CONTROL,
 		the resolver picks the action for the current state, and the action is
 		performed only when the controller allows it. App-level controls (hide,
 		click-through) go to the pill. Plan Step 1 leaves out Edit (its inline
@@ -40,6 +40,8 @@ feature -- Constants
 	Speed_down_id: INTEGER = 101
 	Open_id: INTEGER = 102
 	Vk_o: INTEGER = 0x4F
+	Mode_id: INTEGER = 103
+	Vk_m: INTEGER = 0x4D
 	Speed_step: INTEGER = 10
 			-- Words per minute per press.
 
@@ -82,6 +84,7 @@ feature -- Commands
 			claim (Speed_up_id, hotkeys.Mod_control | hotkeys.Mod_alt, Vk_up, 0, {STRING_32} "faster")
 			claim (Speed_down_id, hotkeys.Mod_control | hotkeys.Mod_alt, Vk_down, 0, {STRING_32} "slower")
 			claim (Open_id, hotkeys.Mod_control | hotkeys.Mod_alt, Vk_o, 0, {STRING_32} "open a script")
+			claim (Mode_id, hotkeys.Mod_control | hotkeys.Mod_alt, Vk_m, 0, {STRING_32} "follow mode: voice / constant speed (when stopped)")
 		end
 
 	set_on_open (a_action: PROCEDURE)
@@ -94,6 +97,17 @@ feature -- Commands
 
 	on_open: detachable PROCEDURE
 			-- Called for the open-a-script hotkey.
+
+	set_on_mode (a_action: PROCEDURE)
+			-- What Ctrl+Alt+M does.
+		do
+			on_mode := a_action
+		ensure
+			set: on_mode = a_action
+		end
+
+	on_mode: detachable PROCEDURE
+			-- Called for the follow-mode hotkey.
 
 	release_all
 		do
@@ -110,6 +124,10 @@ feature -- Commands
 			elseif a_id = Open_id then
 				if attached on_open as al_open then
 					al_open.call (Void)
+				end
+			elseif a_id = Mode_id then
+				if attached on_mode as al_mode then
+					al_mode.call (Void)
 				end
 			elseif controls.has (a_id) then
 				on_control (controls [a_id])

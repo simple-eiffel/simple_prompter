@@ -29,6 +29,7 @@ feature {NONE} -- Initialization
 			create sessions_root.make_empty
 			create camera_name.make_from_string ({STRING_32} "FHD Camera")
 			create microphone_name.make_from_string ({STRING_32} "Microphone (FHD Camera Microphone)")
+			follow_mode := {PT_FOLLOW_MODE}.Tracking
 		ensure
 			memory_only: path = Void
 			nothing_saved: save_count = 0
@@ -53,7 +54,7 @@ feature -- Constants
 	Default_font: INTEGER = 28
 	Min_lines: INTEGER = 1
 	Max_lines: INTEGER = 12
-	Default_lines: INTEGER = 3
+	Default_lines: INTEGER = 5
 	Min_width: INTEGER = 200
 	Max_width: INTEGER = 2400
 	Default_width: INTEGER = 560
@@ -180,7 +181,7 @@ feature {NONE} -- Implementation
 					.with_string ("sessions_root", sessions_root).with_string ("camera", camera_name)
 					.with_string ("microphone", microphone_name).with_boolean ("tracking_proven", is_tracking_proven)
 					.with_boolean ("pill_placed", has_pill_position).with_integer ("pill_x", pill_x).with_integer ("pill_y", pill_y)
-					.with_string ("last_script", last_script)
+					.with_string ("last_script", last_script).with_integer ("follow_mode", follow_mode)
 				create l_root.make
 				l_root := l_root.with_table ("prompter", l_table)
 					-- simple_toml.save_file narrows to STRING_8 (lossy); write UTF-8 through simple_file instead.
@@ -205,6 +206,23 @@ feature -- Script
 			save
 		ensure
 			set: last_script.same_string (a_path)
+			saved: save_count = old save_count + 1
+		end
+
+feature -- Following
+
+	follow_mode: INTEGER
+			-- How the app moves the text (a PT_FOLLOW_MODE); Tracking unless chosen otherwise.
+
+	set_follow_mode (a_mode: INTEGER)
+			-- Remember `a_mode' for the next start.
+		require
+			known: a_mode >= {PT_FOLLOW_MODE}.Constant and a_mode <= {PT_FOLLOW_MODE}.Tracking
+		do
+			follow_mode := a_mode
+			save
+		ensure
+			set: follow_mode = a_mode
 			saved: save_count = old save_count + 1
 		end
 
@@ -344,6 +362,9 @@ feature {NONE} -- Loading
 			end
 			if attached t.string_item ("last_script") as al_s then
 				last_script := al_s
+			end
+			if t.has ("follow_mode") and then in_range (t.integer_item ("follow_mode"), {PT_FOLLOW_MODE}.Constant, {PT_FOLLOW_MODE}.Tracking) then
+				follow_mode := t.integer_item ("follow_mode").to_integer_32
 			end
 			if t.has ("pill_placed") and then t.boolean_item ("pill_placed") and then t.has ("pill_x") and then t.has ("pill_y")
 				and then in_range (t.integer_item ("pill_x"), -100_000, 100_000) and then in_range (t.integer_item ("pill_y"), -100_000, 100_000) then

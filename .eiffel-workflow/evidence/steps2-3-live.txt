@@ -1,0 +1,32 @@
+# Plan Steps 2+3 evidence - live speech path
+# Date: 2026-10-06
+# Commands: /d/prod/ec.sh test -config simple_prompter.ecf -target simple_prompter_live_tests;
+#           EIFGENs/simple_prompter_live_tests/F_code/simple_prompter.exe (CUDA whisper DLLs beside it)
+
+simple_prompter live speech tests
+    [live] 144 s of audio in 41 s; 472 decodes, mean 62 ms, worst 159 ms; 406 anchored alignments; pill ends at word 311 of 311
+    [live] aligner at checkpoints: 17 29 82 157 263 311
+    [check] teleprompter: script 20, pill 18
+    [check] camera: script 29, pill 31
+    [check] specification: script 82, pill 84
+    [check] gigabytes: script 114, pill 117
+    [check] watching: script 157, pill 157
+    [check] repeated: script 194, pill 194
+    [check] waits: script 214, pill 215
+    [check] processors: script 263, pill 266
+    [check] construction: script 287, pill 288
+    [check] patience: script 311, pill 311
+  PASS: live_path_follows_larry
+    [live] 334 s of audio in 108 s; 1222 decodes, mean 64 ms, worst 179 ms; 1145 anchored alignments; pill ends at word 758 of 7991
+    [sermon] 32 distinctive words checked, 0 more than a line away:
+  PASS: live_path_follows_a_sermon
+    [worker] listening: Microphone (FHD Camera Microphone); 32784 samples after 2200 ms
+  PASS: worker_listens_to_the_microphone
+
+Results: 3 passed, 0 failed
+
+# Headless suite (simple_prompter_tests):
+Results: 201 passed, 0 failed
+
+# simple_speech gpu (simple_speech_gpu_tests): 5 passed, 0 failed (three consecutive runs)
+# Installed 0.2.0: ffmpeg child on Microphone (FHD Camera Microphone); tee file grows 64000 bytes/s; closes cleanly (ffmpeg gone, tee removed)

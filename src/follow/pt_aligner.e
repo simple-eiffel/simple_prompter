@@ -65,8 +65,35 @@ feature -- Access
 	confidence: REAL_64
 			-- Confidence in `position', 0..1.
 
+	heard_tail: ARRAYED_LIST [STRING_32]
+			-- The heard words the next alignment starts from, oldest first (a fresh list).
+		do
+			Result := recent_tail
+		ensure
+			bounded: Result.count <= Recent_heard
+		end
+
 	last_alignment: PT_ALIGNMENT
 			-- Estimate produced by the last `update' or `reanchor'.
+
+	spoken_distance (a_from, a_to: INTEGER): INTEGER
+			-- Words in `a_from' + 1 .. `a_to' that can be spoken (cue text is never read aloud, so
+			-- moving past a cue is not a jump; approved by Larry 2026-10-06).
+		require
+			ordered: a_from <= a_to
+			inside: a_from >= 0 and a_to <= revision.word_count
+		local
+			i: INTEGER
+		do
+			from i := a_from + 1 until i > a_to loop
+				if not revision.word (i).is_cue then
+					Result := Result + 1
+				end
+				i := i + 1
+			end
+		ensure
+			bounded: Result >= 0 and Result <= a_to - a_from
+		end
 
 	required_anchors (a_jump: INTEGER): INTEGER
 			-- Anchored matches needed to move forward by `a_jump' words.
@@ -114,7 +141,10 @@ feature -- Element change
 						-- paragraph), also search wide; take it only with more anchored evidence.
 					if not best_explains_tail and l_hi < (position + Window_ahead).min (revision.word_count) then
 						best_alignment (l_heard, l_lo, (position + Window_ahead).min (revision.word_count))
-						if best_anchors > l_anchors and best_end > l_end then
+							-- The wide match must itself explain the newest words: old, already-aligned
+						-- words matching a repeated phrase further on are no evidence of a skip
+						-- ("keep natural eye contact" twice in the read test; live replay 2026-10-06).
+					if best_explains_tail and best_anchors > l_anchors and best_end > l_end then
 							l_anchors := best_anchors
 							l_matched := best_matched
 						else
@@ -133,7 +163,7 @@ feature -- Element change
 								position := l_new
 							end
 						elseif l_new > position then
-							if l_new - position <= Small_jump or else l_anchors >= required_anchors (l_new - position) then
+							if spoken_distance (position, l_new) <= Small_jump or else l_anchors >= required_anchors (spoken_distance (position, l_new)) then
 								position := l_new
 							end
 						end
@@ -167,8 +197,8 @@ feature -- Element change
 			window_bound: position <= old position + Window_ahead
 			forward_bias: position < old position implies last_alignment.anchor_count >= Backward_evidence
 			stop_words_inert: last_alignment.anchor_count = 0 implies position = old position
-			jump_evidence: (position - old position) > Small_jump implies
-					last_alignment.anchor_count >= required_anchors (position - old position)
+			jump_evidence: position > old position and then spoken_distance (old position, position) > Small_jump implies
+					last_alignment.anchor_count >= required_anchors (spoken_distance (old position, position))
 			confidence_range: confidence >= 0.0 and confidence <= 1.0
 			alignment_consistent: last_alignment.word_index = position
 		end
@@ -224,7 +254,8 @@ feature {NONE} -- Alignment
 		end
 
 	recent_words: ARRAYED_LIST [STRING_32]
-			-- Spoken words heard since the last reanchor, newest last (overlapping windows deduplicated by time).
+			-- Spoken words heard since the last reanchor, newest last (overlapping windows deduplicated
+			-- by word overlap, else by time).
 
 	last_buffered_t0: REAL_64
 			-- Absolute start time of the newest buffered word (-1 = none).
@@ -233,16 +264,34 @@ feature {NONE} -- Alignment
 			-- Add the spoken words of `a_heard' not already buffered (overlapping windows re-decode
 			-- the same words; non-speech tags such as *cough* or [BLANK_AUDIO] are dropped). Words
 			-- accumulate across windows so that slow speech still gives enough evidence.
+			-- Live windows re-stamp the same words up to a second apart (a word cut at a window's
+			-- start is stamped at the start), so time alone re-buffered "this is a test of simple"
+			-- again and again (live replay, 2026-10-06). The newest words of the window that repeat
+			-- the end of the buffer, word for word, mark where the new words begin; time decides
+			-- only when no such overlap exists.
 		local
-			i: INTEGER
-			l_abs: REAL_64
+			l_words: ARRAYED_LIST [STRING_32]
+			l_starts: ARRAYED_LIST [REAL_64]
+			i, l_after: INTEGER
+			l_floor: REAL_64
 		do
+				-- Only words buffered from EARLIER windows count as possible duplicates: two words of
+				-- one window may start under Duplicate_gap apart ("I keep", live replay).
+			l_floor := last_buffered_t0 + Duplicate_gap
+			create l_words.make (a_heard.count)
+			create l_starts.make (a_heard.count)
 			from i := 1 until i > a_heard.count loop
-				l_abs := a_heard.window_start / 16_000 + a_heard.word (i).t0
-				if l_abs > last_buffered_t0 + Duplicate_gap and then not a_heard.word (i).normalized.is_empty
-					and then not is_non_speech (a_heard.word (i).text) then
-					recent_words.extend (a_heard.word (i).normalized)
-					last_buffered_t0 := l_abs
+				if not a_heard.word (i).normalized.is_empty and then not is_non_speech (a_heard.word (i).text) then
+					l_words.extend (a_heard.word (i).normalized)
+					l_starts.extend (a_heard.window_start / 16_000 + a_heard.word (i).t0)
+				end
+				i := i + 1
+			end
+			l_after := overlap_end (l_words, l_starts)
+			from i := 1 until i > l_words.count loop
+				if (l_after > 0 and i > l_after) or else (l_after = 0 and l_starts [i] > l_floor) then
+					recent_words.extend (l_words [i])
+					last_buffered_t0 := last_buffered_t0.max (l_starts [i])
 				end
 				i := i + 1
 			end
@@ -253,6 +302,38 @@ feature {NONE} -- Alignment
 		ensure
 			bounded: recent_words.count <= Recent_heard * 2
 			never_older: last_buffered_t0 >= old last_buffered_t0
+		end
+
+	Overlap_slack: REAL_64 = 0.6
+			-- A window word can repeat a buffered word only if it starts no later than this after
+			-- the newest buffered word (later words are new speech, e.g. a restarted sentence).
+
+	overlap_end (a_words: ARRAYED_LIST [STRING_32]; a_starts: ARRAYED_LIST [REAL_64]): INTEGER
+			-- Index of the newest word in `a_words' that ends a run repeating the end of the buffer
+			-- (two or more words, or one content word); 0 when there is none.
+		require
+			parallel: a_words.count = a_starts.count
+		local
+			j, m: INTEGER
+		do
+			from j := 1 until j > a_words.count loop
+				if a_starts [j] <= last_buffered_t0 + Overlap_slack then
+					from
+						m := 0
+					until
+						m >= j or m >= recent_words.count
+							or else not a_words [j - m].same_string (recent_words [recent_words.count - m])
+					loop
+						m := m + 1
+					end
+					if m >= 2 or (m = 1 and not matcher_stop (recent_words.last)) then
+						Result := j
+					end
+				end
+				j := j + 1
+			end
+		ensure
+			in_range: Result >= 0 and Result <= a_words.count
 		end
 
 	recent_tail: ARRAYED_LIST [STRING_32]

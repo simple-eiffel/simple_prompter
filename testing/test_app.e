@@ -40,6 +40,8 @@ feature {NONE} -- Initialization
 			run_coverage_take_tests
 			run_coverage_core_tests
 			run_pill_tests
+			run_heard_stabilizer_tests
+			run_live_alignment_tests
 			say ("%N========================%N")
 			say ("Results: " + passed.out + " passed, " + failed.out + " failed%N")
 			if failed > 0 then
@@ -367,6 +369,33 @@ feature {NONE} -- Test sets
 			run_test (agent t.test_hold_never_offers_a_cue, "hold_never_offers_a_cue")
 			run_test (agent t.test_pill_position_survives_a_restart, "pill_position_survives_a_restart")
 			run_test (agent t.test_all_bindings_lists_every_binding, "all_bindings_lists_every_binding")
+		end
+
+	run_heard_stabilizer_tests
+		local
+			t: TEST_HEARD_STABILIZER
+		do
+			section ("Heard stabilizer (live local agreement)")
+			create t
+			run_test (agent t.test_first_decode_trusts_nothing, "first_decode_trusts_nothing")
+			run_test (agent t.test_agreed_words_pass, "agreed_words_pass")
+			run_test (agent t.test_invented_tail_is_dropped, "invented_tail_is_dropped")
+			run_test (agent t.test_disagreeing_words_are_dropped, "disagreeing_words_are_dropped")
+			run_test (agent t.test_same_word_far_away_is_not_agreement, "same_word_far_away_is_not_agreement")
+			run_test (agent t.test_reset_forgets, "reset_forgets")
+			run_test (agent t.test_constants, "constants")
+		end
+
+	run_live_alignment_tests
+		local
+			t: TEST_LIVE_ALIGNMENT
+		do
+			section ("Aligner fixes from the live replay")
+			create t
+			run_test (agent t.test_spoken_distance_skips_cues, "spoken_distance_skips_cues")
+			run_test (agent t.test_cue_is_not_a_jump, "cue_is_not_a_jump")
+			run_test (agent t.test_close_words_of_one_window_all_count, "close_words_of_one_window_all_count")
+			run_test (agent t.test_restamped_words_are_not_buffered_twice, "restamped_words_are_not_buffered_twice")
 		end
 
 feature {NONE} -- Implementation

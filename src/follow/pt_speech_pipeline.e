@@ -3,7 +3,8 @@ note
 		Pure speech scheduling (approved intent Q9). Fed 16 kHz mono samples (from
 		the ffmpeg tee file), it emits one PT_VOICE_FRAME per 512 samples and,
 		while speech is recent, decodes the last Window_samples every Step_samples
-		with the already-read prompt, emitting PT_HEARD_WORDS. The sample count
+		with the already-read prompt, emitting as PT_HEARD_WORDS only the words two
+		consecutive decodes agree on (PT_HEARD_STABILIZER). The sample count
 		is the recording clock. The SCOOP worker (speech/ cluster) only owns the
 		processor and the blocking externals behind PT_VAD and PT_DECODER.
 	]"
@@ -32,6 +33,7 @@ feature {NONE} -- Initialization
 			frames_since_speech := Hangover_frames + 1
 			create pending_frame_list.make (16)
 			create pending_heard_list.make (2)
+			create stabilizer.make
 		ensure
 			vad_set: vad = a_vad
 			decoder_set: decoder = a_decoder
@@ -238,8 +240,12 @@ feature {NONE} -- Implementation
 				l_window [j] := ring [(l_first + j) \\ Window_samples]
 				j := j + 1
 			end
-			pending_heard_list.extend (decoder.decode (l_window, ring_fill, samples_seen - ring_fill, prompt))
+			stabilizer.accept (decoder.decode (l_window, ring_fill, samples_seen - ring_fill, prompt))
+			pending_heard_list.extend (stabilizer.last_stable)
 		end
+
+	stabilizer: PT_HEARD_STABILIZER
+			-- Passes on only the words two consecutive decodes agree on.
 
 	pending_frame_list: ARRAYED_LIST [PT_VOICE_FRAME]
 	pending_heard_list: ARRAYED_LIST [PT_HEARD_WORDS]

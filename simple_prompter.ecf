@@ -42,6 +42,9 @@
 		<library name="simple_widgets" location="$SIMPLE_EIFFEL/simple_widgets/simple_widgets.ecf"/>
 		<library name="simple_cairo" location="$SIMPLE_EIFFEL/simple_cairo/simple_cairo.ecf"/>
 		<library name="simple_shell" location="$SIMPLE_EIFFEL/simple_shell/simple_shell.ecf"/>
+		<library name="simple_process" location="$SIMPLE_EIFFEL/simple_process/simple_process.ecf"/>
+		<library name="simple_speech_gpu" location="$SIMPLE_EIFFEL/simple_speech/gpu/simple_speech_gpu.ecf"/>
+		<cluster name="speech" location=".\speech\" recursive="true"/>
 		<cluster name="app" location=".\app\" recursive="true"/>
 		<cluster name="runtime" location=".\runtime\" recursive="true"/>
 	</target>
@@ -63,5 +66,22 @@
 				<exclude>/fixtures$</exclude>
 			</file_rule>
 		</cluster>
+	</target>
+
+	<!-- Plan Steps 2+3 verification: the live speech path (real Silero + GPU whisper,
+	     tail source, pipeline, facade in Tracking mode) replayed on a real recording.
+	     Needs the CUDA whisper DLLs beside the exe; kept out of the headless tests. -->
+	<target name="simple_prompter_live_tests" extends="simple_prompter">
+		<root class="LIVE_TEST_APP" feature="make"/>
+		<setting name="console_application" value="true"/>
+		<option warning="warning">
+			<assertions precondition="true" postcondition="true" check="true" invariant="true" loop="true" supplier_precondition="true"/>
+		</option>
+		<library name="testing" location="$ISE_LIBRARY\library\testing\testing.ecf"/>
+		<library name="simple_testing" location="$SIMPLE_EIFFEL\simple_testing\simple_testing.ecf"/>
+		<library name="simple_process" location="$SIMPLE_EIFFEL/simple_process/simple_process.ecf"/>
+		<library name="simple_speech_gpu" location="$SIMPLE_EIFFEL/simple_speech/gpu/simple_speech_gpu.ecf"/>
+		<cluster name="speech" location=".\speech\" recursive="true"/>
+		<cluster name="live_tests" location=".\testing_live\" recursive="true"/>
 	</target>
 </system>

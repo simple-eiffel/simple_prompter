@@ -40,3 +40,11 @@ testing/fixtures/larry_read_01.wav
 
 # Built installers (rebuild with installeruild_installer.cmd)
 installer/output/
+# Larry's voice recordings stay local (never public)
+testing/fixtures/*.m4a
+testing/fixtures/*.wav
+testing/fixtures/*.mp3
+samples/*.m4a
+samples/*.wav
+samples/*.mp3
+testing/fixtures/larry_sermon_01*

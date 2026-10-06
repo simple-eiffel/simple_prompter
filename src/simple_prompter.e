@@ -235,6 +235,26 @@ feature -- Script
 			idle: controller.state = {PT_TAKE_STATE}.Idle
 		end
 
+	set_mode (a_mode: INTEGER)
+			-- Follow in `a_mode' from now on. With a script loaded (idle), its current text is
+			-- reloaded so a follower of the new mode takes over from the start.
+		require
+			known: a_mode >= {PT_FOLLOW_MODE}.Constant and a_mode <= {PT_FOLLOW_MODE}.Tracking
+			idle: not has_script or else controller.state = {PT_TAKE_STATE}.Idle
+		local
+			l_title, l_text: STRING_32
+		do
+			mode := a_mode
+			if has_script then
+				l_title := history.current_revision.title.twin
+				l_text := history.current_revision.source_text.twin
+				load_script_text (l_title, l_text)
+			end
+		ensure
+			set: mode = a_mode
+			still_loaded: old has_script implies has_script
+		end
+
 feature -- Following
 
 	feed_voice (a_frame: PT_VOICE_FRAME)

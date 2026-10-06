@@ -5,6 +5,10 @@ note
 		anchored alignment it coasts at the measured rate for at most Coast_limit
 		seconds, then holds still (ad-libs don't drag the script). Before the
 		first alignment it behaves like voice-gated at the fallback speed.
+		In a pause shortly after an anchor it closes the gap to the word last
+		said, never beyond it: the measured rate includes pauses, so a follower
+		that only moved while sound was heard fell further behind every sentence
+		(live replay of larry_read_01, 2026-10-06).
 	]"
 	author: "Larry Rix"
 
@@ -42,7 +46,10 @@ feature -- Constants
 
 	Coast_limit: REAL_64 = 1.5
 	Min_rate: REAL_64 = 1.0
-	Max_rate_factor: REAL_64 = 1.6
+	Max_rate_factor: REAL_64 = 3.0
+			-- Headroom to catch up (1.6 in spec 07 left the live follower 10-80 words behind).
+	Snap_lag: INTEGER = 8
+			-- Words behind a fresh anchor (about a line) beyond which the follower jumps instead of steering.
 	Steer_gain: REAL_64 = 1.5
 			-- Extra words per second per word of lag behind the aligned word.
 
@@ -91,17 +98,33 @@ feature -- Motion
 		do
 			caret_changed := False
 			seconds_since_anchor := seconds_since_anchor + a_dt_s
-			if is_held or not is_speaking then
+			if is_held then
 				velocity := 0
+			elseif has_alignment and seconds_since_anchor > Coast_limit then
+				velocity := 0
+			elseif not is_speaking then
+				if has_alignment then
+						-- A pause: catch up to the word last said, never past it.
+					velocity := (Steer_gain * (aligned_word - target)).max (0.0).min (rate_cap)
+				else
+					velocity := 0
+				end
 			elseif not has_alignment then
 				velocity := fallback_rate.min (rate_cap)
-			elseif seconds_since_anchor > Coast_limit then
-				velocity := 0
 			else
 				velocity := (measured_rate + Steer_gain * (aligned_word - target)).max (0.0).min (rate_cap)
 			end
+			if not is_held and has_alignment and seconds_since_anchor <= Coast_limit and aligned_word - target > Snap_lag then
+					-- More than a line behind a fresh anchor (a skipped paragraph, a late start):
+					-- jump to the reader; the scroll's spring turns the jump into a quick glide.
+				target := aligned_word.to_double.min (word_count)
+			end
 			if not is_held then
-				target := (target + velocity * a_dt_s).min (word_count)
+				if is_speaking then
+					target := (target + velocity * a_dt_s).min (word_count)
+				else
+					target := (target + velocity * a_dt_s).min (aligned_word.to_double.max (target)).min (word_count)
+				end
 			end
 		ensure then
 			coast_limited: (has_alignment and seconds_since_anchor > Coast_limit) implies velocity = 0

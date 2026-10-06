@@ -1,10 +1,13 @@
 note
 	description: "[
-		simple_prompter, plan Step 1: the pill at constant speed. A small control
-		window (state, speed, keys) owns the event pump; the pill is a
-		capture-excluded panel under the webcam. The 16 ms tick finishes the
-		count-in, advances the follower and the smoothed scroll, and repaints
-		the pill when anything it shows has changed.
+		simple_prompter, plan Steps 1-3: the pill follows your voice. A small
+		control window (state, follow mode, speech, keys) owns the event pump; the
+		pill is a capture-excluded panel under the webcam. Speech runs on its own
+		processor (PT_SPEECH_WORKER: Silero + whisper on the GPU, ffmpeg on the
+		microphone); the 16 ms tick takes what it heard from the slot, feeds the
+		facade while reading, keeps the recording clock and the already-read
+		prompt current, finishes the count-in, advances the follower and the
+		smoothed scroll, and repaints the pill when anything it shows has changed.
 
 		Usage: simple_prompter_app [script.md|script.txt] [--capturable]
 		(no script: the read test from the project fixtures, if present;
@@ -38,7 +41,7 @@ feature {NONE} -- Initialization
 			create clock.make
 			create measure.make (theme, settings.font_size)
 			create prompter.make_with_settings (settings)
-			prompter := prompter.with_mode ({PT_FOLLOW_MODE}.Constant).with_speed_wpm (settings.speed_wpm)
+			prompter := prompter.with_mode (settings.follow_mode).with_speed_wpm (settings.speed_wpm)
 				.with_clock (clock).with_measure (measure, settings.column_width * theme.text_scale)
 			load_script
 			prompter.controller.set_count_in (settings.count_in_seconds)
@@ -47,6 +50,11 @@ feature {NONE} -- Initialization
 				pill.make_capturable
 			end
 			create router.make (prompter, pill, settings)
+			create codec.make
+			create incoming.make (4096)
+			create speech_status.make_from_string ({STRING_32} "loading the speech models")
+			create mode_note.make_empty
+			create speech_slot.make
 			geometry := new_geometry
 			create status_canvas.make (Window_height * theme.text_scale)
 			l_title := {STRING_32} "simple_prompter"
@@ -57,23 +65,26 @@ feature {NONE} -- Initialization
 			status_canvas.set_on_press (agent on_status_press)
 			status_canvas.set_on_files (agent on_files)
 			router.set_on_open (agent choose_script)
+			router.set_on_mode (agent switch_mode)
+			start_speech
 			window.set_root (status_canvas)
 			window.set_on_shell_event (agent on_shell_event)
 			window.set_on_tick (agent on_heartbeat)
 			window.run
 				-- The window closed: give everything back.
+			stop_speech
 			router.release_all
 			pill.close
 		end
 
 feature -- Constants
 
-	Version: STRING_32 = "0.1.0"
+	Version: STRING_32 = "0.2.0"
 			-- Shown in the control window; keep in step with installer/simple_prompter.iss.
 
 	Tick_ms: INTEGER = 16
 	Window_width: INTEGER = 520
-	Window_height: INTEGER = 460
+	Window_height: INTEGER = 560
 
 feature -- Access
 
@@ -156,6 +167,7 @@ feature {NONE} -- The clock
 		do
 			if is_started then
 				l_now := clock.now_ms
+				poll_speech (l_now)
 				l_state := prompter.controller.state
 				if l_state = {PT_TAKE_STATE}.Count_in and previous_state /= {PT_TAKE_STATE}.Count_in then
 					count_in_started_ms := l_now
@@ -273,6 +285,13 @@ feature {NONE} -- Pill content
 			else
 				create Result.make_empty
 			end
+			if prompter.mode /= {PT_FOLLOW_MODE}.Constant and speech_state /= {PT_SPEECH_SLOT}.Listening
+				and prompter.controller.state /= {PT_TAKE_STATE}.Idle then
+				if not Result.is_empty then
+					Result.append ({STRING_32} "  ")
+				end
+				Result.append ({STRING_32} "MIC OFF")
+			end
 			if pill.is_click_through then
 				if not Result.is_empty then
 					Result.append ({STRING_32} "  ")
@@ -289,6 +308,7 @@ feature {NONE} -- Control window
 			l_status: STRING_32
 		do
 			l_status := state_name + settings.speed_wpm.out + pill.is_shown.out + pill.is_click_through.out + pill.capture_note
+				+ prompter.mode.out + speech_status + mode_note
 			if not l_status.same_string (last_status) then
 				last_status := l_status
 				window.request_render
@@ -324,8 +344,20 @@ feature {NONE} -- Control window
 			p.set_color (theme.ink_muted)
 			p.text (a_x + open_button_x + open_button_width + 14 * k, a_y + open_button_y + 19 * k, {STRING_32} "or drop a .md / .txt file here")
 			l_y := l_y + open_button_height + 26 * k
-			p.text (a_x + 18 * k, l_y, {STRING_32} "State: " + state_name + {STRING_32} "    Speed: " + settings.speed_wpm.out + {STRING_32} " wpm (constant)")
+			p.text (a_x + 18 * k, l_y, {STRING_32} "State: " + state_name + {STRING_32} "    Follows: " + mode_name)
 			l_y := l_y + 22 * k
+			if speech_state = {PT_SPEECH_SLOT}.Failed then
+				p.set_color (theme.danger)
+			end
+			p.text (a_x + 18 * k, l_y, {STRING_32} "Speech: " + speech_status)
+			p.set_color (theme.ink_muted)
+			l_y := l_y + 22 * k
+			if not mode_note.is_empty then
+				p.set_color (theme.danger)
+				p.text (a_x + 18 * k, l_y, mode_note)
+				p.set_color (theme.ink_muted)
+				l_y := l_y + 22 * k
+			end
 			p.text (a_x + 18 * k, l_y, {STRING_32} "Pill: " + (if pill.is_shown then {STRING_32} "shown" else {STRING_32} "hidden" end)
 				+ {STRING_32} ", " + pill.capture_note
 				+ (if pill.is_click_through then {STRING_32} ", click-through" else {STRING_32} "" end))
@@ -371,6 +403,221 @@ feature {NONE} -- Control window
 			else
 				Result := {STRING_32} "wrapped"
 			end
+		end
+
+feature {NONE} -- Speech
+
+	speech_slot: separate PT_SPEECH_SLOT
+			-- Where the speech worker leaves what it heard.
+
+	codec: PT_SPEECH_CODEC
+	incoming: STRING_8
+			-- Records taken from the slot this tick.
+
+	speech_state: INTEGER
+			-- The worker's state as last seen (a PT_SPEECH_SLOT state; 0 before the worker runs).
+
+	speech_status: STRING_32
+			-- What the worker says it is doing.
+
+	speech_samples: INTEGER_64
+			-- Microphone samples the worker has consumed: the recording clock.
+
+	speech_stopped: BOOLEAN
+	speech_started: BOOLEAN
+	listen_asked: BOOLEAN
+	fell_back: BOOLEAN
+	prompt_at: INTEGER
+			-- Reader position the decoder's prompt was last built for.
+
+	mode_note: STRING_32
+			-- Why a mode switch did not happen, or that voice following is unavailable.
+
+	Model_name: STRING_32 = "ggml-large-v3-turbo-q5_0.bin"
+	Vad_name: STRING_32 = "ggml-silero-v6.2.0.bin"
+	Developer_models: STRING_32 = "D:\prod\simple_speech\models\"
+	Chocolatey_ffmpeg: STRING_32 = "C:\ProgramData\chocolatey\lib\ffmpeg\tools\ffmpeg\bin\ffmpeg.exe"
+
+	start_speech
+			-- Start the speech worker on its own processor; it loads the models there,
+			-- so the window opens at once.
+		local
+			l_model, l_vad, l_ffmpeg: STRING_32
+			l_worker: separate PT_SPEECH_WORKER
+		do
+			l_model := first_existing (<<program_folder + {STRING_32} "\models\" + Model_name, Developer_models + Model_name>>)
+			l_vad := first_existing (<<program_folder + {STRING_32} "\models\" + Vad_name, Developer_models + Vad_name>>)
+			l_ffmpeg := first_existing (<<program_folder + {STRING_32} "\ffmpeg.exe", Chocolatey_ffmpeg>>)
+			if l_ffmpeg.is_empty then
+				l_ffmpeg := {STRING_32} "ffmpeg.exe"
+			end
+			if l_model.is_empty or l_vad.is_empty then
+				speech_state := {PT_SPEECH_SLOT}.Failed
+				speech_status := {STRING_32} "the speech models were not found (" + Model_name + {STRING_32} ", " + Vad_name + {STRING_32} ")"
+			else
+				create l_worker.make (l_ffmpeg, settings.microphone_name, tee_path, l_model, l_vad)
+				launch (l_worker, speech_slot)
+				speech_started := True
+			end
+		end
+
+	poll_speech (a_now: REAL_64)
+			-- Take what the worker heard and feed it while reading; keep the recording clock
+			-- and the already-read prompt current; start the microphone once the models are ready.
+		local
+			l_voice, l_reading: BOOLEAN
+		do
+			if speech_started then
+				take_speech (speech_slot)
+				l_voice := prompter.mode /= {PT_FOLLOW_MODE}.Constant
+				l_reading := l_voice and prompter.controller.state = {PT_TAKE_STATE}.Reading
+				if not incoming.is_empty then
+					across incoming.split ('%N') as ic loop
+						if not ic.is_empty then
+							codec.decode (ic)
+							if l_reading then
+								if attached codec.last_frame as al_frame then
+									prompter.feed_voice (al_frame)
+								elseif attached codec.last_heard as al_heard then
+									prompter.feed_heard (al_heard)
+								end
+							end
+						end
+					end
+				end
+				if speech_samples * 4 > prompter.recording_clock.byte_count and a_now >= prompter.recording_clock.observed_at_ms then
+					prompter.recording_clock.observe_bytes (speech_samples * 4, a_now)
+				end
+				if l_reading and then prompter.controller.reader_position /= prompt_at then
+					prompt_at := prompter.controller.reader_position
+					send_prompt (speech_slot, prompter.prompt_text)
+				end
+				if l_voice and not listen_asked and speech_state = {PT_SPEECH_SLOT}.Ready then
+					ask_listen (speech_slot)
+					listen_asked := True
+				end
+			end
+			if speech_state = {PT_SPEECH_SLOT}.Failed and not fell_back and prompter.mode /= {PT_FOLLOW_MODE}.Constant
+				and prompter.controller.state = {PT_TAKE_STATE}.Idle then
+					-- No voice following: constant speed for now, so the pill still moves (not saved).
+				fell_back := True
+				apply_mode ({PT_FOLLOW_MODE}.Constant)
+				mode_note := {STRING_32} "Voice following is unavailable, so the text moves at a constant speed."
+			end
+		end
+
+	stop_speech
+			-- Ask the worker to stop (it stops ffmpeg and frees the GPU) and give it a moment.
+		local
+			l_waited: INTEGER
+		do
+			if speech_started then
+				ask_stop (speech_slot)
+				from
+					take_speech (speech_slot)
+				until
+					speech_stopped or l_waited >= 3_000
+				loop
+					(create {EXECUTION_ENVIRONMENT}).sleep (50_000_000)
+					l_waited := l_waited + 50
+					take_speech (speech_slot)
+				end
+			end
+		end
+
+	switch_mode
+			-- Ctrl+Alt+M: your voice <-> constant speed, while stopped.
+		do
+			if prompter.controller.state /= {PT_TAKE_STATE}.Idle then
+				mode_note := {STRING_32} "Stop first (Ctrl+Alt+P), then switch the follow mode (Ctrl+Alt+M)."
+			elseif prompter.mode = {PT_FOLLOW_MODE}.Constant then
+				settings.set_follow_mode ({PT_FOLLOW_MODE}.Tracking)
+				apply_mode ({PT_FOLLOW_MODE}.Tracking)
+				mode_note := {STRING_32} ""
+			else
+				settings.set_follow_mode ({PT_FOLLOW_MODE}.Constant)
+				apply_mode ({PT_FOLLOW_MODE}.Constant)
+				mode_note := {STRING_32} ""
+			end
+			window.request_render
+			on_tick
+		end
+
+	apply_mode (a_mode: INTEGER)
+			-- Follow in `a_mode' (the script reloads with a follower of that mode).
+		require
+			known: a_mode >= {PT_FOLLOW_MODE}.Constant and a_mode <= {PT_FOLLOW_MODE}.Tracking
+			idle: prompter.controller.state = {PT_TAKE_STATE}.Idle
+		do
+			prompter.set_mode (a_mode)
+			prompter.controller.set_count_in (settings.count_in_seconds)
+			geometry := new_geometry
+			previous_state := prompter.controller.state
+			prompt_at := 0
+			last_signature := -1
+			last_status := {STRING_32} ""
+		ensure
+			set: prompter.mode = a_mode
+		end
+
+	mode_name: STRING_32
+		do
+			inspect prompter.mode
+			when {PT_FOLLOW_MODE}.Constant then
+				Result := {STRING_32} "constant speed, " + settings.speed_wpm.out + {STRING_32} " wpm"
+			when {PT_FOLLOW_MODE}.Voice_gated then
+				Result := {STRING_32} "your voice (moves while you speak)"
+			else
+				Result := {STRING_32} "your voice, word by word"
+			end
+		end
+
+	tee_path: STRING_32
+			-- Where ffmpeg writes the microphone for the worker (removed when it stops).
+		do
+			if attached (create {EXECUTION_ENVIRONMENT}).temporary_directory_path as al_temp then
+				Result := al_temp.extended ("simple_prompter_live.f32").name
+			else
+				Result := program_folder + {STRING_32} "\simple_prompter_live.f32"
+			end
+		end
+
+feature {NONE} -- Speech: separate calls (each locks the slot for one short call)
+
+	launch (a_worker: separate PT_SPEECH_WORKER; a_slot: separate PT_SPEECH_SLOT)
+			-- Hand the worker its slot and start it; `run' proceeds on the worker's processor.
+		do
+			a_worker.attach_slot (a_slot)
+			a_worker.run
+		end
+
+	take_speech (a_slot: separate PT_SPEECH_SLOT)
+			-- Copy what is waiting into `incoming' and the worker's state into this processor.
+		do
+			incoming.wipe_out
+			if not a_slot.records.is_empty then
+				incoming.append (create {STRING_8}.make_from_separate (a_slot.records))
+				a_slot.clear_records
+			end
+			speech_state := a_slot.state
+			create speech_status.make_from_separate (a_slot.status_text)
+			speech_samples := a_slot.samples_heard
+			speech_stopped := a_slot.has_stopped
+		end
+
+	send_prompt (a_slot: separate PT_SPEECH_SLOT; a_text: STRING_32)
+		do
+			a_slot.set_prompt (a_text)
+		end
+
+	ask_listen (a_slot: separate PT_SPEECH_SLOT)
+		do
+			a_slot.request_listen
+		end
+
+	ask_stop (a_slot: separate PT_SPEECH_SLOT)
+		do
+			a_slot.request_stop
 		end
 
 feature {NONE} -- Setup
@@ -468,6 +715,6 @@ feature {NONE} -- Setup
 
 	Default_script: STRING_32 = "D:\prod\simple_prompter\testing\fixtures\read_test_01.md"
 
-	Sample_text: STRING_32 = "This is simple prompter. Press Control Alt P to start, and Control Alt Space to hold. The text scrolls at a steady speed for now; following your voice comes next."
+	Sample_text: STRING_32 = "This is simple prompter. Press Control Alt P to start, and Control Alt Space to hold. Read aloud and the text follows your voice."
 
 end
