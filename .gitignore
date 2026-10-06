@@ -37,3 +37,6 @@ testing/out/
 testing/fixtures/Recording.m4a
 testing/fixtures/larry_read_01.wav
 .eiffel-workflow/evidence/video_frames/
+
+# Built installers (rebuild with installeruild_installer.cmd)
+installer/output/

@@ -28,6 +28,7 @@ feature {NONE} -- Initialization
 		local
 			l_title: STRING_32
 		do
+			create last_status.make_empty
 			settings := new_settings
 			create desktop
 			desktop.become_dpi_aware
@@ -53,6 +54,9 @@ feature {NONE} -- Initialization
 				(Window_height * theme.text_scale).ceiling, theme)
 				-- Every attribute is set: only now may agents on Current be made (VEVI).
 			status_canvas.set_on_paint (agent paint_status)
+			status_canvas.set_on_press (agent on_status_press)
+			status_canvas.set_on_files (agent on_files)
+			router.set_on_open (agent choose_script)
 			window.set_root (status_canvas)
 			window.set_on_shell_event (agent on_shell_event)
 			window.set_on_tick (agent on_heartbeat)
@@ -63,6 +67,9 @@ feature {NONE} -- Initialization
 		end
 
 feature -- Constants
+
+	Version: STRING_32 = "0.1.0"
+			-- Shown in the control window; keep in step with installer/simple_prompter.iss.
 
 	Tick_ms: INTEGER = 16
 	Window_width: INTEGER = 520
@@ -173,6 +180,73 @@ feature {NONE} -- The clock
 			end
 		end
 
+feature {NONE} -- Opening scripts
+
+	choose_script
+			-- Ask for a script with the Open dialog and load it.
+		local
+			l_dialog: SHELL_FILE_DIALOG
+			l_dir: STRING_32
+		do
+			create l_dir.make_empty
+			if not settings.last_script.is_empty then
+				l_dir := (create {PATH}.make_from_string (settings.last_script)).parent.name
+			end
+			create l_dialog.make
+			l_dialog.choose_file ({STRING_32} "Open a script", {STRING_32} "Scripts (*.md, *.txt)|*.md;*.txt|All files|*.*", l_dir)
+			if l_dialog.has_choice then
+				open_script_file (l_dialog.chosen_path)
+			end
+		end
+
+	on_files (a_paths: ARRAYED_LIST [STRING_32])
+			-- Files dropped on the control window: open the first script among them.
+		local
+			l_done: BOOLEAN
+		do
+			across a_paths as ic until l_done loop
+				if ic.as_lower.ends_with ({STRING_32} ".md") or ic.as_lower.ends_with ({STRING_32} ".txt") then
+					open_script_file (ic)
+					l_done := True
+				end
+			end
+		end
+
+	on_status_press (a_x, a_y: REAL_64)
+			-- A click on the control window: the Open button opens a script.
+		do
+			if a_x >= open_button_x and a_x <= open_button_x + open_button_width
+				and a_y >= open_button_y and a_y <= open_button_y + open_button_height then
+				choose_script
+			end
+		end
+
+	open_script_file (a_path: READABLE_STRING_32)
+			-- Load `a_path' as the script, rewire the pill, and remember it.
+		do
+			if prompter.has_script and then prompter.controller.is_recording then
+				script_note := {STRING_32} "Cannot open a script while recording."
+			else
+				prompter.open_script (a_path)
+				if attached prompter.last_error as al_error and then not al_error.is_empty then
+					script_note := al_error.twin
+				else
+					prompter.controller.set_count_in (settings.count_in_seconds)
+					geometry := new_geometry
+					settings.set_last_script (a_path)
+					note_script (a_path)
+					previous_state := prompter.controller.state
+					last_signature := -1
+				end
+			end
+			last_status := {STRING_32} ""
+			window.request_render
+			on_tick
+		end
+
+	open_button_x, open_button_y, open_button_width, open_button_height: REAL_64
+			-- Where the Open button was last drawn (canvas coordinates).
+
 feature {NONE} -- Pill content
 
 	caret_shown: INTEGER
@@ -231,12 +305,25 @@ feature {NONE} -- Control window
 			l_y := a_y + 30 * k
 			p.font (p.Role_ui, 18, True)
 			p.set_color (theme.ink)
-			p.text (a_x + 18 * k, l_y, {STRING_32} "simple_prompter")
+			p.text (a_x + 18 * k, l_y, {STRING_32} "simple_prompter " + Version)
 			l_y := l_y + 28 * k
 			p.font (p.Role_ui, 13, False)
 			p.set_color (theme.ink_muted)
 			p.text (a_x + 18 * k, l_y, script_note)
-			l_y := l_y + 22 * k
+			l_y := l_y + 12 * k
+			open_button_x := 18 * k
+			open_button_y := l_y - a_y
+			open_button_width := 150 * k
+			open_button_height := 28 * k
+			p.set_color (theme.accent)
+			p.rrect_fill (a_x + open_button_x, a_y + open_button_y, open_button_width, open_button_height, 6 * k)
+			p.font (p.Role_ui, 13, True)
+			p.set_color (theme.background)
+			p.text (a_x + open_button_x + 14 * k, a_y + open_button_y + 19 * k, {STRING_32} "Open script...")
+			p.font (p.Role_ui, 13, False)
+			p.set_color (theme.ink_muted)
+			p.text (a_x + open_button_x + open_button_width + 14 * k, a_y + open_button_y + 19 * k, {STRING_32} "or drop a .md / .txt file here")
+			l_y := l_y + open_button_height + 26 * k
 			p.text (a_x + 18 * k, l_y, {STRING_32} "State: " + state_name + {STRING_32} "    Speed: " + settings.speed_wpm.out + {STRING_32} " wpm (constant)")
 			l_y := l_y + 22 * k
 			p.text (a_x + 18 * k, l_y, {STRING_32} "Pill: " + (if pill.is_shown then {STRING_32} "shown" else {STRING_32} "hidden" end)
@@ -311,23 +398,59 @@ feature {NONE} -- Setup
 		local
 			l_path: STRING_32
 		do
-			l_path := Default_script
+				-- The command line, else the script opened last, else the welcome
+				-- script installed beside the program, else the read test (developer
+				-- machine), else a built-in sample.
+			create l_path.make_empty
 			across 1 |..| argument_count as ic loop
 				if not argument (ic).starts_with ({STRING_32} "--") then
 					l_path := argument (ic)
 				end
 			end
-			if (create {SIMPLE_FILE}.make (l_path)).exists then
+			if l_path.is_empty or else not (create {SIMPLE_FILE}.make (l_path)).exists then
+				l_path := first_existing (<<settings.last_script, program_folder + {STRING_32} "\samples\Welcome to simple_prompter.md", Default_script>>)
+			end
+			if not l_path.is_empty then
 				prompter.open_script (l_path)
 			end
 			if prompter.has_script then
-				script_note := {STRING_32} "Script: " + l_path + {STRING_32} " (" + prompter.history.current_revision.word_count.out + {STRING_32} " words)"
+				note_script (l_path)
 			else
 				prompter.load_script_text ({STRING_32} "Sample", Sample_text)
-				script_note := {STRING_32} "Sample text (no script found at " + l_path + {STRING_32} ")"
+				script_note := {STRING_32} "Sample text. Open a script with the button below or Ctrl+Alt+O."
 			end
 		ensure
 			loaded: prompter.has_script
+		end
+
+	first_existing (a_paths: ARRAY [READABLE_STRING_32]): STRING_32
+			-- The first of `a_paths' that names an existing file, else empty.
+		do
+			create Result.make_empty
+			across a_paths as ic until not Result.is_empty loop
+				if not ic.is_empty and then (create {SIMPLE_FILE}.make (ic)).exists then
+					Result := ic.to_string_32
+				end
+			end
+		end
+
+	program_folder: STRING_32
+			-- Folder holding this program.
+		do
+			Result := (create {PATH}.make_from_string (command_name)).parent.name
+		end
+
+	note_script (a_path: READABLE_STRING_32)
+			-- Describe the loaded script for the control window.
+		require
+			loaded: prompter.has_script
+		do
+			if attached (create {PATH}.make_from_string (a_path)).entry as al_entry then
+				script_note := {STRING_32} "Script: " + al_entry.name
+			else
+				script_note := {STRING_32} "Script: " + a_path
+			end
+			script_note.append ({STRING_32} " (" + prompter.history.current_revision.word_count.out + {STRING_32} " words)")
 		end
 
 	has_flag (a_flag: READABLE_STRING_32): BOOLEAN

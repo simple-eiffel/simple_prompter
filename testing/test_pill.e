@@ -24,9 +24,10 @@ feature -- Geometry
 			assert_reals_equal ("first word inset", 12.0, g.word_x (1), 1.0e-9)
 			assert_reals_equal ("first word width", 40.0, g.word_width (1), 1.0e-9)
 			assert_reals_equal ("second word after one space", 62.0, g.word_x (2), 1.0e-9)
-				-- 12 padding + 30 reading line + 15 (half a line: the reading point is centred).
-			assert_reals_equal ("line 1 half a line below the reading row at offset 0", 57.0, g.line_top (1, 0.0), 1.0e-9)
-			assert_reals_equal ("line 2 one line lower", 87.0, g.line_top (2, 0.0), 1.0e-9)
+				-- 12 padding + 30 reading line; the reading point is centred half a line down,
+				-- and until the reader is half a line in the first line sits in the reading row.
+			assert_reals_equal ("line 1 in the reading row before reading", 42.0, g.line_top (1, 0.0), 1.0e-9)
+			assert_reals_equal ("line 2 one line lower", 72.0, g.line_top (2, 0.0), 1.0e-9)
 			assert_reals_equal ("scrolling moves lines up", 27.0, g.line_top (1, 30.0), 1.0e-9)
 			assert_reals_equal ("halfway through line 1 it fills the reading row", 42.0, g.line_top (1, 15.0), 1.0e-9)
 		end
@@ -113,8 +114,10 @@ feature -- Settings and keys
 			create s.make_with_file (l_path)
 			assert_false ("not placed yet", s.has_pill_position)
 			s.set_pill_position (-1200, 24)
+			s.set_last_script ({STRING_32} "C:\Scripts\Episode 12 - caf%/233/.md")
 			create s.make_with_file (l_path)
 			assert_true ("placed after reload", s.has_pill_position)
+			assert_true ("last script after reload (non-ASCII kept)", s.last_script.same_string ({STRING_32} "C:\Scripts\Episode 12 - caf%/233/.md"))
 			assert_integers_equal ("x", -1200, s.pill_x)
 			assert_integers_equal ("y", 24, s.pill_y)
 		end

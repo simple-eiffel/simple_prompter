@@ -8,7 +8,9 @@ note
 		starts `reading_line' pixels below the top of the text area, and the
 		scroll offset (PT_SCROLL_MODEL.y_offset) is the content y of the
 		reading point, placed half a line down that row - so the line being
-		read crosses the reading row centred halfway through it.
+		read crosses the reading row centred halfway through it. Until the
+		reader is half a line in, the first line simply sits in the reading
+		row (no half-empty pill before reading starts).
 		Pure: the GUI's painting and hit testing are tested headless.
 	]"
 	author: "Larry Rix"
@@ -86,9 +88,9 @@ feature -- Access
 		require
 			valid: a_line >= 1 and a_line <= layout.line_count
 		do
-			Result := padding + reading_line + layout.line_height / 2 + layout.line (a_line).y - a_offset
+			Result := padding + reading_line + layout.line_height / 2 + layout.line (a_line).y - a_offset.max (layout.line_height / 2)
 		ensure
-			definition: Result = padding + reading_line + layout.line_height / 2 + layout.line (a_line).y - a_offset
+			definition: Result = padding + reading_line + layout.line_height / 2 + layout.line (a_line).y - a_offset.max (layout.line_height / 2)
 		end
 
 	word_at (a_x, a_y, a_offset: REAL_64): INTEGER

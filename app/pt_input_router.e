@@ -38,6 +38,8 @@ feature -- Constants
 
 	Speed_up_id: INTEGER = 100
 	Speed_down_id: INTEGER = 101
+	Open_id: INTEGER = 102
+	Vk_o: INTEGER = 0x4F
 	Speed_step: INTEGER = 10
 			-- Words per minute per press.
 
@@ -79,7 +81,19 @@ feature -- Commands
 			end
 			claim (Speed_up_id, hotkeys.Mod_control | hotkeys.Mod_alt, Vk_up, 0, {STRING_32} "faster")
 			claim (Speed_down_id, hotkeys.Mod_control | hotkeys.Mod_alt, Vk_down, 0, {STRING_32} "slower")
+			claim (Open_id, hotkeys.Mod_control | hotkeys.Mod_alt, Vk_o, 0, {STRING_32} "open a script")
 		end
+
+	set_on_open (a_action: PROCEDURE)
+			-- What Ctrl+Alt+O does.
+		do
+			on_open := a_action
+		ensure
+			set: on_open = a_action
+		end
+
+	on_open: detachable PROCEDURE
+			-- Called for the open-a-script hotkey.
 
 	release_all
 		do
@@ -93,6 +107,10 @@ feature -- Commands
 				change_speed (Speed_step)
 			elseif a_id = Speed_down_id then
 				change_speed (-Speed_step)
+			elseif a_id = Open_id then
+				if attached on_open as al_open then
+					al_open.call (Void)
+				end
 			elseif controls.has (a_id) then
 				on_control (controls [a_id])
 			end

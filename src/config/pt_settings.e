@@ -180,6 +180,7 @@ feature {NONE} -- Implementation
 					.with_string ("sessions_root", sessions_root).with_string ("camera", camera_name)
 					.with_string ("microphone", microphone_name).with_boolean ("tracking_proven", is_tracking_proven)
 					.with_boolean ("pill_placed", has_pill_position).with_integer ("pill_x", pill_x).with_integer ("pill_y", pill_y)
+					.with_string ("last_script", last_script)
 				create l_root.make
 				l_root := l_root.with_table ("prompter", l_table)
 					-- simple_toml.save_file narrows to STRING_8 (lossy); write UTF-8 through simple_file instead.
@@ -187,6 +188,24 @@ feature {NONE} -- Implementation
 			end
 		ensure
 			counted: save_count = old save_count + 1
+		end
+
+feature -- Script
+
+	last_script: STRING_32
+			-- Path of the script opened last (empty: none yet).
+		attribute
+			create Result.make_empty
+		end
+
+	set_last_script (a_path: READABLE_STRING_32)
+			-- Remember `a_path' as the script to reopen at the next start.
+		do
+			last_script := a_path.to_string_32
+			save
+		ensure
+			set: last_script.same_string (a_path)
+			saved: save_count = old save_count + 1
 		end
 
 feature -- Pill placement
@@ -322,6 +341,9 @@ feature {NONE} -- Loading
 			end
 			if t.has ("tracking_proven") then
 				is_tracking_proven := t.boolean_item ("tracking_proven")
+			end
+			if attached t.string_item ("last_script") as al_s then
+				last_script := al_s
 			end
 			if t.has ("pill_placed") and then t.boolean_item ("pill_placed") and then t.has ("pill_x") and then t.has ("pill_y")
 				and then in_range (t.integer_item ("pill_x"), -100_000, 100_000) and then in_range (t.integer_item ("pill_y"), -100_000, 100_000) then
