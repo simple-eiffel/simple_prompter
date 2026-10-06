@@ -26,7 +26,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - A script path with non-ASCII characters was lost from the settings (a
   simple_toml escaping bug, fixed there).
 
-### Added
+### Added (library core)
 - Library core (Eiffel Spec Kit phases 0-5): script model with stable word ids and live edits;
   constant, voice-gated and tracking followers; forward-only aligner with equivalence classes
   (homophones, spoken abbreviations, number words, compounds, sound-alikes); speech pipeline;
