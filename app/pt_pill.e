@@ -3,7 +3,9 @@ note
 		The pill: a capture-excluded SHELL_PANEL just below the webcam, painted
 		by PT_PILL_RENDERER. It sits at the top centre of the primary monitor
 		until the reader Shift+drags it; where it was dropped is remembered in
-		the settings. Hide and click-through are toggles the hotkeys reach.
+		the settings. Shift+drag on an edge or corner sizes it: the height snaps
+		to whole lines and the width becomes the text column, both remembered.
+		Hide and click-through are toggles the hotkeys reach.
 	]"
 	author: "Larry Rix"
 
@@ -34,6 +36,9 @@ feature -- Constants
 
 	Top_gap: INTEGER = 6
 			-- Pixels between the monitor's top edge (where the webcam sits) and the pill.
+
+	Design_grip: REAL_64 = 10.0
+			-- How near an edge (design pixels) a Shift+drag sizes instead of moving.
 
 feature -- Access
 
@@ -144,6 +149,9 @@ feature -- Lifecycle
 				end
 				panel.set_opacity (settings.opacity.max (40))
 				panel.set_draggable (True)
+				panel.set_resizable ((Design_grip * scale).rounded.max (1).min (64),
+					(settings.Min_width * scale + 2 * padding).ceiling,
+					(measure.line_height + 2 * padding).ceiling)
 				panel.show (l_x, l_y, width, height)
 			end
 		end
@@ -178,12 +186,55 @@ feature -- Commands
 		end
 
 	remember_position (a_x, a_y: INTEGER)
-			-- The reader dropped the pill at (`a_x', `a_y').
+			-- The reader dropped the pill at (`a_x', `a_y'). The window is already there:
+			-- read its geometry back (a resize may have changed its size too).
 		do
 			if panel.is_open then
-				panel.place (a_x, a_y, panel.width, panel.height)
+				panel.sync_geometry
 			end
 			settings.set_pill_position (a_x, a_y)
+		end
+
+	apply_resize (a_width, a_height: INTEGER)
+			-- The reader sized the pill to `a_width' x `a_height': keep whole lines and the
+			-- text column that fit, remember both, and snap the pill to exactly that.
+		require
+			sane: a_width > 0 and a_height > 0
+		local
+			l_lines, l_column: INTEGER
+		do
+			l_lines := ((a_height - 2 * padding) / measure.line_height).rounded
+				.max (settings.Min_lines).min (settings.Max_lines)
+			l_column := ((a_width - 2 * padding) / scale).rounded
+				.max (settings.Min_width).min (settings.Max_width)
+			if l_lines /= settings.lines_visible then
+				settings.set_lines_visible (l_lines)
+			end
+			if l_column /= settings.column_width then
+				settings.set_column_width (l_column)
+			end
+			if panel.is_open then
+				panel.sync_geometry
+				panel.place (panel.x, panel.y, width, height)
+				settings.set_pill_position (panel.x, panel.y)
+			end
+		ensure
+			lines_in_range: settings.lines_visible >= settings.Min_lines and settings.lines_visible <= settings.Max_lines
+			column_in_range: settings.column_width >= settings.Min_width and settings.column_width <= settings.Max_width
+		end
+
+	set_shows_grips (a_on: BOOLEAN)
+			-- Show the resize grips (the app turns them on while Shift is held).
+		do
+			renderer.set_shows_grips (a_on)
+		ensure
+			set: renderer.shows_grips = a_on
+		end
+
+	is_shift_held: BOOLEAN
+			-- Is Shift down (so a drag on the pill moves or sizes it)?
+		do
+			Result := panel.is_shift_held
 		end
 
 	paint (a_prompter: SIMPLE_PROMPTER; a_geometry: PT_PILL_GEOMETRY; a_caret: INTEGER; a_badge: READABLE_STRING_32)

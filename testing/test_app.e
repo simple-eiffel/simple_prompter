@@ -396,6 +396,7 @@ feature {NONE} -- Test sets
 			run_test (agent t.test_cue_is_not_a_jump, "cue_is_not_a_jump")
 			run_test (agent t.test_close_words_of_one_window_all_count, "close_words_of_one_window_all_count")
 			run_test (agent t.test_restamped_words_are_not_buffered_twice, "restamped_words_are_not_buffered_twice")
+			run_test (agent t.test_column_width_relays_out_in_place, "column_width_relays_out_in_place")
 		end
 
 feature {NONE} -- Implementation

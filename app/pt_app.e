@@ -79,7 +79,7 @@ feature {NONE} -- Initialization
 
 feature -- Constants
 
-	Version: STRING_32 = "0.2.0"
+	Version: STRING_32 = "0.2.1"
 			-- Shown in the control window; keep in step with installer/simple_prompter.iss.
 
 	Tick_ms: INTEGER = 16
@@ -151,6 +151,8 @@ feature {NONE} -- The clock
 				on_tick
 			when {SHELL_PANEL}.Event_moved then
 				pill.remember_position (a_a, a_b)
+			when {SHELL_PANEL}.Event_resized then
+				on_pill_resized (a_a, a_b)
 			when {SHELL_PANEL}.Event_expose then
 				last_signature := -1
 				on_tick
@@ -180,6 +182,11 @@ feature {NONE} -- The clock
 					previous_state := prompter.controller.state
 				end
 				prompter.tick (l_now)
+				if pill.is_shift_held /= grips_shown then
+					grips_shown := not grips_shown
+					pill.set_shows_grips (grips_shown)
+					last_signature := -1
+				end
 				l_signature := (prompter.scroll.position * 64).rounded.to_integer_64 * 1000
 					+ prompter.controller.state * 100 + badge.count + caret_shown
 				if pill.is_click_through then
@@ -380,7 +387,9 @@ feature {NONE} -- Control window
 			l_y := l_y + 20 * k
 			p.text (a_x + 30 * k, l_y, {STRING_32} "click: hold    held: click a word to start there")
 			l_y := l_y + 20 * k
-			p.text (a_x + 30 * k, l_y, {STRING_32} "right-click: go    wheel: back / forward    Shift+drag: move")
+			p.text (a_x + 30 * k, l_y, {STRING_32} "right-click: go    wheel: back / forward")
+			l_y := l_y + 20 * k
+			p.text (a_x + 30 * k, l_y, {STRING_32} "hold Shift: drag to move, drag an edge or corner to size")
 			across router.refused as ic loop
 				l_y := l_y + 22 * k
 				p.set_color (theme.danger)
@@ -402,6 +411,24 @@ feature {NONE} -- Control window
 			when {PT_TAKE_STATE}.Analyzing then Result := {STRING_32} "analyzing"
 			else
 				Result := {STRING_32} "wrapped"
+			end
+		end
+
+feature {NONE} -- Pill size
+
+	grips_shown: BOOLEAN
+			-- Are the pill's resize grips drawn (Shift held)?
+
+	on_pill_resized (a_width, a_height: INTEGER)
+			-- The reader finished a Shift+drag: snap the pill to whole lines and lay the script
+			-- out again at the new column width.
+		do
+			if a_width > 0 and a_height > 0 then
+				pill.apply_resize (a_width, a_height)
+				prompter.set_column_width (pill.column_width)
+				geometry := new_geometry
+				last_signature := -1
+				on_tick
 			end
 		end
 

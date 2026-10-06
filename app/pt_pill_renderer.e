@@ -41,6 +41,18 @@ feature -- Access
 	theme: SW_THEME
 	font_size: REAL_64
 
+	shows_grips: BOOLEAN
+			-- Draw the resize grips (while Shift is held)?
+
+feature -- Settings
+
+	set_shows_grips (a_on: BOOLEAN)
+		do
+			shows_grips := a_on
+		ensure
+			set: shows_grips = a_on
+		end
+
 feature -- Rendering
 
 	render (a_dc: POINTER; a_width, a_height: INTEGER; a_prompter: SIMPLE_PROMPTER; a_geometry: PT_PILL_GEOMETRY;
@@ -134,6 +146,37 @@ feature {NONE} -- Painting
 				p.set_color (Badge_ink)
 				p.text (a_width - p.advance (a_badge) - 14 * k, 18 * k, a_badge)
 			end
+			if shows_grips then
+				grips (p, a_width, a_height, k)
+			end
+		end
+
+	grips (p: SW_PAINTER; a_width, a_height: INTEGER; k: REAL_64)
+			-- A frame and short bars at the edge midpoints and corners: drag them (with Shift)
+			-- to size the pill, drag anywhere else to move it.
+		local
+			w, h, l_bar, l_t: REAL_64
+		do
+			w := a_width
+			h := a_height
+			l_bar := 18 * k
+			l_t := 3 * k
+			p.set_color_alpha (Accent, 0.55)
+			p.set_line_width (1.5 * k)
+			p.rrect_stroke (1 * k, 1 * k, w - 2 * k, h - 2 * k, 10 * k)
+			p.set_color (Accent)
+			p.line (w / 2 - l_bar, l_t, w / 2 + l_bar, l_t, l_t)
+			p.line (w / 2 - l_bar, h - l_t, w / 2 + l_bar, h - l_t, l_t)
+			p.line (l_t, h / 2 - l_bar, l_t, h / 2 + l_bar, l_t)
+			p.line (w - l_t, h / 2 - l_bar, w - l_t, h / 2 + l_bar, l_t)
+			p.line (l_t, l_t, l_t + l_bar, l_t, l_t)
+			p.line (l_t, l_t, l_t, l_t + l_bar, l_t)
+			p.line (w - l_t, l_t, w - l_t - l_bar, l_t, l_t)
+			p.line (w - l_t, l_t, w - l_t, l_t + l_bar, l_t)
+			p.line (l_t, h - l_t, l_t + l_bar, h - l_t, l_t)
+			p.line (l_t, h - l_t, l_t, h - l_t - l_bar, l_t)
+			p.line (w - l_t, h - l_t, w - l_t - l_bar, h - l_t, l_t)
+			p.line (w - l_t, h - l_t, w - l_t, h - l_t - l_bar, l_t)
 		end
 
 	fade (p: SW_PAINTER; a_top, a_bottom: REAL_64; a_opaque_at_top: BOOLEAN; a_width: INTEGER)

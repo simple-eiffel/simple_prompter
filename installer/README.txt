@@ -1,4 +1,4 @@
-simple_prompter 0.2.0
+simple_prompter 0.2.1
 =====================
 
 A teleprompter that sits under your webcam and follows your voice: read
@@ -34,7 +34,10 @@ Keys (work in any program)
 
 Mouse on the pill
   click: hold. While held: click a word to start there, the wheel steps back
-  and forward, right-click goes. Shift+drag moves the pill (remembered).
+  and forward, right-click goes.
+  Hold Shift and the pill shows its grips: drag the middle to move it, drag
+  an edge or corner to size it. The height snaps to whole lines (1 to 12);
+  the width sets the text column. Position and size are remembered.
 
 Following your voice
   The control window shows "Speech:" - loading (a few seconds at start),

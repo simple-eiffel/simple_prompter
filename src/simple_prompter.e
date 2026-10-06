@@ -255,6 +255,23 @@ feature -- Script
 			still_loaded: old has_script implies has_script
 		end
 
+feature -- Layout
+
+	set_column_width (a_width: REAL_64)
+			-- Lay the script out again at `a_width' pixels (the reader resized the pill). The
+			-- reader's place is kept: the follower counts words, not pixels.
+		require
+			width_positive: a_width > 0
+		do
+			column_width := a_width.ceiling
+			if has_script then
+				layout.build (history.current_revision, measure, column_width)
+			end
+		ensure
+			set: column_width = a_width.ceiling
+			laid_out: has_script implies layout.word_count = history.current_revision.word_count
+		end
+
 feature -- Following
 
 	feed_voice (a_frame: PT_VOICE_FRAME)

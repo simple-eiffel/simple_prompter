@@ -1,6 +1,6 @@
 note
 	description: "[
-		PT_ALIGNER fixes found by the live replay of larry_read_01 (2026-10-06): cue text
+		Fixes found by the live replay of larry_read_01 (2026-10-06): cue text
 		is no distance, words of one window are never duplicates of each other, and a
 		window re-stamping words already buffered adds only what follows them.
 	]"
@@ -66,6 +66,27 @@ feature -- Tests
 			assert_integers_equal ("seven words once each", 7, a.heard_tail.count)
 			assert_strings_equal ("newest", "prompter", a.heard_tail.last)
 			assert_integers_equal ("at the end", 7, a.position)
+		end
+
+	test_column_width_relays_out_in_place
+			-- Sizing the pill narrower lays the script out on more lines and keeps the reader's place.
+		local
+			p: SIMPLE_PROMPTER
+			l_lines, l_reader: INTEGER
+		do
+			create p.make_with_settings (create {PT_SETTINGS}.make_in_memory)
+			p := p.with_measure (create {PT_FIXED_MEASURE}.make (10.0, 20.0), 400.0)
+			p.load_script_text ({STRING_32} "t", {STRING_32} "One two three four five six seven eight nine ten. Eleven twelve thirteen fourteen fifteen sixteen.")
+			p.perform ({PT_ACTION}.Play)
+			p.perform ({PT_ACTION}.Count_in_done)
+			p.controller.follower.advance (2.0)
+			l_lines := p.layout.line_count
+			l_reader := p.controller.reader_position
+			p.set_column_width (120.0)
+			assert_integers_equal ("width kept", 120, p.column_width)
+			assert_true ("more lines when narrower", p.layout.line_count > l_lines)
+			assert_integers_equal ("every word laid out", p.history.current_revision.word_count, p.layout.word_count)
+			assert_integers_equal ("reader kept", l_reader, p.controller.reader_position)
 		end
 
 feature {NONE} -- Fixtures
