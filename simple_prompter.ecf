@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="ISO-8859-1"?>
+<system xmlns="http://www.eiffel.com/developers/xml/configuration-1-23-0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.eiffel.com/developers/xml/configuration-1-23-0 http://www.eiffel.com/developers/xml/configuration-1-23-0.xsd" name="simple_prompter" uuid="B4FC0B7C-83CA-4491-BE62-4E0A0C1EB2F0" library_target="simple_prompter">
+	<description>Voice-following, capture-invisible teleprompter with retake-aware recording and automatic assembly (Take Studio)</description>
+
+	<!-- The library: PURE Eiffel (no GUI, no whisper, no child processes), so the
+	     test executable starts without the whisper/ggml DLLs and the risky logic
+	     (aligner, followers, take controller, solver, writers) is tested headless.
+	     Effects live in the speech/, runtime/, app/ and worker/ clusters of the
+	     application targets (added when their root classes exist; spec 04 section 8). -->
+	<target name="simple_prompter">
+		<root all_classes="true"/>
+		<file_rule>
+			<exclude>/EIFGENs$</exclude>
+			<exclude>/\..*$</exclude>
+		</file_rule>
+		<option warning="warning">
+			<assertions precondition="true" postcondition="true" check="true" invariant="true" loop="true" supplier_precondition="true"/>
+		</option>
+		<setting name="dead_code_removal" value="feature"/>
+		<capability>
+			<concurrency support="scoop" use="scoop"/>
+			<void_safety support="all"/>
+		</capability>
+		<library name="base" location="$ISE_LIBRARY\library\base\base.ecf"/>
+		<library name="simple_mml" location="$SIMPLE_EIFFEL/simple_mml/simple_mml.ecf"/>
+		<library name="simple_json" location="$SIMPLE_EIFFEL/simple_json/simple_json.ecf"/>
+		<library name="simple_file" location="$SIMPLE_EIFFEL/simple_file/simple_file.ecf"/>
+		<library name="simple_encoding" location="$SIMPLE_EIFFEL/simple_encoding/simple_encoding.ecf"/>
+		<library name="simple_toml" location="$SIMPLE_EIFFEL/simple_toml/simple_toml.ecf"/>
+		<cluster name="src" location=".\src\" recursive="true"/>
+	</target>
+
+	<!-- Test runner. Console, so results land on stdout. Both testing libraries
+	     per ecosystem standard: ISE testing for EQA, simple_testing for TEST_SET_BASE. -->
+	<target name="simple_prompter_tests" extends="simple_prompter">
+		<root class="TEST_APP" feature="make"/>
+		<setting name="console_application" value="true"/>
+		<!-- Repeated on purpose: clusters declared in an extending target do NOT
+		     inherit the parent target's assertion options (oracle gotcha 2026-10-05). -->
+		<option warning="warning">
+			<assertions precondition="true" postcondition="true" check="true" invariant="true" loop="true" supplier_precondition="true"/>
+		</option>
+		<library name="testing" location="$ISE_LIBRARY\library\testing\testing.ecf"/>
+		<library name="simple_testing" location="$SIMPLE_EIFFEL\simple_testing\simple_testing.ecf"/>
+		<cluster name="tests" location=".\testing\" recursive="true">
+			<file_rule>
+				<exclude>/fixtures$</exclude>
+			</file_rule>
+		</cluster>
+	</target>
+</system>

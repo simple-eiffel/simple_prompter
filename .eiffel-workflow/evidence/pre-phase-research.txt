@@ -1,0 +1,22 @@
+# Pre-Phase Research Evidence
+# Project: D:/prod/simple_prompter
+# Date: 2026-10-05
+
+Research completed: yes
+Steps completed: 7/7 (+ REFERENCES, + video analysis, + CUDA spike)
+Recommendation: BUILD
+Confidence: HIGH (shape, ASR perf measured) / MEDIUM (live mic, capture exclusion unspiked)
+
+References cited: 45+ URLs and ecosystem file:line citations (REFERENCES.md)
+Alternatives researched: 16 products/projects + 5 ASR engines (02-LANDSCAPE.md)
+Risks identified: 13 (06-RISKS.md)
+Decisions proposed: 14 (04-DECISIONS.md)
+
+Executed evidence:
+- video-analysis.md: ffprobe, speech_cli transcription (no narration), 25 frames read
+- spike-cuda-whisper.md: whisper.cpp CUDA build for sm_120 (BUILD_OK), whisper-bench,
+  whisper-server latency table, two decode gotchas found and verified
+
+Nothing Eiffel was written or compiled in this phase.
+
+# Status: COMPLETE

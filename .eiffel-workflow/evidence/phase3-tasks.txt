@@ -1,0 +1,13 @@
+# Phase 3 Task Evidence
+# Project: D:/prod/simple_prompter
+# Date: 2026-10-05
+
+Tasks created: 24 (Track A, pure library) + Track B sequencing table (upstream libs, spikes, app)
+Dependencies identified: 17 edges (see tasks.md dependency graph)
+Stub coverage: 34/34 files with "Phase 4" markers mapped to a task (mechanical check)
+Review findings carried: M9 (T14), M10/M11 (T15), M12 (T16), M13 (T8), M14 (T10), M23 (T17), L17 (T11), L18 (T1), L19 (T7, T19), L20 (T23), L21 (T8)
+Contract additions needing approval (small postconditions): M9, M10, M12, M13, M14, L17
+Real-voice fixtures saved: testing/fixtures/larry_read_01.words.tsv (252 words), larry_read_01.vad.tsv (41 segments)
+Human approved: yes (Larry, 2026-10-05: "approve 24; incl. additions; then phase 4")
+
+# Status: APPROVED

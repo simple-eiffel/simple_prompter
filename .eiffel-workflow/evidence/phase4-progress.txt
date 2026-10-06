@@ -1,0 +1,18 @@
+# Phase 4 progress / HANDOFF (updated 2026-10-05 20:00)
+
+PHASE 4 COMPLETE. Evidence: evidence/phase4-compile.txt (Status PASS).
+- 24/24 tasks implemented. ec.sh test: 0 errors, 0 warnings.
+- DBC F_code: 116/116 pass in 13.8 s. Lean: 108 pass + 8 expected contract-refusal fails, 1.4 s.
+- Contract freeze: 0 frozen lines changed; 51 additions in new helper features.
+- Real-voice replay of larry_read_01 passes; aligner 0.11 ms/update lean, 2.5 ms DBC (frame-budget test).
+- Root cause of the slow suite was NOT the aligner: ISE JSON_PARSER hang on an unterminated string
+  (torn journal line). Fixed upstream in D:\prod\simple_json (src/core/simple_json.e
+  unterminated_string_at guard; testing/adversarial_tests.e test_unclosed_string re-enabled;
+  CHANGELOG [Unreleased] Fixed). simple_json 273/273. NOT COMMITTED (simple_json is a git repo;
+  awaiting Larry).
+- Clients of simple_json need a -clean rebuild to pick the fix up (incremental builds keep old code).
+
+NEXT
+1. /eiffel.verify d:/prod/simple_prompter (Phase 5). Carry the 4 known gaps (phase4-compile.txt).
+2. Track B: simple_shell panel, simple_speech VAD/CUDA, simple_text_structure, live mic spike.
+3. Ask Larry whether to commit the simple_json fix.

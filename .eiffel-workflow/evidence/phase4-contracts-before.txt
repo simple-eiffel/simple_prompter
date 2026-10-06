@@ -1,0 +1,1511 @@
+simple_prompter.e:ensure
+simple_prompter.e:settings_set: settings = a_settings
+simple_prompter.e:no_script: not has_script
+simple_prompter.e:mode_from_settings: mode = a_settings.default_mode (False)
+simple_prompter.e:require
+simple_prompter.e:known: a_mode >= {PT_FOLLOW_MODE}.Constant and a_mode <= {PT_FOLLOW_MODE}.Tracking
+simple_prompter.e:no_script_yet: not has_script
+simple_prompter.e:ensure
+simple_prompter.e:set: mode = a_mode
+simple_prompter.e:chained: Result = Current
+simple_prompter.e:require
+simple_prompter.e:range: a_wpm >= 40 and a_wpm <= 400
+simple_prompter.e:no_script_yet: not has_script
+simple_prompter.e:ensure
+simple_prompter.e:set: speed_wpm = a_wpm
+simple_prompter.e:chained: Result = Current
+simple_prompter.e:require
+simple_prompter.e:no_script_yet: not has_script
+simple_prompter.e:ensure
+simple_prompter.e:set: clock = a_clock
+simple_prompter.e:chained: Result = Current
+simple_prompter.e:require
+simple_prompter.e:width_positive: a_width > 0
+simple_prompter.e:no_script_yet: not has_script
+simple_prompter.e:ensure
+simple_prompter.e:set: measure = a_measure
+simple_prompter.e:chained: Result = Current
+simple_prompter.e:require
+simple_prompter.e:loaded: has_script
+simple_prompter.e:require
+simple_prompter.e:loaded: has_script
+simple_prompter.e:require
+simple_prompter.e:loaded: has_script
+simple_prompter.e:require
+simple_prompter.e:loaded: has_script
+simple_prompter.e:require
+simple_prompter.e:loaded: has_script
+simple_prompter.e:require
+simple_prompter.e:loaded: has_script
+simple_prompter.e:ensure
+simple_prompter.e:already_read_only: history.current_revision.text_of_range (1, (controller.reader_position - 1).max (0)).ends_with (Result)
+simple_prompter.e:require
+simple_prompter.e:path_present: not a_path.is_empty
+simple_prompter.e:ensure
+simple_prompter.e:loaded_or_error: has_script or attached last_error
+simple_prompter.e:require
+simple_prompter.e:not_recording: not has_script or else not controller.is_recording
+simple_prompter.e:ensure
+simple_prompter.e:loaded: has_script
+simple_prompter.e:first_revision: history.revision_count = 1
+simple_prompter.e:follower_sized: follower.word_count = history.current_revision.word_count
+simple_prompter.e:idle: controller.state = {PT_TAKE_STATE}.Idle
+simple_prompter.e:require
+simple_prompter.e:loaded: has_script
+simple_prompter.e:require
+simple_prompter.e:loaded: has_script
+simple_prompter.e:require
+simple_prompter.e:loaded: has_script
+simple_prompter.e:not_backward: scroll.is_started implies a_now_ms >= scroll.last_ms
+simple_prompter.e:ensure
+simple_prompter.e:ticked: scroll.last_ms = a_now_ms
+simple_prompter.e:require
+simple_prompter.e:loaded: has_script
+simple_prompter.e:known: a_action >= {PT_ACTION}.Play and a_action <= {PT_ACTION}.Analysis_done
+simple_prompter.e:no_argument: not controller.needs_argument (a_action)
+simple_prompter.e:allowed: controller.is_allowed (a_action)
+simple_prompter.e:ensure
+simple_prompter.e:reanchored_on_resume: a_action = {PT_ACTION}.Count_in_done implies
+simple_prompter.e:(aligner.position = (controller.caret - 1).max (0) and aligner.reanchored_at = recording_clock.sample_count)
+simple_prompter.e:require
+simple_prompter.e:loaded: has_script
+simple_prompter.e:editing: controller.state = {PT_TAKE_STATE}.Editing
+simple_prompter.e:ensure
+simple_prompter.e:follows_revision: aligner.revision = history.current_revision
+simple_prompter.e:require
+simple_prompter.e:loaded: has_script
+simple_prompter.e:ensure
+simple_prompter.e:aligner_current: aligner.revision = history.current_revision
+simple_prompter.e:layout_current: layout.word_count = history.current_revision.word_count
+simple_prompter.e:follower_current: follower.word_count = history.current_revision.word_count
+simple_prompter.e:require
+simple_prompter.e:non_negative: a_word_count >= 0
+simple_prompter.e:ensure
+simple_prompter.e:sized: Result.word_count = a_word_count
+simple_prompter.e:invariant
+simple_prompter.e:mode_known: mode >= {PT_FOLLOW_MODE}.Constant and mode <= {PT_FOLLOW_MODE}.Tracking
+simple_prompter.e:speed_range: speed_wpm >= 40 and speed_wpm <= 400
+simple_prompter.e:width_positive: column_width > 0
+simple_prompter.e:loaded_consistently: has_script implies (attached follower_cell and attached controller_cell and attached scroll_cell and attached aligner_cell)
+simple_prompter.e:follows_current_revision: (attached history_cell as al_h and attached aligner_cell as al_a and attached follower_cell as al_f) implies
+simple_prompter.e:(al_a.revision = al_h.current_revision and layout.word_count = al_h.current_revision.word_count and al_f.word_count = layout.word_count)
+pt_analysis.e:ensure
+pt_analysis.e:success: is_success and error = Void
+pt_analysis.e:cuts_set: cuts = a_cuts
+pt_analysis.e:require
+pt_analysis.e:reason_present: not a_error.is_empty
+pt_analysis.e:ensure
+pt_analysis.e:failed: not is_success and attached error
+pt_analysis.e:invariant
+pt_analysis.e:success_xor_error: is_success xor attached error
+pt_attempt.e:require
+pt_attempt.e:index_positive: a_index >= 1
+pt_attempt.e:real_caret: not a_caret.is_none
+pt_attempt.e:revision_positive: a_revision >= 1
+pt_attempt.e:first_positive: a_first_index >= 1
+pt_attempt.e:range_ordered: a_last_index >= a_first_index - 1
+pt_attempt.e:not_both: not (a_starred and a_rejected)
+pt_attempt.e:ensure
+pt_attempt.e:index_set: index = a_index
+pt_attempt.e:span_set: span = a_span
+pt_attempt.e:caret_set: caret ~ a_caret
+pt_attempt.e:revision_set: revision = a_revision
+pt_attempt.e:range_set: first_index = a_first_index and last_index = a_last_index
+pt_attempt.e:marks_set: is_starred = a_starred and is_rejected = a_rejected
+pt_attempt.e:ensure
+pt_attempt.e:non_negative: Result >= 0
+pt_attempt.e:invariant
+pt_attempt.e:index_positive: index >= 1
+pt_attempt.e:real_caret: not caret.is_none
+pt_attempt.e:revision_positive: revision >= 1
+pt_attempt.e:first_positive: first_index >= 1
+pt_attempt.e:range_ordered: last_index >= first_index - 1
+pt_attempt.e:not_both: not (is_starred and is_rejected)
+pt_attempt_aligner.e:ensure
+pt_attempt_aligner.e:matcher_set: matcher = a_matcher
+pt_attempt_aligner.e:empty: last_timeline.count = 0
+pt_attempt_aligner.e:require
+pt_attempt_aligner.e:revisions_known: across a_attempts as ic all ic.revision >= 1 and ic.revision <= a_history.revision_count end
+pt_attempt_aligner.e:ensure
+pt_attempt_aligner.e:inside_attempts: across 1 |..| last_timeline.count as i all
+pt_attempt_aligner.e:last_timeline.occurrence (i).attempt <= a_attempts.count and then
+pt_attempt_aligner.e:a_attempts [last_timeline.occurrence (i).attempt].span.contains (last_timeline.occurrence (i).span.t0) end
+pt_attempt_aligner.e:words_of_revision: across 1 |..| last_timeline.count as i all
+pt_attempt_aligner.e:a_history.revision (a_attempts [last_timeline.occurrence (i).attempt].revision).index_of (last_timeline.occurrence (i).word) > 0 end
+pt_attempt_builder.e:ensure
+pt_attempt_builder.e:nothing_built: last_attempts.is_empty
+pt_attempt_builder.e:require
+pt_attempt_builder.e:ended: a_end_rt >= a_journal.last_rt
+pt_attempt_builder.e:has_revision: a_history.revision_count >= 1
+pt_attempt_builder.e:ensure
+pt_attempt_builder.e:one_per_resume: last_attempts.count = a_journal.count_of ({PT_EVENT_KIND}.Resume)
+pt_attempt_builder.e:indexed: across 1 |..| last_attempts.count as i all last_attempts [i].index = i end
+pt_attempt_builder.e:ordered_disjoint: across 2 |..| last_attempts.count as i all
+pt_attempt_builder.e:last_attempts [i - 1].span.t1 <= last_attempts [i].span.t0 end
+pt_attempt_builder.e:within: across last_attempts as ic all ic.span.t1 <= a_end_rt end
+pt_attempt_builder.e:known_revisions: across last_attempts as ic all ic.revision <= a_history.revision_count end
+pt_attempt_builder.e:one_star_one_attempt: starred_count <= a_journal.count_of ({PT_EVENT_KIND}.Star)
+pt_attempt_builder.e:not_both: across last_attempts as ic all not (ic.is_starred and ic.is_rejected) end
+pt_cut.e:require
+pt_cut.e:src_non_negative: a_src >= 0
+pt_cut.e:first_positive: a_first_index >= 1
+pt_cut.e:ordered: a_first_index <= a_last_index
+pt_cut.e:attempt_positive: a_attempt >= 1
+pt_cut.e:ensure
+pt_cut.e:src_set: src = a_src
+pt_cut.e:span_set: span = a_span
+pt_cut.e:range_set: first_word_index = a_first_index and last_word_index = a_last_index
+pt_cut.e:attempt_set: attempt = a_attempt
+pt_cut.e:tight_set: is_tight = a_tight
+pt_cut.e:require
+pt_cut.e:has_words: not word_ids.is_empty
+pt_cut.e:require
+pt_cut.e:has_words: not word_ids.is_empty
+pt_cut.e:ensure
+pt_cut.e:same_words: Result.word_ids ~ word_ids
+pt_cut.e:span_set: Result.span = a_span
+pt_cut.e:invariant
+pt_cut.e:src_non_negative: src >= 0
+pt_cut.e:first_positive: first_word_index >= 1
+pt_cut.e:ordered: first_word_index <= last_word_index
+pt_cut.e:attempt_positive: attempt >= 1
+pt_cut.e:ids_fit_range: word_ids.count <= last_word_index - first_word_index + 1
+pt_cut_list.e:ensure
+pt_cut_list.e:empty: count = 0
+pt_cut_list.e:require
+pt_cut_list.e:valid_index: a_index >= 1 and a_index <= count
+pt_cut_list.e:ensure
+pt_cut_list.e:sum: (Result - span_total (cuts_model)).abs < 1.0e-9
+pt_cut_list.e:require
+pt_cut_list.e:kept: is_kept (a_src, a_rt)
+pt_cut_list.e:ensure
+pt_cut_list.e:in_range: Result >= 0 and Result <= output_duration + 1.0e-9
+pt_cut_list.e:require
+pt_cut_list.e:duration_non_negative: a_raw_duration >= 0
+pt_cut_list.e:ensure
+pt_cut_list.e:complement: ((source_kept_duration (a_src) + list_total (Result)) - a_raw_duration).abs < 1.0e-6
+pt_cut_list.e:ensure
+pt_cut_list.e:same_count: Result.count = count
+pt_cut_list.e:require
+pt_cut_list.e:script_order: count = 0 or else a_cut.first_word_index > cut (count).last_word_index
+pt_cut_list.e:ensure
+pt_cut_list.e:appended: (cuts_model |=| (old cuts_model & a_cut))
+pt_cut_list.e:invariant
+pt_cut_list.e:count_non_negative: count >= 0
+pt_flag.e:require
+pt_flag.e:kind_known: a_kind >= {PT_FLAG_KIND}.Misread and a_kind <= {PT_FLAG_KIND}.Long_pause
+pt_flag.e:message_present: not a_message.is_empty
+pt_flag.e:ensure
+pt_flag.e:kind_set: kind = a_kind
+pt_flag.e:span_set: span = a_span
+pt_flag.e:words_set: first_word ~ a_first_word and last_word ~ a_last_word
+pt_flag.e:message_set: message.same_string (a_message)
+pt_flag.e:invariant
+pt_flag.e:kind_known: kind >= {PT_FLAG_KIND}.Misread and kind <= {PT_FLAG_KIND}.Long_pause
+pt_flag.e:message_present: not message.is_empty
+pt_flagger.e:require
+pt_flagger.e:positive: a_long_pause_s > 0
+pt_flagger.e:ensure
+pt_flagger.e:set: long_pause_s = a_long_pause_s
+pt_flagger.e:ensure
+pt_flagger.e:tight_flagged: count_of ({PT_FLAG_KIND}.Tight_splice) = tight_count (a_cuts)
+pt_flagger.e:missing_flagged: a_missing.is_empty = (count_of ({PT_FLAG_KIND}.Missing) = 0)
+pt_flagger.e:invariant
+pt_flagger.e:positive: long_pause_s > 0
+pt_scripted_transcriber.e:ensure
+pt_scripted_transcriber.e:will_succeed: not fails
+pt_scripted_transcriber.e:ensure
+pt_scripted_transcriber.e:will_fail: fails
+pt_session_analyzer.e:ensure
+pt_session_analyzer.e:transcriber_set: transcriber = a_transcriber
+pt_session_analyzer.e:not_yet: not last_analysis.is_success
+pt_session_analyzer.e:require
+pt_session_analyzer.e:path_present: not a_audio_path.is_empty
+pt_session_analyzer.e:duration_positive: a_duration > 0
+pt_session_analyzer.e:journal_within: a_journal.last_rt <= a_duration
+pt_session_analyzer.e:has_revision: a_history.revision_count >= 1
+pt_session_analyzer.e:ensure
+pt_session_analyzer.e:failure_reported: not transcriber.is_success implies not last_analysis.is_success
+pt_session_analyzer.e:attempts_from_journal: last_analysis.is_success implies
+pt_session_analyzer.e:last_analysis.attempts.count = a_journal.count_of ({PT_EVENT_KIND}.Resume)
+pt_session_analyzer.e:cover_when_complete: (last_analysis.is_success and solver.is_complete) implies
+pt_session_analyzer.e:(last_analysis.cuts.words_model |=| a_history.current_revision.spoken_ids_model)
+pt_silence_snapper.e:require
+pt_silence_snapper.e:pads_non_negative: a_head_pad >= 0 and a_tail_pad >= 0
+pt_silence_snapper.e:ensure
+pt_silence_snapper.e:pads_set: head_pad = a_head_pad and tail_pad = a_tail_pad
+pt_silence_snapper.e:require
+pt_silence_snapper.e:spans_in_map: across 1 |..| a_cuts.count as i all a_cuts.cut (i).span.t1 <= a_map.duration end
+pt_silence_snapper.e:ensure
+pt_silence_snapper.e:same_count: last_result.count = a_cuts.count
+pt_silence_snapper.e:same_words: (last_result.words_model |=| a_cuts.words_model)
+pt_silence_snapper.e:within_recording: across 1 |..| last_result.count as i all last_result.cut (i).span.t1 <= a_map.duration end
+pt_silence_snapper.e:in_silence_or_tight: across 1 |..| last_result.count as i all
+pt_silence_snapper.e:last_result.cut (i).is_tight or
+pt_silence_snapper.e:(a_map.is_silent_at (last_result.cut (i).span.t0) and a_map.is_silent_at (last_result.cut (i).span.t1)) end
+pt_silence_snapper.e:words_not_clipped: across 1 |..| last_result.count as i all
+pt_silence_snapper.e:words_inside (last_result.cut (i), a_timeline) end
+pt_silence_snapper.e:invariant
+pt_silence_snapper.e:pads_non_negative: head_pad >= 0 and tail_pad >= 0
+pt_speech_map.e:require
+pt_speech_map.e:non_negative: a_duration >= 0
+pt_speech_map.e:ensure
+pt_speech_map.e:duration_set: duration = a_duration
+pt_speech_map.e:no_speech: span_count = 0
+pt_speech_map.e:require
+pt_speech_map.e:valid_index: a_index >= 1 and a_index <= span_count
+pt_speech_map.e:require
+pt_speech_map.e:in_range: a_t >= 0 and a_t <= duration
+pt_speech_map.e:ensure
+pt_speech_map.e:definition: Result = not across 1 |..| span_count as i some span (i).contains (a_t) end
+pt_speech_map.e:require
+pt_speech_map.e:in_range: a_t >= 0 and a_t <= duration
+pt_speech_map.e:ensure
+pt_speech_map.e:only_when_silent: attached Result implies is_silent_at (a_t)
+pt_speech_map.e:contains_t: attached Result as al_r implies al_r.contains (a_t)
+pt_speech_map.e:ensure
+pt_speech_map.e:same_count: Result.count = span_count
+pt_speech_map.e:require
+pt_speech_map.e:after_previous: a_span.t0 >= last_end
+pt_speech_map.e:within: a_span.t1 <= duration
+pt_speech_map.e:ensure
+pt_speech_map.e:appended: (spans_model |=| (old spans_model & a_span))
+pt_speech_map.e:invariant
+pt_speech_map.e:duration_non_negative: duration >= 0
+pt_speech_map.e:within: last_end <= duration
+pt_take_solver.e:require
+pt_take_solver.e:costs_non_negative: a_splice_cost >= 0 and a_age_penalty >= 0
+pt_take_solver.e:confidence_range: a_min_confidence >= 0.0 and a_min_confidence <= 1.0
+pt_take_solver.e:ensure
+pt_take_solver.e:costs_set: splice_cost = a_splice_cost and age_penalty = a_age_penalty
+pt_take_solver.e:confidence_set: min_confidence = a_min_confidence
+pt_take_solver.e:require
+pt_take_solver.e:has_revision: a_history.revision_count >= 1
+pt_take_solver.e:attempts_indexed: across 1 |..| a_attempts.count as i all a_attempts [i].index = i end
+pt_take_solver.e:ensure
+pt_take_solver.e:exact_cover_in_order: is_complete implies (last_result.words_model |=| a_history.current_revision.spoken_ids_model)
+pt_take_solver.e:missing_are_spoken: across missing_words as ic all a_history.current_revision.spoken_ids_model.has (ic) end
+pt_take_solver.e:no_rejected: across 1 |..| last_result.count as i all
+pt_take_solver.e:not a_attempts [last_result.cut (i).attempt].is_rejected end
+pt_take_solver.e:no_stale: across 1 |..| last_result.count as i all
+pt_take_solver.e:is_current_take (last_result.cut (i), a_history, a_attempts) end
+pt_take_solver.e:star_wins: across 1 |..| last_result.count as i all
+pt_take_solver.e:not superseded_by_star (last_result.cut (i), a_attempts) end
+pt_take_solver.e:decisions_logged: last_result.count > 0 implies decisions.count >= last_result.count
+pt_take_solver.e:switch_at_passage_start: across 2 |..| last_result.count as i all
+pt_take_solver.e:last_result.cut (i).attempt /= last_result.cut (i - 1).attempt implies
+pt_take_solver.e:(is_passage_start (a_history.current_revision, last_result.cut (i).first_word_index) or last_result.cut (i).is_tight) end
+pt_take_solver.e:require
+pt_take_solver.e:attempt_known: a_cut.attempt >= 1 and a_cut.attempt <= a_attempts.count
+pt_take_solver.e:revision_known: a_attempts [a_cut.attempt].revision <= a_history.revision_count
+pt_take_solver.e:require
+pt_take_solver.e:attempt_known: a_cut.attempt >= 1 and a_cut.attempt <= a_attempts.count
+pt_take_solver.e:invariant
+pt_take_solver.e:costs_non_negative: splice_cost >= 0 and age_penalty >= 0
+pt_take_solver.e:confidence_range: min_confidence >= 0.0 and min_confidence <= 1.0
+pt_time_span.e:require
+pt_time_span.e:non_negative: a_t0 >= 0
+pt_time_span.e:ordered: a_t0 <= a_t1
+pt_time_span.e:ensure
+pt_time_span.e:set: t0 = a_t0 and t1 = a_t1
+pt_time_span.e:ensure
+pt_time_span.e:non_negative: Result >= 0
+pt_time_span.e:ensure
+pt_time_span.e:inside: contains (Result)
+pt_time_span.e:ensure
+pt_time_span.e:definition: Result = (t0 <= a_t and a_t <= t1)
+pt_time_span.e:invariant
+pt_time_span.e:non_negative: t0 >= 0
+pt_time_span.e:ordered: t0 <= t1
+pt_transcriber.e:require
+pt_transcriber.e:path_present: not a_audio_path.is_empty
+pt_transcriber.e:duration_positive: a_duration > 0
+pt_transcriber.e:ensure
+pt_transcriber.e:outcome: is_success xor attached last_error
+pt_transcriber.e:map_on_success: is_success implies (attached last_map as al_map and then al_map.duration = a_duration)
+pt_transcriber.e:words_on_success: is_success implies attached last_heard
+pt_word_occurrence.e:require
+pt_word_occurrence.e:real_word: not a_word.is_none
+pt_word_occurrence.e:confidence_range: a_confidence >= 0.0 and a_confidence <= 1.0
+pt_word_occurrence.e:attempt_positive: a_attempt >= 1
+pt_word_occurrence.e:ensure
+pt_word_occurrence.e:word_set: word ~ a_word
+pt_word_occurrence.e:span_set: span = a_span
+pt_word_occurrence.e:confidence_set: confidence = a_confidence
+pt_word_occurrence.e:attempt_set: attempt = a_attempt
+pt_word_occurrence.e:invariant
+pt_word_occurrence.e:real_word: not word.is_none
+pt_word_occurrence.e:confidence_range: confidence >= 0.0 and confidence <= 1.0
+pt_word_occurrence.e:attempt_positive: attempt >= 1
+pt_word_timeline.e:ensure
+pt_word_timeline.e:empty: count = 0
+pt_word_timeline.e:require
+pt_word_timeline.e:valid_index: a_index >= 1 and a_index <= count
+pt_word_timeline.e:ensure
+pt_word_timeline.e:matches: attached Result as al_r implies (al_r.word ~ a_word and al_r.attempt = a_attempt)
+pt_word_timeline.e:ensure
+pt_word_timeline.e:same_count: Result.count = count
+pt_word_timeline.e:require
+pt_word_timeline.e:ordered: a_occurrence.span.t0 >= last_start
+pt_word_timeline.e:ensure
+pt_word_timeline.e:appended: (occurrences_model |=| (old occurrences_model & a_occurrence))
+pt_word_timeline.e:invariant
+pt_word_timeline.e:last_start_non_negative: last_start >= 0
+pt_camera_anchor.e:require
+pt_camera_anchor.e:key_present: not a_monitor_key.is_empty
+pt_camera_anchor.e:ensure
+pt_camera_anchor.e:key_set: monitor_key.same_string (a_monitor_key)
+pt_camera_anchor.e:point_set: x = a_x and y = a_y
+pt_camera_anchor.e:invariant
+pt_camera_anchor.e:key_present: not monitor_key.is_empty
+pt_control_resolver.e:require
+pt_control_resolver.e:control_known: a_control >= {PT_CONTROL}.Hold_toggle and a_control <= {PT_CONTROL}.Click_through
+pt_control_resolver.e:state_known: a_state >= {PT_TAKE_STATE}.Idle and a_state <= {PT_TAKE_STATE}.Wrapped
+pt_control_resolver.e:ensure
+pt_control_resolver.e:allowed_or_none: Result /= 0 implies transitions.is_allowed (a_state, Result, a_recording)
+pt_control_resolver.e:app_level_none: (a_control = {PT_CONTROL}.Hide or a_control = {PT_CONTROL}.Click_through) implies Result = 0
+pt_control_resolver.e:clicker_back_reading: (a_control = {PT_CONTROL}.Clicker_back and a_state = {PT_TAKE_STATE}.Reading) implies Result = {PT_ACTION}.Again
+pt_control_resolver.e:clicker_back_held: (a_control = {PT_CONTROL}.Clicker_back and a_state = {PT_TAKE_STATE}.Held) implies Result = {PT_ACTION}.Back
+pt_control_resolver.e:hold_toggle_held: (a_control = {PT_CONTROL}.Hold_toggle and a_state = {PT_TAKE_STATE}.Held) implies Result = {PT_ACTION}.Go
+pt_key_binding.e:require
+pt_key_binding.e:control_known: a_control >= {PT_CONTROL}.Hold_toggle and a_control <= {PT_CONTROL}.Click_through
+pt_key_binding.e:modifiers_known: a_modifiers <= All_modifiers
+pt_key_binding.e:vkey_range: a_vkey > 0 and a_vkey <= 254
+pt_key_binding.e:interlock: a_modifiers /= 0 or a_bare_while_recording
+pt_key_binding.e:ensure
+pt_key_binding.e:control_set: control = a_control
+pt_key_binding.e:key_set: modifiers = a_modifiers and vkey = a_vkey
+pt_key_binding.e:bare_set: is_bare_while_recording = a_bare_while_recording
+pt_key_binding.e:ensure
+pt_key_binding.e:distinct_vkeys: Result \\ 65_536 = a_vkey
+pt_key_binding.e:invariant
+pt_key_binding.e:control_known: control >= {PT_CONTROL}.Hold_toggle and control <= {PT_CONTROL}.Click_through
+pt_key_binding.e:interlock: modifiers /= 0 or is_bare_while_recording
+pt_key_binding.e:vkey_range: vkey > 0 and vkey <= 254
+pt_keymap.e:ensure
+pt_keymap.e:empty: binding_count = 0
+pt_keymap.e:not_recording: not is_recording and not bare_keys_active
+pt_keymap.e:ensure
+pt_keymap.e:hold_bound: has_control ({PT_CONTROL}.Hold_toggle)
+pt_keymap.e:again_bound: has_control ({PT_CONTROL}.Again)
+pt_keymap.e:wrap_bound: has_control ({PT_CONTROL}.Wrap)
+pt_keymap.e:no_bare_defaults: across bindings as ic all not ic.is_bare end
+pt_keymap.e:ensure
+pt_keymap.e:bare_ignored_unless_active: (a_modifiers = 0 and not bare_keys_active) implies Result = 0
+pt_keymap.e:ensure
+pt_keymap.e:same_count: Result.count = binding_count
+pt_keymap.e:ensure
+pt_keymap.e:bound: attached bindings.item (a_binding.key_code) as al_b and then al_b = a_binding
+pt_keymap.e:others_kept: ((combos_model / a_binding.key_code) |=| (old combos_model / a_binding.key_code))
+pt_keymap.e:ensure
+pt_keymap.e:two_hold_keys: keys_for ({PT_CONTROL}.Clicker_hold) >= 2
+pt_keymap.e:ensure
+pt_keymap.e:set: is_recording = a_recording
+pt_keymap.e:released: not a_recording implies not bare_keys_active
+pt_keymap.e:require
+pt_keymap.e:recording: is_recording
+pt_keymap.e:ensure
+pt_keymap.e:active: bare_keys_active
+pt_keymap.e:ensure
+pt_keymap.e:inactive: not bare_keys_active
+pt_keymap.e:invariant
+pt_keymap.e:bare_only_when_recording: bare_keys_active implies is_recording
+pt_settings.e:ensure
+pt_settings.e:memory_only: path = Void
+pt_settings.e:nothing_saved: save_count = 0
+pt_settings.e:require
+pt_settings.e:path_present: not a_path.is_empty
+pt_settings.e:ensure
+pt_settings.e:persistent: attached path
+pt_settings.e:ensure
+pt_settings.e:tracking_only_when_proven: Result = {PT_FOLLOW_MODE}.Tracking implies (is_tracking_proven and a_gpu_available)
+pt_settings.e:known: Result >= {PT_FOLLOW_MODE}.Constant and Result <= {PT_FOLLOW_MODE}.Tracking
+pt_settings.e:require
+pt_settings.e:in_range: a_px >= Min_font and a_px <= Max_font
+pt_settings.e:ensure
+pt_settings.e:set: font_size = a_px
+pt_settings.e:saved: save_count = old save_count + 1
+pt_settings.e:require
+pt_settings.e:in_range: a_lines >= Min_lines and a_lines <= Max_lines
+pt_settings.e:ensure
+pt_settings.e:set: lines_visible = a_lines
+pt_settings.e:saved: save_count = old save_count + 1
+pt_settings.e:require
+pt_settings.e:in_range: a_px >= Min_width and a_px <= Max_width
+pt_settings.e:ensure
+pt_settings.e:set: column_width = a_px
+pt_settings.e:saved: save_count = old save_count + 1
+pt_settings.e:require
+pt_settings.e:in_range: a_alpha >= 0 and a_alpha <= 255
+pt_settings.e:ensure
+pt_settings.e:set: opacity = a_alpha
+pt_settings.e:saved: save_count = old save_count + 1
+pt_settings.e:require
+pt_settings.e:in_range: a_wpm >= Min_wpm and a_wpm <= Max_wpm
+pt_settings.e:ensure
+pt_settings.e:set: speed_wpm = a_wpm
+pt_settings.e:saved: save_count = old save_count + 1
+pt_settings.e:ensure
+pt_settings.e:proven: is_tracking_proven
+pt_settings.e:saved: save_count = old save_count + 1
+pt_settings.e:ensure
+pt_settings.e:counted: save_count = old save_count + 1
+pt_settings.e:invariant
+pt_settings.e:font_range: font_size >= Min_font and font_size <= Max_font
+pt_settings.e:lines_range: lines_visible >= Min_lines and lines_visible <= Max_lines
+pt_settings.e:width_range: column_width >= Min_width and column_width <= Max_width
+pt_settings.e:opacity_range: opacity >= 0 and opacity <= 255
+pt_settings.e:wpm_range: speed_wpm >= Min_wpm and speed_wpm <= Max_wpm
+pt_settings.e:count_in_range: count_in_seconds >= 0 and count_in_seconds <= 5
+pt_settings.e:pads_non_negative: head_pad >= 0 and tail_pad >= 0
+pt_aligner.e:ensure
+pt_aligner.e:revision_set: revision = a_revision
+pt_aligner.e:matcher_set: matcher = a_matcher
+pt_aligner.e:at_start: position = 0
+pt_aligner.e:certain: confidence = 1.0
+pt_aligner.e:require
+pt_aligner.e:positive: a_jump > 0
+pt_aligner.e:ensure
+pt_aligner.e:tiers: Result >= 1 and Result <= 3
+pt_aligner.e:small: a_jump <= Small_jump implies Result = 1
+pt_aligner.e:ensure
+pt_aligner.e:stale_ignored: a_heard.window_start < reanchored_at implies (position = old position and confidence = old confidence)
+pt_aligner.e:within_script: position >= 0 and position <= revision.word_count
+pt_aligner.e:window_bound: position <= old position + Window_ahead
+pt_aligner.e:forward_bias: position < old position implies last_alignment.anchor_count >= Backward_evidence
+pt_aligner.e:stop_words_inert: last_alignment.anchor_count = 0 implies position = old position
+pt_aligner.e:jump_evidence: (position - old position) > Small_jump implies
+pt_aligner.e:last_alignment.anchor_count >= required_anchors (position - old position)
+pt_aligner.e:confidence_range: confidence >= 0.0 and confidence <= 1.0
+pt_aligner.e:alignment_consistent: last_alignment.word_index = position
+pt_aligner.e:require
+pt_aligner.e:valid: a_words_read >= 0 and a_words_read <= revision.word_count
+pt_aligner.e:sample_non_negative: a_at_sample >= 0
+pt_aligner.e:ensure
+pt_aligner.e:placed: position = a_words_read
+pt_aligner.e:certain: confidence = 1.0
+pt_aligner.e:stamped: reanchored_at = a_at_sample
+pt_aligner.e:alignment_consistent: last_alignment.word_index = a_words_read
+pt_aligner.e:invariant
+pt_aligner.e:position_range: position >= 0 and position <= revision.word_count
+pt_aligner.e:confidence_range: confidence >= 0.0 and confidence <= 1.0
+pt_aligner.e:reanchor_non_negative: reanchored_at >= 0
+pt_aligner.e:constants_sane: Window_back >= 0 and Window_ahead >= 1 and Backward_evidence >= 2
+pt_alignment.e:require
+pt_alignment.e:index_non_negative: a_word_index >= 0
+pt_alignment.e:confidence_range: a_confidence >= 0.0 and a_confidence <= 1.0
+pt_alignment.e:counts_ordered: a_anchor_count >= 0 and a_anchor_count <= a_matched_count
+pt_alignment.e:rate_non_negative: a_rate_wps >= 0
+pt_alignment.e:position_non_negative: a_sample_pos >= 0
+pt_alignment.e:ensure
+pt_alignment.e:index_set: word_index = a_word_index
+pt_alignment.e:confidence_set: confidence = a_confidence
+pt_alignment.e:counts_set: matched_count = a_matched_count and anchor_count = a_anchor_count
+pt_alignment.e:rate_set: rate_wps = a_rate_wps
+pt_alignment.e:position_set: sample_pos = a_sample_pos
+pt_alignment.e:invariant
+pt_alignment.e:index_non_negative: word_index >= 0
+pt_alignment.e:confidence_range: confidence >= 0.0 and confidence <= 1.0
+pt_alignment.e:counts_ordered: anchor_count >= 0 and anchor_count <= matched_count
+pt_alignment.e:rate_non_negative: rate_wps >= 0
+pt_alignment.e:position_non_negative: sample_pos >= 0
+pt_clock.e:ensure
+pt_clock.e:non_negative: Result >= 0
+pt_constant_follower.e:require
+pt_constant_follower.e:words_non_negative: a_word_count >= 0
+pt_constant_follower.e:wpm_range: a_wpm >= Min_wpm and a_wpm <= Max_wpm
+pt_constant_follower.e:ensure
+pt_constant_follower.e:at_start: target = 0
+pt_constant_follower.e:held_initially: is_held
+pt_constant_follower.e:rate_set: words_per_second = a_wpm / 60.0
+pt_constant_follower.e:ensure then
+pt_constant_follower.e:constant_rate: (not is_held and old target + words_per_second * a_dt_s <= word_count)
+pt_constant_follower.e:implies (target - (old target + words_per_second * a_dt_s)).abs < 1.0e-9
+pt_constant_follower.e:require
+pt_constant_follower.e:wpm_range: a_wpm >= Min_wpm and a_wpm <= Max_wpm
+pt_constant_follower.e:ensure
+pt_constant_follower.e:rate_set: words_per_second = a_wpm / 60.0
+pt_constant_follower.e:target_kept: target = old target
+pt_constant_follower.e:invariant
+pt_constant_follower.e:rate_positive: words_per_second > 0
+pt_decoder.e:require
+pt_decoder.e:count_valid: a_count > 0 and a_count <= a_samples.count
+pt_decoder.e:start_non_negative: a_window_start >= 0
+pt_decoder.e:ensure
+pt_decoder.e:window_kept: Result.window_start = a_window_start and Result.window_samples = a_count
+pt_decoder.e:words_inside: across 1 |..| Result.count as i all Result.word (i).t1 <= a_count / 16_000 + 0.05 end
+pt_equivalences.e:ensure
+pt_equivalences.e:reflexive: a_heard.same_string (a_script) implies Result
+pt_equivalences.e:homophones: same_homophone_class (a_heard, a_script) implies Result
+pt_equivalences.e:abbreviations: (is_spoken_form (a_heard, a_script) or is_spoken_form (a_script, a_heard)) implies Result
+pt_equivalences.e:compounds: joined (a_heard).same_string (joined (a_script)) implies Result
+pt_equivalences.e:ensure
+pt_equivalences.e:non_negative: Result >= 0
+pt_equivalences.e:ensure
+pt_equivalences.e:minus_one_or_value: Result >= -1
+pt_equivalences.e:ensure
+pt_equivalences.e:no_spaces: not Result.has (' ')
+pt_equivalences.e:not_longer: Result.count <= a_text.count
+pt_equivalences.e:ensure
+pt_equivalences.e:deterministic_length: Result.count <= a_word.count + 1
+pt_fake_clock.e:ensure
+pt_fake_clock.e:at_zero: now_ms = 0
+pt_fake_clock.e:require
+pt_fake_clock.e:non_negative: a_ms >= 0
+pt_fake_clock.e:ensure
+pt_fake_clock.e:advanced: now_ms = old now_ms + a_ms
+pt_fake_clock.e:require
+pt_fake_clock.e:not_backward: a_ms >= now_ms
+pt_fake_clock.e:ensure
+pt_fake_clock.e:set: now_ms = a_ms
+pt_fake_clock.e:invariant
+pt_fake_clock.e:non_negative: now_ms >= 0
+pt_fixed_measure.e:require
+pt_fixed_measure.e:width_positive: a_char_width > 0
+pt_fixed_measure.e:height_positive: a_line_height > 0
+pt_fixed_measure.e:ensure
+pt_fixed_measure.e:width_set: char_width = a_char_width
+pt_fixed_measure.e:height_set: line_height = a_line_height
+pt_fixed_measure.e:ensure then
+pt_fixed_measure.e:fixed: Result = a_text.count * char_width
+pt_fixed_measure.e:invariant
+pt_fixed_measure.e:width_positive: char_width > 0
+pt_fixed_measure.e:height_positive: line_height > 0
+pt_follower.e:ensure
+pt_follower.e:position_untouched: target = old target
+pt_follower.e:ensure
+pt_follower.e:position_untouched: target = old target
+pt_follower.e:require
+pt_follower.e:non_negative: a_dt_s >= 0
+pt_follower.e:ensure
+pt_follower.e:held_frozen: is_held implies target = old target
+pt_follower.e:never_backward: target >= old target
+pt_follower.e:end_clamped: target <= word_count
+pt_follower.e:velocity_non_negative: velocity >= 0
+pt_follower.e:ensure
+pt_follower.e:held: is_held
+pt_follower.e:stopped: velocity = 0
+pt_follower.e:target_kept: target = old target
+pt_follower.e:ensure
+pt_follower.e:running: not is_held
+pt_follower.e:target_kept: target = old target
+pt_follower.e:require
+pt_follower.e:valid: a_index >= 0 and a_index <= word_count
+pt_follower.e:ensure
+pt_follower.e:placed: target = a_index.to_double
+pt_follower.e:flagged: caret_changed
+pt_follower.e:require
+pt_follower.e:non_negative: a_word_count >= 0
+pt_follower.e:ensure
+pt_follower.e:resized: word_count = a_word_count
+pt_follower.e:clamped: target = (old target).min (a_word_count)
+pt_follower.e:invariant
+pt_follower.e:velocity_non_negative: velocity >= 0
+pt_follower.e:held_still: is_held implies velocity = 0
+pt_follower.e:target_range: target >= 0 and target <= word_count
+pt_follower.e:word_count_non_negative: word_count >= 0
+pt_heard_word.e:require
+pt_heard_word.e:text_present: not a_text.is_empty
+pt_heard_word.e:times_ordered: a_t0 >= 0 and a_t0 <= a_t1
+pt_heard_word.e:probability_range: a_probability >= 0.0 and a_probability <= 1.0
+pt_heard_word.e:ensure
+pt_heard_word.e:text_set: text.same_string (a_text)
+pt_heard_word.e:normalized_set: normalized.same_string (a_normalized)
+pt_heard_word.e:times_set: t0 = a_t0 and t1 = a_t1
+pt_heard_word.e:probability_set: probability = a_probability
+pt_heard_word.e:invariant
+pt_heard_word.e:text_present: not text.is_empty
+pt_heard_word.e:times_ordered: t0 >= 0 and t0 <= t1
+pt_heard_word.e:probability_range: probability >= 0.0 and probability <= 1.0
+pt_heard_words.e:require
+pt_heard_words.e:start_non_negative: a_window_start >= 0
+pt_heard_words.e:window_positive: a_window_samples > 0
+pt_heard_words.e:ensure
+pt_heard_words.e:start_set: window_start = a_window_start
+pt_heard_words.e:size_set: window_samples = a_window_samples
+pt_heard_words.e:require
+pt_heard_words.e:valid_index: a_index >= 1 and a_index <= count
+pt_heard_words.e:ensure
+pt_heard_words.e:after_start: Result > window_start
+pt_heard_words.e:ensure
+pt_heard_words.e:same_count: Result.count = count
+pt_heard_words.e:invariant
+pt_heard_words.e:start_non_negative: window_start >= 0
+pt_heard_words.e:window_positive: window_samples > 0
+pt_layout.e:ensure
+pt_layout.e:empty: line_count = 0 and word_count = 0
+pt_layout.e:require
+pt_layout.e:valid_index: a_index >= 1 and a_index <= line_count
+pt_layout.e:require
+pt_layout.e:valid: a_word >= 1 and a_word <= word_count
+pt_layout.e:ensure
+pt_layout.e:contains: line (Result).contains (a_word)
+pt_layout.e:require
+pt_layout.e:in_range: a_position >= 0 and a_position <= word_count
+pt_layout.e:ensure
+pt_layout.e:non_negative: Result >= 0
+pt_layout.e:ensure
+pt_layout.e:same_count: Result.count = line_count
+pt_layout.e:require
+pt_layout.e:positive_width: a_width > 0
+pt_layout.e:ensure
+pt_layout.e:counted: word_count = a_revision.word_count
+pt_layout.e:covers: word_count > 0 implies
+pt_layout.e:(line_count > 0 and then (line (1).first_word = 1 and line (line_count).last_word = word_count))
+pt_layout.e:contiguous: across 2 |..| line_count as i all line (i).first_word = line (i - 1).last_word + 1 end
+pt_layout.e:fits_or_single: across 1 |..| line_count as i all
+pt_layout.e:line (i).width <= a_width or line (i).first_word = line (i).last_word end
+pt_layout.e:invariant
+pt_layout.e:lines_fit_words: line_count <= word_count
+pt_layout.e:empty_consistent: word_count = 0 implies line_count = 0
+pt_line.e:require
+pt_line.e:first_positive: a_first_word >= 1
+pt_line.e:ordered: a_first_word <= a_last_word
+pt_line.e:width_non_negative: a_width >= 0
+pt_line.e:y_non_negative: a_y >= 0
+pt_line.e:ensure
+pt_line.e:span_set: first_word = a_first_word and last_word = a_last_word
+pt_line.e:width_set: width = a_width
+pt_line.e:y_set: y = a_y
+pt_line.e:invariant
+pt_line.e:first_positive: first_word >= 1
+pt_line.e:ordered: first_word <= last_word
+pt_line.e:width_non_negative: width >= 0
+pt_line.e:y_non_negative: y >= 0
+pt_scripted_decoder.e:ensure
+pt_scripted_decoder.e:nothing_scripted: scripted_count = 0
+pt_scripted_decoder.e:require
+pt_scripted_decoder.e:start_non_negative: a_window_start >= 0
+pt_scripted_decoder.e:words_present: across a_words as ic all not ic.is_empty end
+pt_scripted_decoder.e:ensure
+pt_scripted_decoder.e:scripted: scripted_count >= old scripted_count
+pt_scripted_vad.e:require
+pt_scripted_vad.e:all_in_range: across a_probabilities as ic all ic >= 0.0 and ic <= 1.0 end
+pt_scripted_vad.e:ensure
+pt_scripted_vad.e:set: probabilities = a_probabilities
+pt_scroll_model.e:ensure
+pt_scroll_model.e:follower_set: follower = a_follower
+pt_scroll_model.e:layout_set: layout = a_layout
+pt_scroll_model.e:spring_set: spring = a_spring
+pt_scroll_model.e:at_start: position = 0 and last_ms = 0 and not is_started
+pt_scroll_model.e:require
+pt_scroll_model.e:laid_out: position <= layout.word_count
+pt_scroll_model.e:ensure
+pt_scroll_model.e:non_negative: Result >= 0
+pt_scroll_model.e:require
+pt_scroll_model.e:not_backward: is_started implies a_now_ms >= last_ms
+pt_scroll_model.e:ensure
+pt_scroll_model.e:time_kept: last_ms = a_now_ms
+pt_scroll_model.e:started: is_started
+pt_scroll_model.e:snaps_back: follower.target < old position implies position = follower.target
+pt_scroll_model.e:forward_otherwise: follower.target >= old position implies
+pt_scroll_model.e:(position >= old position - 1.0e-9 and position <= follower.target + 1.0e-9)
+pt_scroll_model.e:bounded: position >= 0 and position <= follower.word_count
+pt_scroll_model.e:require
+pt_scroll_model.e:in_range: a_position >= 0 and a_position <= follower.word_count
+pt_scroll_model.e:ensure
+pt_scroll_model.e:placed: position = a_position
+pt_scroll_model.e:invariant
+pt_scroll_model.e:position_non_negative: position >= 0
+pt_scroll_model.e:time_non_negative: last_ms >= 0
+pt_speech_codec.e:ensure
+pt_speech_codec.e:nothing_decoded: last_frame = Void and last_heard = Void
+pt_speech_codec.e:ensure
+pt_speech_codec.e:tagged: Result.starts_with ("F|")
+pt_speech_codec.e:one_line: not Result.has ('%N')
+pt_speech_codec.e:ensure
+pt_speech_codec.e:tagged: Result.starts_with ("H|")
+pt_speech_codec.e:one_line: not Result.has ('%N')
+pt_speech_codec.e:ensure
+pt_speech_codec.e:at_most_one: not (attached last_frame and attached last_heard)
+pt_speech_pipeline.e:ensure
+pt_speech_pipeline.e:vad_set: vad = a_vad
+pt_speech_pipeline.e:decoder_set: decoder = a_decoder
+pt_speech_pipeline.e:fresh: samples_seen = 0 and pending_frame_count = 0 and pending_heard_count = 0
+pt_speech_pipeline.e:decoding: is_decoding_enabled
+pt_speech_pipeline.e:require
+pt_speech_pipeline.e:valid_index: a_index >= 1 and a_index <= pending_frame_count
+pt_speech_pipeline.e:require
+pt_speech_pipeline.e:valid_index: a_index >= 1 and a_index <= pending_heard_count
+pt_speech_pipeline.e:require
+pt_speech_pipeline.e:count_valid: a_count >= 0 and a_count <= a_samples.count
+pt_speech_pipeline.e:ensure
+pt_speech_pipeline.e:clock_advanced: samples_seen = old samples_seen + a_count
+pt_speech_pipeline.e:frames_emitted: pending_frame_count = old pending_frame_count +
+pt_speech_pipeline.e:(samples_seen // Frame_samples - old samples_seen // Frame_samples).to_integer_32
+pt_speech_pipeline.e:decodes_bounded: pending_heard_count <= old pending_heard_count +
+pt_speech_pipeline.e:(samples_seen // Step_samples - old samples_seen // Step_samples).to_integer_32
+pt_speech_pipeline.e:no_decode_when_disabled: not is_decoding_enabled implies pending_heard_count = old pending_heard_count
+pt_speech_pipeline.e:decode_only_in_speech: pending_heard_count > old pending_heard_count implies last_push_had_speech
+pt_speech_pipeline.e:ensure
+pt_speech_pipeline.e:set: prompt.same_string (a_text)
+pt_speech_pipeline.e:require
+pt_speech_pipeline.e:range: a_threshold > 0.0 and a_threshold < 1.0
+pt_speech_pipeline.e:ensure
+pt_speech_pipeline.e:set: threshold = a_threshold
+pt_speech_pipeline.e:ensure
+pt_speech_pipeline.e:enabled: is_decoding_enabled
+pt_speech_pipeline.e:ensure
+pt_speech_pipeline.e:disabled: not is_decoding_enabled
+pt_speech_pipeline.e:ensure
+pt_speech_pipeline.e:cleared: pending_frame_count = 0 and pending_heard_count = 0
+pt_speech_pipeline.e:clock_kept: samples_seen = old samples_seen
+pt_speech_pipeline.e:invariant
+pt_speech_pipeline.e:threshold_range: threshold > 0.0 and threshold < 1.0
+pt_speech_pipeline.e:clock_non_negative: samples_seen >= 0
+pt_speech_pipeline.e:ring_sized: ring.count = Window_samples
+pt_speech_pipeline.e:step_divides_window: Window_samples \\ Step_samples = 0
+pt_spring.e:require
+pt_spring.e:positive: a_omega > 0
+pt_spring.e:ensure
+pt_spring.e:omega_set: omega = a_omega
+pt_spring.e:at_rest: value = 0 and rate = 0
+pt_spring.e:require
+pt_spring.e:non_negative: a_dt_s >= 0
+pt_spring.e:ensure
+pt_spring.e:no_time_no_move: a_dt_s = 0 implies value = old value
+pt_spring.e:not_farther: (a_target - value).abs <= (a_target - old value).abs + 1.0e-9
+pt_spring.e:no_overshoot: (old value <= a_target implies value <= a_target + 1.0e-9) and
+pt_spring.e:(old value >= a_target implies value >= a_target - 1.0e-9)
+pt_spring.e:ensure
+pt_spring.e:placed: value = a_value
+pt_spring.e:at_rest: rate = 0
+pt_spring.e:invariant
+pt_spring.e:omega_positive: omega > 0
+pt_text_measure.e:ensure
+pt_text_measure.e:non_negative: Result >= 0
+pt_text_measure.e:empty_is_zero: a_text.is_empty implies Result = 0
+pt_text_measure.e:ensure
+pt_text_measure.e:positive: Result > 0
+pt_text_measure.e:ensure
+pt_text_measure.e:positive: Result > 0
+pt_tracking_follower.e:require
+pt_tracking_follower.e:words_non_negative: a_word_count >= 0
+pt_tracking_follower.e:wpm_range: a_fallback_wpm >= 40 and a_fallback_wpm <= 400
+pt_tracking_follower.e:ensure
+pt_tracking_follower.e:at_start: target = 0
+pt_tracking_follower.e:held_initially: is_held
+pt_tracking_follower.e:fallback_set: fallback_rate = a_fallback_wpm / 60.0
+pt_tracking_follower.e:ensure then
+pt_tracking_follower.e:coast_limited: (has_alignment and seconds_since_anchor > Coast_limit) implies velocity = 0
+pt_tracking_follower.e:rate_capped: velocity <= Max_rate_factor * measured_rate.max (Min_rate)
+pt_tracking_follower.e:clock_runs: seconds_since_anchor = old seconds_since_anchor + a_dt_s
+pt_tracking_follower.e:invariant
+pt_tracking_follower.e:rates_positive: fallback_rate > 0 and measured_rate > 0
+pt_tracking_follower.e:aligned_in_script: aligned_word >= 0 and aligned_word <= word_count
+pt_tracking_follower.e:clock_non_negative: seconds_since_anchor >= 0
+pt_vad.e:require
+pt_vad.e:frame_inside: a_offset >= 0 and a_offset + Frame_samples <= a_samples.count
+pt_vad.e:position_non_negative: a_first_sample >= 0
+pt_vad.e:ensure
+pt_vad.e:probability_range: Result >= 0.0 and Result <= 1.0
+pt_voice_frame.e:require
+pt_voice_frame.e:position_non_negative: a_sample_pos >= 0
+pt_voice_frame.e:level_range: a_level >= 0.0 and a_level <= 1.0
+pt_voice_frame.e:probability_range: a_speech_probability >= 0.0 and a_speech_probability <= 1.0
+pt_voice_frame.e:ensure
+pt_voice_frame.e:position_set: sample_pos = a_sample_pos
+pt_voice_frame.e:level_set: level = a_level
+pt_voice_frame.e:probability_set: speech_probability = a_speech_probability
+pt_voice_frame.e:decision_set: is_speech = a_is_speech
+pt_voice_frame.e:ensure
+pt_voice_frame.e:non_negative: Result >= 0
+pt_voice_frame.e:invariant
+pt_voice_frame.e:position_non_negative: sample_pos >= 0
+pt_voice_frame.e:level_range: level >= 0.0 and level <= 1.0
+pt_voice_frame.e:probability_range: speech_probability >= 0.0 and speech_probability <= 1.0
+pt_voice_gated_follower.e:require
+pt_voice_gated_follower.e:words_non_negative: a_word_count >= 0
+pt_voice_gated_follower.e:wpm_range: a_wpm >= Min_wpm and a_wpm <= Max_wpm
+pt_voice_gated_follower.e:ensure
+pt_voice_gated_follower.e:at_start: target = 0
+pt_voice_gated_follower.e:held_initially: is_held
+pt_voice_gated_follower.e:rate_set: words_per_second = a_wpm / 60.0
+pt_voice_gated_follower.e:ensure then
+pt_voice_gated_follower.e:silent_stops: (not is_speaking and ramp_finished) implies velocity = 0
+pt_voice_gated_follower.e:speed_capped: velocity <= words_per_second
+pt_voice_gated_follower.e:invariant
+pt_voice_gated_follower.e:rate_positive: words_per_second > 0
+pt_word_matcher.e:ensure
+pt_word_matcher.e:non_negative: Result >= 0
+pt_word_matcher.e:zero_iff_equal: (Result = 0) = a.same_string (b)
+pt_word_matcher.e:bounded: Result <= Max_distance + 1
+pt_word_matcher.e:require
+pt_word_matcher.e:non_negative: a_length >= 0
+pt_word_matcher.e:ensure
+pt_word_matcher.e:short_strict: a_length <= 4 implies Result = 0
+pt_word_matcher.e:medium: (a_length >= 5 and a_length <= 7) implies Result = 1
+pt_word_matcher.e:long: a_length >= 8 implies Result = 2
+pt_word_matcher.e:within_max: Result <= Max_distance
+pt_word_matcher.e:ensure
+pt_word_matcher.e:equal_is_not_variant: a_heard.same_string (a_script) implies not Result
+pt_word_matcher.e:ensure
+pt_word_matcher.e:exact_matches: (a_heard.same_string (a_script.normalized) and not a_script.is_cue) implies Result
+pt_word_matcher.e:equivalent_matches: (not a_script.is_cue and equivalences.are_equivalent (a_heard, a_script.normalized)) implies Result
+pt_word_matcher.e:cue_never: a_script.is_cue implies not Result
+pt_word_matcher.e:tolerance: Result implies (distance (a_heard, a_script.normalized) <= allowed_distance (a_script.normalized.count)
+pt_word_matcher.e:or is_stem_variant (a_heard, a_script.normalized)
+pt_word_matcher.e:or equivalences.are_equivalent (a_heard, a_script.normalized))
+pt_analysis_codec.e:ensure
+pt_analysis_codec.e:nothing_decoded: not last_analysis.is_success
+pt_analysis_codec.e:ensure
+pt_analysis_codec.e:object: Result.starts_with ("{") and Result.ends_with ("}")
+pt_caption_builder.e:ensure
+pt_caption_builder.e:empty: last_cues.is_empty
+pt_caption_builder.e:ensure
+pt_caption_builder.e:ordered_non_overlapping: across 2 |..| last_cues.count as i all last_cues [i].t0 >= last_cues [i - 1].t1 end
+pt_caption_builder.e:text_is_final_script: (concatenated_ids (last_cues) |=| a_cuts.words_model)
+pt_caption_builder.e:within_output: across last_cues as ic all ic.t1 <= a_cuts.output_duration + 0.001 end
+pt_caption_builder.e:cue_limits: across last_cues as ic all ic.text.count <= Max_cue_chars and ic.t1 - ic.t0 <= Max_cue_seconds end
+pt_caption_builder.e:ensure
+pt_caption_builder.e:numbered: a_cues.is_empty or else Result.starts_with ("1%N")
+pt_caption_builder.e:ensure
+pt_caption_builder.e:header: Result.starts_with ("WEBVTT")
+pt_caption_cue.e:require
+pt_caption_cue.e:times_ordered: a_t0 >= 0 and a_t0 < a_t1
+pt_caption_cue.e:text_present: not a_text.is_empty
+pt_caption_cue.e:ensure
+pt_caption_cue.e:times_set: t0 = a_t0 and t1 = a_t1
+pt_caption_cue.e:text_set: text.same_string (a_text)
+pt_caption_cue.e:invariant
+pt_caption_cue.e:times_ordered: t0 >= 0 and t0 < t1
+pt_caption_cue.e:text_present: not text.is_empty
+pt_chapter_writer.e:ensure
+pt_chapter_writer.e:starts_at_zero: (a_final.section_count > 0 and a_cuts.count > 0) implies Result.starts_with ({STRING_32} "0:00 ")
+pt_cut_codec.e:ensure
+pt_cut_codec.e:nothing_decoded: not has_cuts and last_error = Void
+pt_cut_codec.e:ensure
+pt_cut_codec.e:object: Result.starts_with ("{") and Result.ends_with ("}")
+pt_cut_codec.e:ensure
+pt_cut_codec.e:outcome: has_cuts xor attached last_error
+pt_edl_writer.e:require
+pt_edl_writer.e:fps_positive: a_fps > 0
+pt_edl_writer.e:title_present: not a_title.is_empty
+pt_edl_writer.e:reel_present: not a_reel.is_empty
+pt_edl_writer.e:ensure
+pt_edl_writer.e:header: Result.starts_with ("TITLE:")
+pt_edl_writer.e:one_event_per_cut: event_lines (Result) = a_cuts.count
+pt_review_srt_writer.e:ensure
+pt_review_srt_writer.e:one_cue_per_mark: cue_count (Result) = shown_count (a_journal)
+pt_timecode.e:require
+pt_timecode.e:non_negative: a_seconds >= 0
+pt_timecode.e:below_100_hours: a_seconds < 360_000
+pt_timecode.e:ensure
+pt_timecode.e:shape: Result.count = 12 and Result [9] = ','
+pt_timecode.e:round_trip: (seconds_of_srt (Result) - a_seconds).abs <= 0.0005
+pt_timecode.e:require
+pt_timecode.e:non_negative: a_seconds >= 0
+pt_timecode.e:below_100_hours: a_seconds < 360_000
+pt_timecode.e:ensure
+pt_timecode.e:shape: Result.count = 12 and Result [9] = '.'
+pt_timecode.e:require
+pt_timecode.e:non_negative: a_seconds >= 0
+pt_timecode.e:ensure
+pt_timecode.e:zero_is_0_00: a_seconds < 1 implies Result.same_string ("0:00")
+pt_timecode.e:require
+pt_timecode.e:non_negative: a_seconds >= 0
+pt_timecode.e:fps_positive: a_fps > 0
+pt_timecode.e:ensure
+pt_timecode.e:shape: Result.count = 11
+pt_timecode.e:require
+pt_timecode.e:shape: a_code.count = 12 and a_code [3] = ':' and a_code [6] = ':' and (a_code [9] = ',' or a_code [9] = '.')
+pt_timecode.e:digits: is_digits (a_code.substring (1, 2)) and is_digits (a_code.substring (4, 5))
+pt_timecode.e:and is_digits (a_code.substring (7, 8)) and is_digits (a_code.substring (10, 12))
+pt_timecode.e:ensure
+pt_timecode.e:non_negative: Result >= 0
+pt_timecode.e:require
+pt_timecode.e:range: a_value >= 0 and a_value <= 99
+pt_timecode.e:ensure
+pt_timecode.e:two_chars: Result.count = 2
+pt_timecode.e:require
+pt_timecode.e:range: a_value >= 0 and a_value <= 999
+pt_timecode.e:ensure
+pt_timecode.e:three_chars: Result.count = 3
+pt_capture_plan.e:require
+pt_capture_plan.e:ffmpeg_present: not a_ffmpeg.is_empty
+pt_capture_plan.e:has_camera: a_devices.has_camera
+pt_capture_plan.e:raw_present: not a_raw_path.is_empty
+pt_capture_plan.e:tee_present: not a_tee_path.is_empty
+pt_capture_plan.e:ensure
+pt_capture_plan.e:recording: not is_audio_only
+pt_capture_plan.e:require
+pt_capture_plan.e:ffmpeg_present: not a_ffmpeg.is_empty
+pt_capture_plan.e:tee_present: not a_tee_path.is_empty
+pt_capture_plan.e:ensure
+pt_capture_plan.e:audio_only: is_audio_only
+pt_capture_plan.e:ensure
+pt_capture_plan.e:dshow_input: has_pair (Result, "-f", "dshow")
+pt_capture_plan.e:small_audio_buffer: has_pair (Result, "-audio_buffer_size", Audio_buffer_ms.out)
+pt_capture_plan.e:mjpeg_when_recording: not is_audio_only implies has_pair (Result, "-vcodec", "mjpeg")
+pt_capture_plan.e:pcm_when_recording: not is_audio_only implies has_pair (Result, "-c:a", "pcm_s16le")
+pt_capture_plan.e:raw_when_recording: not is_audio_only implies across Result as ic some ic.same_string (raw_path) end
+pt_capture_plan.e:no_raw_in_practice: is_audio_only implies not has_pair (Result, "-c:v", "h264_nvenc")
+pt_capture_plan.e:tee_format: has_pair (Result, "-f", "f32le") and has_pair (Result, "-ar", "16000") and has_pair (Result, "-ac", "1")
+pt_capture_plan.e:tee_flushed: has_pair (Result, "-flush_packets", "1")
+pt_capture_plan.e:tee_last: Result.last.same_string (tee_path)
+pt_capture_plan.e:ensure
+pt_capture_plan.e:grown: a_args.count = old a_args.count + a_items.count
+pt_capture_plan.e:invariant
+pt_capture_plan.e:raw_iff_recording: is_audio_only = raw_path.is_empty
+pt_capture_plan.e:tee_present: not tee_path.is_empty
+pt_device_choice.e:require
+pt_device_choice.e:microphone_present: not a_microphone.is_empty
+pt_device_choice.e:size_positive: a_width > 0 and a_height > 0
+pt_device_choice.e:fps_range: a_fps >= 1 and a_fps <= 120
+pt_device_choice.e:ensure
+pt_device_choice.e:devices_set: camera.same_string (a_camera) and microphone.same_string (a_microphone)
+pt_device_choice.e:mode_set: width = a_width and height = a_height and fps = a_fps
+pt_device_choice.e:invariant
+pt_device_choice.e:microphone_present: not microphone.is_empty
+pt_device_choice.e:size_positive: width > 0 and height > 0
+pt_device_choice.e:fps_range: fps >= 1 and fps <= 120
+pt_preflight.e:ensure
+pt_preflight.e:no_problems: problems.is_empty
+pt_preflight.e:require
+pt_preflight.e:bitrate_positive: a_bitrate_bps > 0
+pt_preflight.e:minutes_non_negative: a_minutes >= 0
+pt_preflight.e:ensure
+pt_preflight.e:positive: Result > 0
+pt_preflight.e:require
+pt_preflight.e:free_non_negative: a_free_bytes >= 0
+pt_preflight.e:bitrate_positive: a_bitrate_bps > 0
+pt_preflight.e:minutes_non_negative: a_minutes >= 0
+pt_preflight.e:ensure
+pt_preflight.e:ready_iff_no_problems: is_ready = problems.is_empty
+pt_preflight.e:ffmpeg_reported: not a_ffmpeg_found implies not is_ready
+pt_preflight.e:disk_reported: a_free_bytes < required_bytes (a_bitrate_bps, a_minutes) implies not is_ready
+pt_recorder_health.e:require
+pt_recorder_health.e:rate_non_negative: a_tee_bytes_per_s >= 0
+pt_recorder_health.e:drop_range: a_drop_ratio >= 0.0 and a_drop_ratio <= 1.0
+pt_recorder_health.e:ensure
+pt_recorder_health.e:alive_set: is_alive = a_alive
+pt_recorder_health.e:rate_set: tee_bytes_per_s = a_tee_bytes_per_s
+pt_recorder_health.e:drop_set: drop_ratio = a_drop_ratio
+pt_recorder_health.e:invariant
+pt_recorder_health.e:rate_non_negative: tee_bytes_per_s >= 0
+pt_recorder_health.e:drop_range: drop_ratio >= 0.0 and drop_ratio <= 1.0
+pt_render_plan.e:require
+pt_render_plan.e:ffmpeg_present: not a_ffmpeg.is_empty
+pt_render_plan.e:fade_range: a_fade_ms >= 0 and a_fade_ms <= 200
+pt_render_plan.e:ensure
+pt_render_plan.e:fade_set: fade_ms = a_fade_ms
+pt_render_plan.e:punch_set: is_punch_in = a_punch_in
+pt_render_plan.e:require
+pt_render_plan.e:non_empty: a_cuts.count >= 1
+pt_render_plan.e:ensure
+pt_render_plan.e:trims: occurrences (Result, "]trim=") = a_cuts.count and occurrences (Result, "]atrim=") = a_cuts.count
+pt_render_plan.e:one_concat: occurrences (Result, "concat=n=" + a_cuts.count.out) = 1
+pt_render_plan.e:fades_at_joints: fade_ms > 0 implies occurrences (Result, "afade=") = 2 * a_cuts.count - 2
+pt_render_plan.e:ensure
+pt_render_plan.e:output_last: not Result.is_empty implies Result.last.same_string_general (a_output)
+pt_render_plan.e:require
+pt_render_plan.e:part_present: not a_part.is_empty
+pt_render_plan.e:invariant
+pt_render_plan.e:fade_range: fade_ms >= 0 and fade_ms <= 200
+pt_id_source.e:ensure
+pt_id_source.e:nothing_issued: last_issued = 0
+pt_id_source.e:require
+pt_id_source.e:non_negative: a_last >= 0
+pt_id_source.e:ensure
+pt_id_source.e:resumed: last_issued = a_last
+pt_id_source.e:require
+pt_id_source.e:issued: last_issued > 0
+pt_id_source.e:ensure
+pt_id_source.e:matches: Result.value = last_issued
+pt_id_source.e:ensure
+pt_id_source.e:incremented: last_issued = old last_issued + 1
+pt_id_source.e:invariant
+pt_id_source.e:non_negative: last_issued >= 0
+pt_normalizer.e:ensure
+pt_normalizer.e:not_longer: Result.count <= a_text.count
+pt_normalizer.e:no_upper: Result.same_string (Result.as_lower)
+pt_normalizer.e:no_spaces: not Result.has (' ')
+pt_passage.e:require
+pt_passage.e:index_positive: a_index >= 1
+pt_passage.e:first_positive: a_first_word >= 1
+pt_passage.e:ordered: a_first_word <= a_last_word
+pt_passage.e:paragraph_positive: a_paragraph >= 1
+pt_passage.e:section_non_negative: a_section >= 0
+pt_passage.e:ensure
+pt_passage.e:index_set: index = a_index
+pt_passage.e:span_set: first_word = a_first_word and last_word = a_last_word
+pt_passage.e:structure_set: paragraph_index = a_paragraph and section_index = a_section
+pt_passage.e:ensure
+pt_passage.e:definition: Result = last_word - first_word + 1
+pt_passage.e:ensure
+pt_passage.e:definition: Result = (first_word <= a_word and a_word <= last_word)
+pt_passage.e:invariant
+pt_passage.e:index_positive: index >= 1
+pt_passage.e:first_positive: first_word >= 1
+pt_passage.e:ordered: first_word <= last_word
+pt_passage.e:paragraph_positive: paragraph_index >= 1
+pt_passage.e:section_non_negative: section_index >= 0
+pt_script_edit.e:require
+pt_script_edit.e:revision_positive: a_from_revision >= 1
+pt_script_edit.e:first_positive: a_first >= 1
+pt_script_edit.e:range_ordered: a_first <= a_last + 1
+pt_script_edit.e:ensure
+pt_script_edit.e:revision_set: from_revision = a_from_revision
+pt_script_edit.e:range_set: first = a_first and last = a_last
+pt_script_edit.e:text_set: new_text.same_string_general (a_new_text)
+pt_script_edit.e:invariant
+pt_script_edit.e:revision_positive: from_revision >= 1
+pt_script_edit.e:first_positive: first >= 1
+pt_script_edit.e:range_ordered: first <= last + 1
+pt_script_history.e:ensure
+pt_script_history.e:empty: revision_count = 0
+pt_script_history.e:ids_set: ids = a_ids
+pt_script_history.e:parser_set: parser = a_parser
+pt_script_history.e:require
+pt_script_history.e:has_revision: revision_count >= 1
+pt_script_history.e:require
+pt_script_history.e:valid: a_number >= 1 and a_number <= revision_count
+pt_script_history.e:ensure
+pt_script_history.e:numbered: Result.number = a_number
+pt_script_history.e:ensure
+pt_script_history.e:same_count: Result.count = revision_count
+pt_script_history.e:require
+pt_script_history.e:empty: revision_count = 0
+pt_script_history.e:first_numbered: a_first.number = 1
+pt_script_history.e:ensure
+pt_script_history.e:one: revision_count = 1
+pt_script_history.e:current_is_first: current_revision = a_first
+pt_script_history.e:require
+pt_script_history.e:has_revision: revision_count >= 1
+pt_script_history.e:range_low: a_first >= 1
+pt_script_history.e:range_high: a_last <= current_revision.word_count
+pt_script_history.e:range_ordered: a_first <= a_last + 1
+pt_script_history.e:ensure
+pt_script_history.e:one_more: revision_count = old revision_count + 1
+pt_script_history.e:numbered: current_revision.number = old current_revision.number + 1
+pt_script_history.e:history_kept: (revisions_model.front (old revision_count) |=| old revisions_model)
+pt_script_history.e:prefix_ids_kept: (current_revision.ids_model.front (a_first - 1)
+pt_script_history.e:|=| (old current_revision.ids_model).front (a_first - 1))
+pt_script_history.e:suffix_ids_kept: (current_revision.ids_model.tail (current_revision.word_count - (old current_revision.word_count - a_last) + 1)
+pt_script_history.e:|=| (old current_revision.ids_model).tail (a_last + 1))
+pt_script_history.e:ids_unique: current_revision.ids_model.range.count = current_revision.word_count
+pt_script_history.e:invariant
+pt_script_history.e:current_consistent: revision_count >= 1 implies current_revision.number = revision_count
+pt_script_parser.e:ensure
+pt_script_parser.e:nothing_parsed: not has_parsed
+pt_script_parser.e:require
+pt_script_parser.e:number_positive: a_number >= 1
+pt_script_parser.e:ensure
+pt_script_parser.e:parsed: has_parsed
+pt_script_parser.e:numbered: last_revision.number = a_number
+pt_script_parser.e:ids_unique: last_revision.ids_model.range.count = last_revision.word_count
+pt_script_parser.e:ids_fresh: across 1 |..| last_revision.word_count as i all
+pt_script_parser.e:last_revision.word (i).id.value > old a_ids.last_issued end
+pt_script_parser.e:ids_consumed: a_ids.last_issued = old a_ids.last_issued + last_revision.word_count
+pt_script_parser.e:words_found: has_words (a_text) implies last_revision.word_count > 0
+pt_script_parser.e:optional_not_required: across 1 |..| last_revision.word_count as i all
+pt_script_parser.e:not last_revision.word (i).is_required implies not last_revision.spoken_ids_model.has (last_revision.word (i).id) end
+pt_script_parser.e:headings_flagged: across 1 |..| last_revision.section_count as i all
+pt_script_parser.e:last_revision.word (last_revision.section (i).first_word).is_heading end
+pt_script_parser.e:require
+pt_script_parser.e:number_positive: a_number >= 1
+pt_script_parser.e:ensure
+pt_script_parser.e:empty: Result.word_count = 0
+pt_script_revision.e:require
+pt_script_revision.e:number_positive: a_number >= 1
+pt_script_revision.e:ids_unique: ids_are_unique (a_words)
+pt_script_revision.e:passages_partition: passages_partition (a_words.count, a_passages)
+pt_script_revision.e:sections_fit: a_sections.count <= a_passages.count
+pt_script_revision.e:ensure
+pt_script_revision.e:number_set: number = a_number
+pt_script_revision.e:title_set: title.same_string (a_title)
+pt_script_revision.e:counts_set: word_count = a_words.count and passage_count = a_passages.count and section_count = a_sections.count
+pt_script_revision.e:require
+pt_script_revision.e:valid_index: a_index >= 1 and a_index <= word_count
+pt_script_revision.e:require
+pt_script_revision.e:valid_index: a_index >= 1 and a_index <= passage_count
+pt_script_revision.e:require
+pt_script_revision.e:valid_index: a_index >= 1 and a_index <= section_count
+pt_script_revision.e:ensure
+pt_script_revision.e:zero_or_found: Result = 0 or else word (Result).id ~ a_id
+pt_script_revision.e:found_if_present: ids_model.has (a_id) implies Result > 0
+pt_script_revision.e:require
+pt_script_revision.e:valid_index: a_index >= 1 and a_index <= word_count
+pt_script_revision.e:ensure
+pt_script_revision.e:contains: passage (Result).contains (a_index)
+pt_script_revision.e:require
+pt_script_revision.e:first_valid: a_first >= 1
+pt_script_revision.e:last_valid: a_last <= word_count
+pt_script_revision.e:ordered: a_first <= a_last + 1
+pt_script_revision.e:ensure
+pt_script_revision.e:empty_range: a_first > a_last implies Result.is_empty
+pt_script_revision.e:ensure
+pt_script_revision.e:same_count: Result.count = word_count
+pt_script_revision.e:ensure
+pt_script_revision.e:not_longer: Result.count <= word_count
+pt_script_revision.e:ensure
+pt_script_revision.e:same_count: Result.count = passage_count
+pt_script_revision.e:invariant
+pt_script_revision.e:number_positive: number >= 1
+pt_script_revision.e:passages_fit: passage_count <= word_count
+pt_script_revision.e:sections_fit: section_count <= passage_count
+pt_script_revision.e:empty_consistent: word_count = 0 implies passage_count = 0
+pt_script_revision.e:index_sized: index_by_id.count = word_count
+pt_section.e:require
+pt_section.e:index_positive: a_index >= 1
+pt_section.e:heading_present: not a_heading.is_empty
+pt_section.e:first_positive: a_first_word >= 1
+pt_section.e:ensure
+pt_section.e:index_set: index = a_index
+pt_section.e:heading_set: heading.same_string (a_heading)
+pt_section.e:first_set: first_word = a_first_word
+pt_section.e:invariant
+pt_section.e:index_positive: index >= 1
+pt_section.e:heading_present: not heading.is_empty
+pt_section.e:first_positive: first_word >= 1
+pt_stop_words.e:ensure
+pt_stop_words.e:comparing_text: Result.object_comparison
+pt_stop_words.e:invariant
+pt_stop_words.e:non_empty: count > 0
+pt_word.e:require
+pt_word.e:real_id: not a_id.is_none
+pt_word.e:text_present: not a_text.is_empty
+pt_word.e:span_ordered: a_char_start >= 1 and a_char_start <= a_char_end
+pt_word.e:structure_positive: a_passage >= 1 and a_paragraph >= 1 and a_section >= 0
+pt_word.e:normalized_not_longer: a_normalized.count <= a_text.count
+pt_word.e:cue_not_heading: not (a_is_cue and a_is_heading)
+pt_word.e:ensure
+pt_word.e:id_set: id ~ a_id
+pt_word.e:text_set: text.same_string (a_text)
+pt_word.e:normalized_set: normalized.same_string (a_normalized)
+pt_word.e:span_set: char_start = a_char_start and char_end = a_char_end
+pt_word.e:structure_set: passage_index = a_passage and paragraph_index = a_paragraph and section_index = a_section
+pt_word.e:flags_set: is_stop_word = a_is_stop and is_cue = a_is_cue and is_heading = a_is_heading
+pt_word.e:ensure
+pt_word.e:definition: Result = (not is_cue and not is_heading)
+pt_word.e:invariant
+pt_word.e:real_id: not id.is_none
+pt_word.e:text_present: not text.is_empty
+pt_word.e:span_ordered: char_start >= 1 and char_start <= char_end
+pt_word.e:structure_positive: passage_index >= 1 and paragraph_index >= 1 and section_index >= 0
+pt_word.e:normalized_not_longer: normalized.count <= text.count
+pt_word.e:cue_not_heading: not (is_cue and is_heading)
+pt_word_id.e:ensure then
+pt_word_id.e:none: value = 0
+pt_word_id.e:require
+pt_word_id.e:positive: a_value > 0
+pt_word_id.e:ensure
+pt_word_id.e:set: value = a_value
+pt_word_id.e:ensure
+pt_word_id.e:definition: Result = (value = 0)
+pt_word_id.e:invariant
+pt_word_id.e:non_negative: value >= 0
+pt_event_kind.e:require
+pt_event_kind.e:known: a_kind >= Session_start and a_kind <= Abort
+pt_event_kind.e:ensure
+pt_event_kind.e:named: not Result.is_empty
+pt_journal.e:ensure
+pt_journal.e:empty: count = 0
+pt_journal.e:memory_only: not is_persistent
+pt_journal.e:require
+pt_journal.e:path_present: not a_path.is_empty
+pt_journal.e:ensure
+pt_journal.e:empty: count = 0
+pt_journal.e:persistent: is_persistent
+pt_journal.e:require
+pt_journal.e:valid_index: a_index >= 1 and a_index <= count
+pt_journal.e:require
+pt_journal.e:not_empty: count > 0
+pt_journal.e:require
+pt_journal.e:kind_known: a_kind >= {PT_EVENT_KIND}.Session_start and a_kind <= {PT_EVENT_KIND}.Abort
+pt_journal.e:ensure
+pt_journal.e:bounded: Result >= 0 and Result <= count
+pt_journal.e:ensure
+pt_journal.e:same_count: Result.count = count
+pt_journal.e:require
+pt_journal.e:rt_ordered: a_event.rt >= last_rt
+pt_journal.e:open: is_open
+pt_journal.e:ensure
+pt_journal.e:appended: (events_model |=| (old events_model & a_event))
+pt_journal.e:last_updated: last_rt = a_event.rt
+pt_journal.e:persisted: is_persistent implies lines_written = old lines_written + 1
+pt_journal.e:memory_only_unwritten: not is_persistent implies lines_written = old lines_written
+pt_journal.e:require
+pt_journal.e:empty: count = 0
+pt_journal.e:ensure
+pt_journal.e:ordered: across 2 |..| count as i all event (i).rt >= event (i - 1).rt end
+pt_journal.e:skips_counted: skipped_lines >= old skipped_lines
+pt_journal.e:invariant
+pt_journal.e:last_rt_non_negative: last_rt >= 0
+pt_journal.e:empty_zero: count = 0 implies last_rt = 0
+pt_journal.e:writes_bounded: lines_written <= count
+pt_journal_codec.e:ensure
+pt_journal_codec.e:nothing_decoded: not has_event and not has_error
+pt_journal_codec.e:ensure
+pt_journal_codec.e:one_line: not Result.has ('%N') and not Result.has ('%R')
+pt_journal_codec.e:object: Result.starts_with ("{") and Result.ends_with ("}")
+pt_journal_codec.e:ensure
+pt_journal_codec.e:exactly_one_outcome: has_event xor has_error
+pt_journal_codec.e:invariant
+pt_journal_codec.e:event_when_success: has_event implies attached last_event
+pt_recording_clock.e:ensure
+pt_recording_clock.e:at_zero: rt = 0 and byte_count = 0 and observed_at_ms = 0
+pt_recording_clock.e:ensure
+pt_recording_clock.e:non_negative: Result >= 0
+pt_recording_clock.e:require
+pt_recording_clock.e:after: a_now_ms >= observed_at_ms
+pt_recording_clock.e:ensure
+pt_recording_clock.e:not_before: Result >= rt
+pt_recording_clock.e:bounded: Result <= rt + Max_interpolation_s
+pt_recording_clock.e:require
+pt_recording_clock.e:monotone: a_total >= byte_count
+pt_recording_clock.e:time_ok: a_at_ms >= observed_at_ms
+pt_recording_clock.e:ensure
+pt_recording_clock.e:counted: byte_count = a_total
+pt_recording_clock.e:time_set: observed_at_ms = a_at_ms
+pt_recording_clock.e:rt_exact: (rt - a_total / Bytes_per_second).abs < 1.0e-9
+pt_recording_clock.e:invariant
+pt_recording_clock.e:rt_non_negative: rt >= 0
+pt_recording_clock.e:bytes_non_negative: byte_count >= 0
+pt_recording_clock.e:time_non_negative: observed_at_ms >= 0
+pt_restart_policy.e:require
+pt_restart_policy.e:valid: a_word >= 1 and a_word <= a_revision.word_count
+pt_restart_policy.e:ensure
+pt_restart_policy.e:not_after: Result <= a_word
+pt_restart_policy.e:in_same_passage: a_revision.passage_of (Result) = a_revision.passage_of (a_word)
+pt_restart_policy.e:require
+pt_restart_policy.e:valid_position: a_position >= 1 and a_position <= a_revision.word_count
+pt_restart_policy.e:valid_fallback: a_last_confident >= 1 and a_last_confident <= a_position
+pt_restart_policy.e:ensure
+pt_restart_policy.e:valid: Result >= 1 and Result <= a_revision.word_count
+pt_restart_policy.e:at_passage_start: Result = passage_start (a_revision, Result)
+pt_restart_policy.e:not_after: Result <= a_position
+pt_restart_policy.e:previous_if_early: (a_confident and a_position - passage_start (a_revision, a_position) < Early_words
+pt_restart_policy.e:and a_revision.passage_of (a_position) > 1)
+pt_restart_policy.e:implies a_revision.passage_of (Result) = a_revision.passage_of (a_position) - 1
+pt_restart_policy.e:fallback_when_unsure: not a_confident implies Result = passage_start (a_revision, a_last_confident)
+pt_restart_policy.e:require
+pt_restart_policy.e:valid_caret: a_caret >= 1 and a_caret <= a_revision.word_count
+pt_restart_policy.e:known_unit: a_unit = Unit_passage or a_unit = Unit_paragraph
+pt_restart_policy.e:ensure
+pt_restart_policy.e:valid: Result >= 1 and Result <= a_revision.word_count
+pt_restart_policy.e:not_after: Result <= a_caret
+pt_restart_policy.e:moves_unless_first: a_revision.passage_of (a_caret) > 1 implies Result < a_caret
+pt_restart_policy.e:at_passage_start: Result = passage_start (a_revision, Result)
+pt_restart_policy.e:require
+pt_restart_policy.e:valid_caret: a_caret >= 1 and a_caret <= a_revision.word_count
+pt_restart_policy.e:known_unit: a_unit = Unit_passage or a_unit = Unit_paragraph
+pt_restart_policy.e:ensure
+pt_restart_policy.e:valid: Result >= 1 and Result <= a_revision.word_count
+pt_restart_policy.e:not_before: Result >= a_caret
+pt_restart_policy.e:moves_unless_last: a_revision.passage_of (a_caret) < a_revision.passage_count implies Result > a_caret
+pt_restart_policy.e:at_passage_start: Result > a_caret implies Result = passage_start (a_revision, Result)
+pt_session.e:require
+pt_session.e:has_revision: a_history.revision_count >= 1
+pt_session.e:ensure
+pt_session.e:folder_set: folder = a_folder
+pt_session.e:history_set: history = a_history
+pt_session.e:journal_set: journal = a_journal
+pt_session.e:not_analyzed: analysis = Void and cuts = Void
+pt_session.e:ensure
+pt_session.e:set: analysis = a_analysis
+pt_session.e:cuts_from_success: a_analysis.is_success implies cuts = a_analysis.cuts
+pt_session.e:ensure
+pt_session.e:set: cuts = a_cuts
+pt_session.e:analysis_kept: analysis = old analysis
+pt_session_folder.e:require
+pt_session_folder.e:root_present: not a_root.is_empty
+pt_session_folder.e:no_trailing_separator: a_root [a_root.count] /= '\' and a_root [a_root.count] /= '/'
+pt_session_folder.e:ensure
+pt_session_folder.e:root_set: root.same_string (a_root)
+pt_session_folder.e:require
+pt_session_folder.e:positive: a_number >= 1
+pt_session_folder.e:ensure
+pt_session_folder.e:inside: Result.starts_with (script_dir)
+pt_session_folder.e:ensure
+pt_session_folder.e:inside: Result.starts_with (root)
+pt_session_folder.e:named: Result.ends_with (a_name)
+pt_session_folder.e:invariant
+pt_session_folder.e:root_present: not root.is_empty
+pt_take_controller.e:require
+pt_take_controller.e:has_revision: a_history.revision_count >= 1
+pt_take_controller.e:follower_sized: a_follower.word_count = a_history.current_revision.word_count
+pt_take_controller.e:ensure
+pt_take_controller.e:idle: state = {PT_TAKE_STATE}.Idle
+pt_take_controller.e:not_recording: not is_recording
+pt_take_controller.e:caret_at_start: caret = a_history.current_revision.word_count.min (1)
+pt_take_controller.e:history_set: history = a_history
+pt_take_controller.e:journal_set: journal = a_journal
+pt_take_controller.e:follower_set: follower = a_follower
+pt_take_controller.e:ensure
+pt_take_controller.e:non_negative: Result >= 0
+pt_take_controller.e:ensure
+pt_take_controller.e:in_script: Result >= 0 and Result <= revision.word_count
+pt_take_controller.e:ensure
+pt_take_controller.e:in_script: Result >= 0 and Result <= revision.word_count
+pt_take_controller.e:require
+pt_take_controller.e:known: a_action >= {PT_ACTION}.Play and a_action <= {PT_ACTION}.Analysis_done
+pt_take_controller.e:ensure
+pt_take_controller.e:table_rules: Result implies transitions.is_allowed (state, a_action, is_recording)
+pt_take_controller.e:nothing_to_read: (revision.word_count = 0 and (a_action = {PT_ACTION}.Play or a_action = {PT_ACTION}.Record)) implies not Result
+pt_take_controller.e:require
+pt_take_controller.e:known: a_action >= {PT_ACTION}.Play and a_action <= {PT_ACTION}.Analysis_done
+pt_take_controller.e:no_argument: not needs_argument (a_action)
+pt_take_controller.e:allowed: is_allowed (a_action)
+pt_take_controller.e:ensure
+pt_take_controller.e:transitioned: state = transitions.next_state (old state, a_action)
+pt_take_controller.e:recording_starts: a_action = {PT_ACTION}.Record implies is_recording
+pt_take_controller.e:recording_ends: (a_action = {PT_ACTION}.Wrap or a_action = {PT_ACTION}.Abort) implies not is_recording
+pt_take_controller.e:journal_monotone: journal.count >= old journal.count
+pt_take_controller.e:practice_not_journaled: (not old is_recording and a_action /= {PT_ACTION}.Record) implies journal.count = old journal.count
+pt_take_controller.e:again_caret: a_action = {PT_ACTION}.Again implies (caret = last_again_target and last_again_target >= 1)
+pt_take_controller.e:browse_not_journaled: is_browse (a_action) implies journal.count = old journal.count
+pt_take_controller.e:resumes_at_caret: a_action = {PT_ACTION}.Count_in_done implies follower.target = (caret - 1).to_double
+pt_take_controller.e:frozen_unless_reading: (state = {PT_TAKE_STATE}.Count_in or state = {PT_TAKE_STATE}.Held) implies follower.is_held
+pt_take_controller.e:reading_runs: state = {PT_TAKE_STATE}.Reading implies not follower.is_held
+pt_take_controller.e:skip_revises: a_action = {PT_ACTION}.Skip implies history.revision_count = old history.revision_count + 1
+pt_take_controller.e:require
+pt_take_controller.e:held: state = {PT_TAKE_STATE}.Held
+pt_take_controller.e:valid: a_index >= 1 and a_index <= revision.word_count
+pt_take_controller.e:ensure
+pt_take_controller.e:placed: caret = a_index
+pt_take_controller.e:not_journaled: journal.count = old journal.count
+pt_take_controller.e:still_held: state = {PT_TAKE_STATE}.Held
+pt_take_controller.e:require
+pt_take_controller.e:editing: state = {PT_TAKE_STATE}.Editing
+pt_take_controller.e:ensure
+pt_take_controller.e:new_revision: history.revision_count = old history.revision_count + 1
+pt_take_controller.e:back_to_held: state = {PT_TAKE_STATE}.Held
+pt_take_controller.e:journaled_when_recording: is_recording implies journal.count = old journal.count + 1
+pt_take_controller.e:follower_resized: follower.word_count = revision.word_count
+pt_take_controller.e:caret_at_edit: revision.word_count > 0 implies caret = policy.passage_start (revision,
+pt_take_controller.e:(old edit_first).max (1).min (revision.word_count))
+pt_take_controller.e:require
+pt_take_controller.e:allowed: is_allowed ({PT_ACTION}.Marker)
+pt_take_controller.e:ensure
+pt_take_controller.e:journaled: journal.count = old journal.count + 1
+pt_take_controller.e:state_kept: state = old state
+pt_take_controller.e:ensure
+pt_take_controller.e:confidence_taken: alignment_confidence = a_alignment.confidence
+pt_take_controller.e:at_most_one_event: journal.count <= old journal.count + 1
+pt_take_controller.e:not_journaled_in_practice: not is_recording implies journal.count = old journal.count
+pt_take_controller.e:require
+pt_take_controller.e:range: a_seconds >= 0 and a_seconds <= 5
+pt_take_controller.e:ensure
+pt_take_controller.e:set: count_in_seconds = a_seconds
+pt_take_controller.e:invariant
+pt_take_controller.e:state_known: state >= {PT_TAKE_STATE}.Idle and state <= {PT_TAKE_STATE}.Wrapped
+pt_take_controller.e:caret_valid: revision.word_count > 0 implies (caret >= 1 and caret <= revision.word_count)
+pt_take_controller.e:caret_zero_when_empty: revision.word_count = 0 implies caret = 0
+pt_take_controller.e:confidence_range: alignment_confidence >= 0.0 and alignment_confidence <= 1.0
+pt_take_controller.e:count_in_range: count_in_seconds >= 0 and count_in_seconds <= 5
+pt_take_controller.e:last_confident_in_script: last_confident_word >= 0 and last_confident_word <= revision.word_count
+pt_take_controller.e:again_target_in_script: last_again_target >= 0 and last_again_target <= revision.word_count
+pt_take_event.e:require
+pt_take_event.e:rt_ok: a_rt >= 0
+pt_take_event.e:revision_ok: a_revision >= 1
+pt_take_event.e:ensure
+pt_take_event.e:kind_set: kind = {PT_EVENT_KIND}.Session_start
+pt_take_event.e:rt_set: rt = a_rt
+pt_take_event.e:revision_set: to_rev = a_revision
+pt_take_event.e:require
+pt_take_event.e:rt_ok: a_rt >= 0
+pt_take_event.e:real_caret: not a_caret.is_none
+pt_take_event.e:revision_ok: a_revision >= 1
+pt_take_event.e:ensure
+pt_take_event.e:kind_set: kind = {PT_EVENT_KIND}.Resume
+pt_take_event.e:rt_set: rt = a_rt
+pt_take_event.e:caret_set: caret ~ a_caret
+pt_take_event.e:revision_set: to_rev = a_revision
+pt_take_event.e:require
+pt_take_event.e:rt_ok: a_rt >= 0
+pt_take_event.e:ensure
+pt_take_event.e:kind_set: kind = {PT_EVENT_KIND}.Hold
+pt_take_event.e:rt_set: rt = a_rt
+pt_take_event.e:require
+pt_take_event.e:rt_ok: a_rt >= 0
+pt_take_event.e:ensure
+pt_take_event.e:kind_set: kind = {PT_EVENT_KIND}.Flub
+pt_take_event.e:rt_set: rt = a_rt
+pt_take_event.e:word_set: word ~ a_word
+pt_take_event.e:require
+pt_take_event.e:rt_ok: a_rt >= 0
+pt_take_event.e:real_caret: not a_caret.is_none
+pt_take_event.e:ensure
+pt_take_event.e:kind_set: kind = {PT_EVENT_KIND}.Rewind_to
+pt_take_event.e:caret_set: caret ~ a_caret
+pt_take_event.e:require
+pt_take_event.e:rt_ok: a_rt >= 0
+pt_take_event.e:seconds_ok: a_seconds >= 0
+pt_take_event.e:ensure
+pt_take_event.e:kind_set: kind = {PT_EVENT_KIND}.Count_in
+pt_take_event.e:seconds_set: seconds = a_seconds
+pt_take_event.e:require
+pt_take_event.e:rt_ok: a_rt >= 0
+pt_take_event.e:revision_ok: a_from_rev >= 1
+pt_take_event.e:ensure
+pt_take_event.e:kind_set: kind = {PT_EVENT_KIND}.Edit
+pt_take_event.e:next_revision: to_rev = a_from_rev + 1
+pt_take_event.e:old_kept: attached old_text as al_old and then al_old.same_string (a_old)
+pt_take_event.e:require
+pt_take_event.e:rt_ok: a_rt >= 0
+pt_take_event.e:ensure
+pt_take_event.e:kind_set: kind = {PT_EVENT_KIND}.Star
+pt_take_event.e:require
+pt_take_event.e:rt_ok: a_rt >= 0
+pt_take_event.e:ensure
+pt_take_event.e:kind_set: kind = {PT_EVENT_KIND}.Reject
+pt_take_event.e:require
+pt_take_event.e:rt_ok: a_rt >= 0
+pt_take_event.e:ensure
+pt_take_event.e:kind_set: kind = {PT_EVENT_KIND}.Marker
+pt_take_event.e:require
+pt_take_event.e:rt_ok: a_rt >= 0
+pt_take_event.e:revision_ok: a_from_rev >= 1
+pt_take_event.e:ensure
+pt_take_event.e:kind_set: kind = {PT_EVENT_KIND}.Skip
+pt_take_event.e:next_revision: to_rev = a_from_rev + 1
+pt_take_event.e:require
+pt_take_event.e:rt_ok: a_rt >= 0
+pt_take_event.e:confidence_range: a_confidence >= 0.0 and a_confidence <= 1.0
+pt_take_event.e:ensure
+pt_take_event.e:kind_set: kind = {PT_EVENT_KIND}.Align
+pt_take_event.e:confidence_set: confidence = a_confidence
+pt_take_event.e:require
+pt_take_event.e:rt_ok: a_rt >= 0
+pt_take_event.e:ensure
+pt_take_event.e:kind_set: kind = {PT_EVENT_KIND}.Wrap
+pt_take_event.e:require
+pt_take_event.e:rt_ok: a_rt >= 0
+pt_take_event.e:ensure
+pt_take_event.e:kind_set: kind = {PT_EVENT_KIND}.Abort
+pt_take_event.e:require
+pt_take_event.e:rt_ok: a_rt >= 0
+pt_take_event.e:ensure
+pt_take_event.e:rt_set: rt = a_rt
+pt_take_event.e:kind_set: kind = a_kind
+pt_take_event.e:invariant
+pt_take_event.e:kind_known: kind >= {PT_EVENT_KIND}.Session_start and kind <= {PT_EVENT_KIND}.Abort
+pt_take_event.e:rt_non_negative: rt >= 0
+pt_take_event.e:edit_complete: kind = {PT_EVENT_KIND}.Edit implies
+pt_take_event.e:(attached old_text and attached new_text and to_rev = from_rev + 1)
+pt_take_event.e:resume_has_caret: kind = {PT_EVENT_KIND}.Resume implies not caret.is_none
+pt_take_event.e:confidence_range: confidence >= 0.0 and confidence <= 1.0
+pt_take_event.e:seconds_non_negative: seconds >= 0
+pt_transitions.e:ensure
+pt_transitions.e:sized: table.height = State_count and table.width = Action_count
+pt_transitions.e:require
+pt_transitions.e:state_known: a_state >= {PT_TAKE_STATE}.Idle and a_state <= {PT_TAKE_STATE}.Wrapped
+pt_transitions.e:action_known: a_action >= {PT_ACTION}.Play and a_action <= {PT_ACTION}.Analysis_done
+pt_transitions.e:ensure
+pt_transitions.e:zero_or_state: Result = 0 or (Result >= {PT_TAKE_STATE}.Idle and Result <= {PT_TAKE_STATE}.Wrapped)
+pt_transitions.e:require
+pt_transitions.e:state_known: a_state >= {PT_TAKE_STATE}.Idle and a_state <= {PT_TAKE_STATE}.Wrapped
+pt_transitions.e:action_known: a_action >= {PT_ACTION}.Play and a_action <= {PT_ACTION}.Analysis_done
+pt_transitions.e:ensure
+pt_transitions.e:listed: Result implies table_entry (a_state, a_action) /= 0
+pt_transitions.e:recording_only: (is_recording_only (a_action) and not a_recording) implies not Result
+pt_transitions.e:practice_only: (is_practice_only (a_action) and a_recording) implies not Result
+pt_transitions.e:require
+pt_transitions.e:state_known: a_state >= {PT_TAKE_STATE}.Idle and a_state <= {PT_TAKE_STATE}.Wrapped
+pt_transitions.e:action_known: a_action >= {PT_ACTION}.Play and a_action <= {PT_ACTION}.Analysis_done
+pt_transitions.e:listed: table_entry (a_state, a_action) /= 0
+pt_transitions.e:ensure
+pt_transitions.e:known: Result >= {PT_TAKE_STATE}.Idle and Result <= {PT_TAKE_STATE}.Wrapped
+pt_transitions.e:invariant
+pt_transitions.e:sized: table.height = State_count and table.width = Action_count

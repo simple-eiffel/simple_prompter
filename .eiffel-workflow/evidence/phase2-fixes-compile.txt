@@ -1,0 +1,127 @@
+# Phase 2 fixes: compile + test evidence (2026-10-05 17:35)
+ec.sh check simple_prompter: errors=0 warnings=0
+ec.sh check simple_prompter_tests: errors=0 warnings=0
+ec.sh test: errors=0
+System Recompiled.
+C compilation completed
+[0;32m✓ Built: EIFGENs/simple_prompter_tests/F_code/simple_prompter.exe (1s ago)[0m
+
+Running simple_prompter tests...
+
+-- script --
+  PASS: word_id_default_is_none
+  PASS: revision_structure_from_fixture
+  PASS: index_of_and_passage_of
+  PASS: revision_rejects_duplicate_ids
+  PASS: id_source_is_monotone
+  PASS: stop_words
+  FAIL: parser_finds_words_and_passages [POSTCONDITION_VIOLATION: words_found]
+  FAIL: parser_cues_are_not_spoken [POSTCONDITION_VIOLATION: words_found]
+  FAIL: history_edit_keeps_untouched_ids [POSTCONDITION_VIOLATION: one_more]
+  FAIL: normalizer [DEVELOPER_EXCEPTION: lower, no punctuation]
+
+-- followers, layout, matcher, aligner --
+  PASS: constant_one_word_per_second_at_60_wpm
+  PASS: held_follower_does_not_move
+  PASS: constant_clamps_at_end
+  PASS: caret_is_the_only_backward_move
+  PASS: rescale_clamps_target
+  FAIL: voice_gated_moves_only_while_speaking [DEVELOPER_EXCEPTION: moved while speaking: expected 0 > 1]
+  PASS: voice_gated_stops_within_250_ms
+  FAIL: tracking_holds_after_coast_limit [DEVELOPER_EXCEPTION: has alignment]
+  FAIL: spring_moves_toward_target [DEVELOPER_EXCEPTION: moved: expected 0 > 0]
+  PASS: fixed_measure
+  FAIL: layout_wraps_every_word [POSTCONDITION_VIOLATION: covers]
+  PASS: scroll_tick_keeps_time
+  FAIL: restart_snaps_scroll_back [POSTCONDITION_VIOLATION: snaps_back]
+  PASS: allowed_distance_tiers
+  FAIL: matcher_exact_and_tolerant [POSTCONDITION_VIOLATION: exact_matches]
+  FAIL: equivalent_word_matches [POSTCONDITION_VIOLATION: equivalent_matches]
+  PASS: reanchor_places_position
+  PASS: stop_words_alone_never_move
+  PASS: stale_window_is_ignored
+  FAIL: aligner_follows_reading [DEVELOPER_EXCEPTION: on 'notch': expected 7, got 0]
+  FAIL: repeated_phrase_picks_the_forward_occurrence [DEVELOPER_EXCEPTION: in sentence 6: expected 6, got 5]
+
+-- equivalences (real voice) --
+  PASS: homophones_from_the_recording
+  PASS: spoken_abbreviations_from_the_recording
+  PASS: numbers_from_the_recording
+  PASS: compounds_from_the_recording
+  FAIL: phonetics_from_the_recording [DEVELOPER_EXCEPTION: celero ~ silero]
+  PASS: unrelated_words_differ
+
+-- speech pipeline --
+  FAIL: push_advances_recording_clock [POSTCONDITION_VIOLATION: frames_emitted]
+  FAIL: one_frame_per_512_samples [POSTCONDITION_VIOLATION: frames_emitted]
+  FAIL: no_decode_when_disabled [POSTCONDITION_VIOLATION: frames_emitted]
+  FAIL: decodes_while_speaking_with_prompt [POSTCONDITION_VIOLATION: frames_emitted]
+  FAIL: clear_pending_keeps_clock [POSTCONDITION_VIOLATION: frames_emitted]
+  PASS: scripted_doubles
+  FAIL: speech_codec_round_trip [DEVELOPER_EXCEPTION: frame back]
+
+-- take studio state machine and journal --
+  PASS: table_lists_34_pairs
+  PASS: recording_only_and_practice_only
+  PASS: editing_allows_only_commit_or_cancel
+  FAIL: record_then_count_in_done_reads [POSTCONDITION_VIOLATION: reading_runs]
+  FAIL: again_counts_in_from_sentence_start [POSTCONDITION_VIOLATION: reading_runs]
+  FAIL: resume_puts_reader_on_the_caret [POSTCONDITION_VIOLATION: resumes_at_caret]
+  PASS: empty_script_cannot_start
+  PASS: pick_word_moves_caret_without_journal
+  FAIL: practice_writes_no_journal [POSTCONDITION_VIOLATION: reading_runs]
+  PASS: disallowed_action_is_refused
+  FAIL: commit_edit_makes_a_revision [POSTCONDITION_VIOLATION: new_revision]
+  PASS: journal_append_keeps_order
+  PASS: journal_refuses_time_travel
+  FAIL: codec_round_trip [DEVELOPER_EXCEPTION: decoded]
+  PASS: 64000_bytes_is_one_second
+  PASS: clock_refuses_shrinking_file
+  FAIL: again_caret_rules [POSTCONDITION_VIOLATION: at_passage_start]
+
+-- assembly --
+  PASS: speech_map_silence
+  PASS: cut_list_output_mapping
+  PASS: cut_list_refuses_script_disorder
+  FAIL: floor_is_the_complement [POSTCONDITION_VIOLATION: complement]
+  FAIL: attempt_per_resume [POSTCONDITION_VIOLATION: one_per_resume]
+  FAIL: solver_exact_cover_after_cough [POSTCONDITION_VIOLATION: exact_cover_in_order]
+  PASS: analyzer_reports_transcriber_failure
+  FAIL: flagger_flags_every_tight_cut [POSTCONDITION_VIOLATION: tight_flagged]
+
+-- outputs and plans --
+  PASS: srt_and_vtt
+  PASS: chapter_and_edl
+  FAIL: review_srt_one_cue_per_mark [POSTCONDITION_VIOLATION: one_cue_per_mark]
+  FAIL: edl_has_one_event_per_cut [POSTCONDITION_VIOLATION: one_event_per_cut]
+  FAIL: render_plan_follows_the_spike_recipe [POSTCONDITION_VIOLATION: trims]
+  FAIL: cut_codec_round_trip [DEVELOPER_EXCEPTION: decoded]
+  PASS: capture_plan_recording_arguments
+  PASS: capture_plan_sets_a_small_audio_buffer
+  PASS: capture_plan_practice_is_audio_only
+  PASS: preflight_disk_check
+
+-- keymap, controls and settings --
+  PASS: defaults_need_modifiers
+  PASS: bare_key_needs_the_recording_flag
+  PASS: bare_keys_only_while_recording
+  PASS: activation_refused_outside_recording
+  PASS: two_keys_for_one_control
+  PASS: rebinding_a_combo_replaces_it
+  PASS: clicker_back_depends_on_state
+  PASS: hold_toggle_and_wrap_by_mode
+  PASS: setters_save_and_clamp_by_contract
+  PASS: default_mode_waits_for_proof
+
+-- facade --
+  FAIL: load_wires_everything [POSTCONDITION_VIOLATION: words_found]
+  PASS: fluent_configuration
+  FAIL: constant_practice_read_moves [POSTCONDITION_VIOLATION: words_found]
+  FAIL: prompt_is_already_read_text_only [POSTCONDITION_VIOLATION: words_found]
+
+-- SCOOP consumer --
+  PASS: separate_recording_clock
+
+========================
+Results: 56 passed, 38 failed
+TESTS FAILED

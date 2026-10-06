@@ -1,0 +1,27 @@
+# Phase 2 Review Chain Evidence
+# Project: D:/prod/simple_prompter
+# Date: 2026-10-05
+
+Review chain: Claude Opus 5.5 (adversarial self-review)
+Classes reviewed: 84 library + 11 test classes (78 tests)
+Issues found: HIGH 7, MEDIUM 12, LOW 6, INFO 3 (incl. 4 from the real recording)
+
+HIGH issues:
+  H1 caret/aligner/follower index conventions (off by one)
+  H2 scroll model cannot see caret changes (Again would rewind visibly)
+  H3 stale decode window after a restart yanks the aligner
+  H4 facade does not rewire aligner/layout after a live edit
+  H5 keymap cannot express several keys per action or state-dependent clicker keys
+  H6 dshow -audio_buffer_size unspecified (pause latency budget)
+  H7 matcher lacks equivalence classes (real voice: 91.7% raw accuracy, systematic misses)
+
+Verified non-issues: MML front/tail clamp via interval (apply_edit edges safe);
+all invariants O(1) (mechanical scan, no across/_model/.has in any invariant).
+
+Synopsis: .eiffel-workflow/synopsis.md
+Full review: .eiffel-workflow/evidence/phase2-claude-response.md
+Approach: .eiffel-workflow/approach.md
+
+Human approval: APPROVED by Larry, 2026-10-05 ("I approve")
+
+# Status: COMPLETE (approved)

@@ -1,0 +1,26 @@
+# Pre-Phase Specification Evidence
+# Project: D:/prod/simple_prompter
+# Date: 2026-10-05
+
+Specification completed: yes
+Steps completed: 8/8
+Classes designed: 101 simple_prompter (77 library, 7 speech, 5 runtime, 11 app, 1 worker)
+                  + 7 simple_text_structure (new upstream lib, extracted from simple_speed_reader)
+                  + upstream interface deltas in 6 libraries (06 section 5)
+Contracts defined: full contract sets for 24 classes in 05; full skeletons for 10 classes in 07
+Requirements traced: 46 FR + 15 NFR + 8 new FR (08 table)
+
+OOSC2 compliance: PASS
+Eiffel excellence: PASS (2 documented CQS exceptions)
+Ready for implementation: yes for /eiffel.intent; open issues 1 and 3 need Larry before contracts compile
+
+Spec-phase evidence executed:
+- simple_speed_reader inventory (read-only)
+- prefix checks: PT_ free; PR_ (Gobo parse) and TS_ (Gobo test) taken; STS_ free
+- simple_mml API read: MML_SEQUENCE not ITERABLE (fixed in 05; oracle gotcha recorded)
+- SHELL_DESKTOP.now_ms is QPC (shell_desktop.e:75-82)
+- ffplay 8.0 present; tail-file latency spike (growing f32le file within ~0.17 s of wall clock)
+
+Nothing Eiffel was written or compiled in this phase.
+
+# Status: COMPLETE

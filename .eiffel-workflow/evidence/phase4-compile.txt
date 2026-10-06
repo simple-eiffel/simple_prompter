@@ -1,0 +1,82 @@
+# Phase 4 Implementation Evidence
+# Project: d:/prod/simple_prompter
+# Date: 2026-10-05
+
+## Compile (finalized, contracts kept)
+Command: /d/prod/ec.sh test -config simple_prompter.ecf -target simple_prompter_tests
+```
+Degree 6: Examining System
+Degree 5: Parsing Classes
+Degree 4: Analyzing Inheritance
+Degree 3: Checking Types
+Degree 2: Generating Byte Code
+Degree -2: Constructing Polymorphic Table
+Degree -3: Generating Optimized Code
+System Recompiled.
+errors=0 warnings=0
+```
+
+## Tests - contract-checked F_code (EIFGENs/simple_prompter_tests/F_code/simple_prompter_dbc.exe, 13.8 s)
+```
+-- script --
+-- followers, layout, matcher, aligner --
+-- equivalences (real voice) --
+-- speech pipeline --
+-- take studio state machine and journal --
+-- assembly --
+-- outputs and plans --
+-- keymap, controls and settings --
+-- phase 4 acceptance --
+-- real voice: larry_read_01 --
+-- facade --
+-- SCOOP consumer --
+Results: 116 passed, 0 failed
+ALL TESTS PASSED
+```
+
+## Tests - lean F_code (no contracts; simple_prompter_lean.exe, 1.4 s)
+The 8 failures are the tests that assert a CONTRACT refuses bad input; with contracts off they cannot fire. Expected.
+```
+  FAIL: revision_rejects_duplicate_ids [DEVELOPER_EXCEPTION: duplicate ids refused]
+  FAIL: disallowed_action_is_refused [DEVELOPER_EXCEPTION: Go from idle refused]
+  FAIL: journal_refuses_time_travel [DEVELOPER_EXCEPTION: earlier rt refused]
+  FAIL: clock_refuses_shrinking_file [DEVELOPER_EXCEPTION: shrink refused]
+  FAIL: cut_list_refuses_script_disorder [DEVELOPER_EXCEPTION: earlier words refused]
+  FAIL: bare_key_needs_the_recording_flag [DEVELOPER_EXCEPTION: bare without flag refused]
+  FAIL: activation_refused_outside_recording [DEVELOPER_EXCEPTION: refused]
+  FAIL: setters_save_and_clamp_by_contract [DEVELOPER_EXCEPTION: out of range refused]
+Results: 108 passed, 8 failed
+TESTS FAILED
+```
+
+## Contract freeze
+phase4-contracts-before.txt vs phase4-contracts-after.txt (content-based snapshot, 1,562 lines after):
+- Frozen lines removed or changed: 0
+- Lines added: 51, all in NEW helper features (PT_ALIGNER.cached_match, codec helpers, L20 setters,
+  controller stamp/log, speech codec field helpers) and rescue clauses. Approved additions M9, M10,
+  M12, M13, M14, L17 were applied before the before-snapshot.
+Contract changes detected: no (frozen contracts unchanged)
+
+## Real voice (larry_read_01)
+TEST_REAL_VOICE replays Larry's recording word times through PT_ALIGNER: within one line at all
+checkpoints, holds during the ad-lib, jumps the skipped paragraph, never moves backward, and
+meets the frame budget (aligner_meets_frame_budget: < 16 ms/update in the DBC build).
+
+## Performance findings (2026-10-05)
+- Aligner: 0.11 ms/update lean, 2.5 ms/update with contracts (580 updates). Not a bottleneck.
+- The suite's slowness (168-224 s DBC, 36 s lean) was ONE torn-JSONL-line replay: ISE's
+  JSON_PARSER.next_json_string never checks end of input, so {"t":"hol looped to INTEGER overflow
+  (157,779 ms with contracts, ~34 s lean, 4.28 GB working set observed). Real product risk: reopening
+  a session after a crash would freeze. Fixed upstream in simple_json (unterminated_string_at guard
+  in parse/is_valid_json; its disabled test_unclosed_string re-enabled; simple_json 273/273).
+  After the fix: torn line 0.025 ms; suite 13.8 s DBC / 1.4 s lean.
+- GC-off experiment: 30x slower (paging). Reverted.
+- Tooling trap: client incremental builds do not pick up library edits; needed -clean.
+
+## Known gaps carried to Phase 5 review
+1. PT_FLAGGER has no misread detection (occurrences carry no heard text) - T18 "55070 flagged" unmet.
+2. PT_JOURNAL write-failure handling (append_line False only skips the count).
+3. O(n) postconditions in journal append (contract builds only).
+4. simple_file.content UTF-8 bug (Track B library fix); interim local tokenizer until simple_text_structure.
+
+# Status: PASS
