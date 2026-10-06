@@ -125,10 +125,14 @@ produced a real episode.
 | 1 | 1a simple_shell 1.11.0: SHELL_PANEL, SHELL_HOTKEYS, SHELL_MONITORS, display scale | done on branch feature/panel-hotkeys-monitors (28/28, SCOOP 4/4); merge + push at the use gate |
 | 1 | 1b S-2 capture exclusion | automated part done: affinity 0x11; screen grab and PrintWindow both see nothing; Larry to confirm in OBS / Teams / Snipping Tool |
 | 1 | 1c simple_prompter_app (PT_APP, PT_PILL, PT_PILL_RENDERER, PT_CAIRO_MEASURE, PT_INPUT_ROUTER, PT_QPC_CLOCK; library: PT_PILL_GEOMETRY, pill position in settings, Hold offers the passage start) | done: app builds 0/0; library 190/190; scripted run by posted hotkeys: play, count-in, scroll, hold, forward, go all work |
-| 1 | 1d use gate | waiting for Larry: `run_prompter.cmd` |
+| 1 | 1d use gate | waiting for Larry: installer `installer\output\simple_prompter-0.1.0-Setup.exe` |
+| 5 | Installer (Larry 2026-10-06: "Let's build an installer so I can install and run" - moved ahead of Steps 2-4) | done: Inno Setup per-user installer 0.1.0, welcome + read-test samples, README; installed-layout run verified (welcome script opens from the program folder) |
 | 2-5 | | pending |
 
 Notes from 1c:
 - The pill is DPI-scaled (settings stay in design pixels; 150% display = 1.5x).
 - `--capturable` lets screenshots see the pill (for docs/demos); default is hidden.
 - simple_widgets fix/locale-unused-local: one unused local removed (every client build warned).
+- Script loading for an installed app: Open dialog (simple_shell SHELL_FILE_DIALOG), Ctrl+Alt+O, drag-drop,
+  last script remembered. simple_toml fix/unicode-escape: non-ASCII strings were saved as \u + 8 digits.
+- simple_shell pump_for deadline moved to the performance counter (a GetTickCount flake).
