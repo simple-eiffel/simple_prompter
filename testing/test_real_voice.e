@@ -115,6 +115,115 @@ feature -- Tests
 			"LARGE_INTEGER f, c; QueryPerformanceFrequency (&f); QueryPerformanceCounter (&c); return (EIF_REAL_64) c.QuadPart * 1000.0 / (EIF_REAL_64) f.QuadPart;"
 		end
 
+	test_misreads_on_larry_read_01
+			-- T18: on the real recording, "5070" heard as "55070" is a misread; equivalence-class
+			-- matches (homophones, "for example" for "e.g.", number words) never are.
+		local
+			l_aligner: PT_ATTEMPT_ALIGNER
+			l_revision: PT_SCRIPT_REVISION
+			l_attempts: ARRAYED_LIST [PT_ATTEMPT]
+			l_found_55070, l_none_equivalent: BOOLEAN
+		do
+			l_revision := script
+			create l_attempts.make (1)
+			l_attempts.extend (create {PT_ATTEMPT}.make (1, create {PT_TIME_SPAN}.make (0, 144.02), l_revision.word (1).id,
+				1, 1, l_revision.word_count, False, False))
+			create l_aligner.make (create {PT_WORD_MATCHER})
+			l_aligner.align (l_attempts, history_of (l_revision), whole_recording)
+			l_none_equivalent := True
+			across l_aligner.last_misreads as ic loop
+				if ic.heard_text.same_string ({STRING_32} "55070") and ic.script_text.has_substring ({STRING_32} "5070") then
+					l_found_55070 := True
+				end
+				if l_aligner.matcher.equivalences.are_equivalent (ic.heard_text, (create {PT_NORMALIZER}).normalized (ic.script_text)) then
+					l_none_equivalent := False
+				end
+			end
+			assert_true ("55070 flagged", l_found_55070)
+			assert_true ("no equivalence-class match flagged", l_none_equivalent)
+			assert_integers_equal ("exactly one misread (no false flags)", 1, l_aligner.last_misreads.count)
+				-- 102 occurrences before the Phase 5 fixes (a long cue line stopped alignment), 214 after.
+			assert_true ("timeline covers the read: " + l_aligner.last_timeline.count.out, l_aligner.last_timeline.count >= 200)
+		end
+
+	test_analysis_of_larry_read_01
+			-- The whole automatic editor on the real recording, one take from start to wrap.
+		local
+			an: PT_SESSION_ANALYZER
+			j: PT_JOURNAL
+			l_revision: PT_SCRIPT_REVISION
+			l_i, l_skipped: INTEGER
+			l_pause_flagged: BOOLEAN
+		do
+			l_revision := script
+			create j.make_in_memory
+			j.append (create {PT_TAKE_EVENT}.make_resume (0.0, l_revision.word (1).id, 1))
+			j.append (create {PT_TAKE_EVENT}.make_wrap (144.0, "user"))
+			create an.make (create {PT_SCRIPTED_TRANSCRIBER}.make (vad_map, whole_recording),
+				create {PT_ATTEMPT_BUILDER}.make, create {PT_ATTEMPT_ALIGNER}.make (create {PT_WORD_MATCHER}),
+				create {PT_TAKE_SOLVER}.make (1.0, 0.1, 0.5), create {PT_SILENCE_SNAPPER}.make (0.12, 0.20),
+				create {PT_FLAGGER}.make (2.0))
+			an.analyze ({STRING_32} "raw.mkv", 144.02, j, history_of (l_revision))
+			assert_true ("analyzed", an.last_analysis.is_success)
+			assert_integers_equal ("one misread", 1, an.flagger.count_of ({PT_FLAG_KIND}.Misread))
+			across an.last_analysis.flags as ic loop
+				if ic.kind = {PT_FLAG_KIND}.Misread then
+					assert_true ("the 55070 misread", ic.message.has_substring ({STRING_32} "55070"))
+				elseif ic.kind = {PT_FLAG_KIND}.Long_pause and then (ic.span.t0 - 19.17).abs < 0.05 then
+					l_pause_flagged := True
+				end
+			end
+			assert_true ("instructed pause flagged", l_pause_flagged)
+				-- Missing: exactly the paragraph the cue said to skip.
+			l_skipped := index_of_word (l_revision, {STRING_32} "skipped")
+			assert_integers_equal ("only the skipped paragraph is missing", 30, an.solver.missing_words.count)
+			across an.solver.missing_words as ic loop
+				assert_true ("missing word in the skipped paragraph",
+					l_revision.passage (l_revision.passage_of (l_revision.index_of (ic))).paragraph_index
+						= l_revision.word (l_skipped).paragraph_index)
+			end
+			from l_i := 1 until l_i > an.last_analysis.cuts.count loop
+				assert_false ("the ad-lib is cut out", an.last_analysis.cuts.cut (l_i).span.contains (88.0))
+				if l_i > 1 then
+					assert_true ("cuts never overlap", an.last_analysis.cuts.cut (l_i).span.t0 >= an.last_analysis.cuts.cut (l_i - 1).span.t1)
+				end
+				l_i := l_i + 1
+			end
+			assert_true ("about two minutes of output: " + an.last_analysis.cuts.output_duration.out,
+				an.last_analysis.cuts.output_duration > 120.0 and an.last_analysis.cuts.output_duration < 130.0)
+		end
+
+	vad_map: PT_SPEECH_MAP
+			-- VAD speech map of larry_read_01 (144.02 s).
+		local
+			l_fields: LIST [STRING_32]
+		do
+			create Result.make (144.02)
+			across file_text ("testing/fixtures/larry_read_01.vad.tsv").split ('%N') as ic loop
+				l_fields := ic.split ('%T')
+				if l_fields.count = 2 and then l_fields [1].is_double and then l_fields [2].is_double
+					and then l_fields [1].to_double >= Result.last_end then
+					Result.extend_span (create {PT_TIME_SPAN}.make (l_fields [1].to_double, l_fields [2].to_double))
+				end
+			end
+		end
+
+	whole_recording: PT_HEARD_WORDS
+			-- Every heard word of larry_read_01 in one window (absolute seconds).
+		local
+			n: PT_NORMALIZER
+			l_words: ARRAYED_LIST [PT_HEARD_WORD]
+		do
+			create n
+			create l_words.make (heard_words.count)
+			across heard_words as ic loop
+				if not ic.text.is_empty then
+					l_words.extend (create {PT_HEARD_WORD}.make (ic.text, n.normalized (ic.text), ic.t0, ic.t1.max (ic.t0), 0.9))
+				end
+			end
+			create Result.make (0, 145 * 16_000, l_words)
+		end
+
 feature {NONE} -- Replay
 
 	Step_s: REAL_64 = 0.25

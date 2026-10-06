@@ -52,9 +52,9 @@ feature -- Tests: identity and revisions
 			l_words.extend (create {PT_WORD}.make (id (1), {STRING_32} "b", {STRING_32} "b", 3, 3, 1, 1, 0, False, False, False))
 			create l_passages.make (1)
 			l_passages.extend (create {PT_PASSAGE}.make (1, 1, 2, 1, 0))
-			assert_true ("duplicate ids refused", raises (agent (a_w: ARRAYED_LIST [PT_WORD]; a_p: ARRAYED_LIST [PT_PASSAGE])
+			assert_refused ("duplicate ids refused", agent (a_w: ARRAYED_LIST [PT_WORD]; a_p: ARRAYED_LIST [PT_PASSAGE])
 				local l_r: PT_SCRIPT_REVISION
-				do create l_r.make (1, {STRING_32} "t", {STRING_32} "a b", a_w, a_p, create {ARRAYED_LIST [PT_SECTION]}.make (0)) end (l_words, l_passages)))
+				do create l_r.make (1, {STRING_32} "t", {STRING_32} "a b", a_w, a_p, create {ARRAYED_LIST [PT_SECTION]}.make (0)) end (l_words, l_passages))
 		end
 
 	test_id_source_is_monotone

@@ -141,7 +141,7 @@ feature -- Tests: controller
 			c: PT_TAKE_CONTROLLER
 		do
 			c := controller_for (moody)
-			assert_true ("Go from idle refused", raises (agent c.perform ({PT_ACTION}.Go)))
+			assert_refused ("Go from idle refused", agent c.perform ({PT_ACTION}.Go))
 		end
 
 	test_commit_edit_makes_a_revision
@@ -177,7 +177,7 @@ feature -- Tests: journal and codec
 		do
 			create j.make_in_memory
 			j.append (create {PT_TAKE_EVENT}.make_hold (5.0, "hotkey"))
-			assert_true ("earlier rt refused", raises (agent j.append (create {PT_TAKE_EVENT}.make_hold (4.0, "hotkey"))))
+			assert_refused ("earlier rt refused", agent j.append (create {PT_TAKE_EVENT}.make_hold (4.0, "hotkey")))
 		end
 
 	test_codec_round_trip
@@ -215,7 +215,7 @@ feature -- Tests: recording clock and restart policy
 		do
 			create k.make
 			k.observe_bytes (64_000, 1000.0)
-			assert_true ("shrink refused", raises (agent k.observe_bytes (100, 2000.0)))
+			assert_refused ("shrink refused", agent k.observe_bytes (100, 2000.0))
 		end
 
 	test_again_caret_rules

@@ -32,3 +32,8 @@ graphify-out/
 
 # Test run output
 testing/out/
+
+# Personal voice recordings and third-party video frames: kept locally, not published
+testing/fixtures/Recording.m4a
+testing/fixtures/larry_read_01.wav
+.eiffel-workflow/evidence/video_frames/

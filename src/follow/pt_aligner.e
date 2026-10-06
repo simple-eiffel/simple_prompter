@@ -96,7 +96,8 @@ feature -- Element change
 		do
 			l_rate := last_alignment.rate_wps
 			if a_heard.window_start >= reanchored_at then
-				l_heard := speech_tail (a_heard)
+				buffer_heard (a_heard)
+				l_heard := recent_tail
 				l_k := l_heard.count
 				l_lo := (position - Window_back + 1).max (1)
 				if misses >= Lost_after then
@@ -228,9 +229,10 @@ feature {NONE} -- Alignment
 	last_buffered_t0: REAL_64
 			-- Absolute start time of the newest buffered word (-1 = none).
 
-	speech_tail (a_heard: PT_HEARD_WORDS): ARRAYED_LIST [STRING_32]
-			-- The last Recent_heard spoken words, accumulated across windows so that slow speech
-			-- still gives enough evidence (non-speech tags such as *cough* or [BLANK_AUDIO] dropped).
+	buffer_heard (a_heard: PT_HEARD_WORDS)
+			-- Add the spoken words of `a_heard' not already buffered (overlapping windows re-decode
+			-- the same words; non-speech tags such as *cough* or [BLANK_AUDIO] are dropped). Words
+			-- accumulate across windows so that slow speech still gives enough evidence.
 		local
 			i: INTEGER
 			l_abs: REAL_64
@@ -248,11 +250,24 @@ feature {NONE} -- Alignment
 				recent_words.start
 				recent_words.remove
 			end
+		ensure
+			bounded: recent_words.count <= Recent_heard * 2
+			never_older: last_buffered_t0 >= old last_buffered_t0
+		end
+
+	recent_tail: ARRAYED_LIST [STRING_32]
+			-- The last `Recent_heard' buffered words, oldest first (a fresh list; the buffer is untouched).
+		local
+			i: INTEGER
+		do
 			create Result.make (Recent_heard)
 			from i := (recent_words.count - Recent_heard + 1).max (1) until i > recent_words.count loop
 				Result.extend (recent_words [i])
 				i := i + 1
 			end
+		ensure
+			sized: Result.count = recent_words.count.min (Recent_heard)
+			newest_last: not Result.is_empty implies Result.last = recent_words.last
 		end
 
 	Duplicate_gap: REAL_64 = 0.12

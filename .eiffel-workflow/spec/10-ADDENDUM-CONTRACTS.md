@@ -39,3 +39,22 @@ Library: **84** classes (82 planned + PT_CAPTION_CUE + PT_SPEECH_CODEC moved in)
 
 Remaining MEDIUM/LOW items (M9-M14, M23, L17-L21, L25) go to /eiffel.tasks as acceptance criteria.
 Library classes: 87 (+ PT_EQUIVALENCES, PT_CONTROL, PT_CONTROL_RESOLVER). Tests: 12 classes, 94 tests.
+
+
+## CQS audit change (approved by Larry, 2026-10-05)
+
+`PT_VAD.speech_probability (a_samples, a_offset, a_first_sample): REAL_64` was a query, but the
+real detector (Silero, via simple_speech) is recurrent: every frame updates a hidden state the next
+frame needs, so the "query" would have had a side effect, and nothing could clear the state at a
+new session. Replaced by:
+
+| Feature | Kind | Contract |
+|---|---|---|
+| `analyze (a_samples, a_offset, a_first_sample)` | command (deferred) | require unchanged (`frame_inside`, `position_non_negative`); ensure `probability_range: last_probability` in 0..1 |
+| `last_probability: REAL_64` | attribute | invariant `probability_range` |
+| `reset` | command (deferred) | ensure `cleared: last_probability = 0.0` |
+
+`PT_SPEECH_PIPELINE.make` resets its VAD (a new pipeline is a new stream); `push` calls `analyze`
+and reads `last_probability`. `PT_SCRIPTED_VAD` implements both and counts resets for tests.
+Frozen contract lines changed: exactly one (`probability_range` moved from `Result` to
+`last_probability`). Evidence: evidence/phase4-cqs-audit.txt, evidence/cqs-contracts-after.txt.

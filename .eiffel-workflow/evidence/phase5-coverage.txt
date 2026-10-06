@@ -1,0 +1,78 @@
+# Phase 5 Coverage and Verification Evidence
+# Project: d:/prod/simple_prompter
+# Date: 2026-10-05
+
+## Result
+- Tests: 183, all passing in both builds (contract-checked 20.6 s; lean 0.87 s). See phase5-tests.txt.
+- Public-feature coverage (exported features named by a test; scratchpad coverage.py):
+    before Phase 5: 369/737 (50.1%), 11 of 87 classes fully covered
+    after Phase 5:  750/750 (100%),  88 of 88 classes fully covered
+- Contract freeze: phase4-contracts-after.txt vs phase5-contracts-after.txt (content-based):
+    frozen lines removed or changed: 0
+    lines added: 69, all on NEW features or the new class:
+      pt_attempt_aligner.e 34 (next_match, match_width, pair_match, is_spoken_run, run_text,
+        is_confirmed, retro_indices, record_substitutions), pt_misread.e 16 (new class),
+      pt_silence_snapper.e 8 (silence_before, silence_after), pt_take_solver.e 6
+      (unheard_allowance, is_unscripted_gap), pt_flagger.e 5 (flag_misreads, kept_count)
+- New tests: TEST_ATTEMPT_ALIGNMENT (13), TEST_COVERAGE_TAKE (17), TEST_COVERAGE_CORE (35),
+  TEST_REAL_VOICE +2 (misreads on larry_read_01; whole analyzer on larry_read_01).
+- Refusal checks go through PT_TEST_SET.assert_refused: checked when contracts are on,
+  skipped in the lean build, so the lean (shipping) binary verifies every behavior assertion.
+
+## Defects found by verification, and fixed (all behavior; no frozen contract changed)
+Found by replaying the real recording larry_read_01 through the attempt aligner and the whole
+analyzer. Synthetic Phase 4 tests had passed over every one of them.
+
+1. Misreads were never flagged (T18 criterion unmet). PT_ATTEMPT_ALIGNER now records one-for-one
+   substitutions (PT_MISREAD, last_misreads); PT_FLAGGER.flag_misreads flags those inside the
+   final video; PT_SESSION_ANALYZER calls it. On larry_read_01: exactly one misread,
+   "you said '55070' (script: '5070')"; homophones and "26" for "twenty twenty-six" are not flagged.
+2. "55070" matched "5070": the phonetic key collapses repeated characters. Sound-alike keys now
+   apply only to words without digits.
+3. A long [CUE] line stopped the attempt aligner for the rest of the recording (cue words counted
+   toward the 8-word lookahead): 102 of 252 heard words aligned. Cue words are now skipped and not
+   counted; 214 of 252 align (the rest: a 37-word ad-lib, an ASR quirk, recovery after the skip).
+4. A stop word in an ad-lib ("So") jumped the script four words ahead. Only a content word (or a
+   multi-word token) may skip ahead now.
+5. Multi-word equivalences were never matched by the attempt aligner ("for example" for "e.g.",
+   "post condition" for "postcondition", "cpp" for "c p p"). Added (pair_match, match_width).
+6. Lost recovery: after 2 unmatched words the search widens (content words, confirmed by the next
+   heard word, so an ad-lib word cannot pull the pointer), and the unmatched words just before a
+   recovered match are aligned backward (retro_indices).
+7. One garbled word discarded a whole passage: the solver required every word heard. Now every
+   word must exist in the revision read (no stale takes) and all but one in five must be heard.
+   The numbers passage (and its misread) came back; missing words on larry_read_01 fell from 50
+   to exactly the 30 words of the paragraph the cue said to skip.
+8. emit_cut stretched a cut to the start of the whole attempt when a passage's first word was
+   unheard. Spans now come from the first and last words actually heard.
+9. A cue line between passages split one continuous read into two cuts. Passages with nothing to
+   read no longer break a run.
+10. Neighbouring cuts of one take overlapped by ~1 s (audio played twice). The snapper now makes
+    them meet between the last word of one and the first word of the next (in silence when there
+    is one; tight otherwise).
+11. The snapper probed only 20 ms past a word edge; VAD speech runs past whisper word ends, so
+    good cuts were marked tight and padded instead of placed in silence. It now searches for the
+    nearest silence within Max_lead / Max_tail (silence_before, silence_after).
+12. A 12-second ad-lib inside one take was kept in the final video. Runs now split where more than
+    Max_join_gap (4 s) passes between the heard words of consecutive passages.
+
+Whole analyzer on larry_read_01 (one take, 0-144 s), before -> after:
+    cuts 6 (2 overlapping pairs) -> 3, none overlapping
+    output 113.2 s (whole passages wrongly dropped) -> 125.0 s (all read passages kept, ad-lib removed)
+    missing 50 words -> 30 (exactly the skipped paragraph)
+    Misread flags 0 -> 1 (55070); Long_pause flags include the instructed 3 s pause
+    tight cuts: 3 remain, all genuine (title read straight into the first sentence; "blah blah"
+    straight into "Now"; the reader went from "waits for you" straight into "The jargon test")
+
+## Known gaps carried forward (for /eiffel.audit-cqs and Phase 6)
+1. A seamless joint (two cuts of one take meeting where the reader skipped a paragraph without
+   pausing) is reported as a tight splice: the frozen contracts tie tightness to silence at both
+   edges. Harmless; the Edit Floor shows it.
+2. Optional headings that were read aloud are left out of the cut, so a title read straight into
+   the first sentence leaves a tight start. Product decision for Larry: keep spoken headings?
+3. PT_JOURNAL write failure only skips the count (append_line False); no error surfaced.
+4. O(n) postconditions in journal append (contract builds only).
+5. simple_file.content UTF-8 bug (Track B library fix); interim local tokenizer until
+   simple_text_structure exists.
+
+# Status: PASS

@@ -30,8 +30,11 @@ feature -- Queries
 				or else is_spoken_form (a_script, a_heard)
 				or else (number_value (a_heard) >= 0 and then number_value (a_heard) = number_value (a_script))
 				or else (l_spaced and then joined (a_heard).same_string (joined (a_script)))
-				or else (not a_heard.has (' ') and then phonetic_key (a_script).count >= Min_phonetic_length
+				or else (not a_heard.has (' ') and then not has_digit (a_heard) and then not has_digit (a_script)
+					and then phonetic_key (a_script).count >= Min_phonetic_length
 					and then phonetic_key (a_heard).same_string (phonetic_key (a_script)))
+						-- Sound-alike keys are for words: a doubled digit is a different number
+						-- ("55070" is not "5070"; T18 on larry_read_01).
 		ensure
 			reflexive: a_heard.same_string (a_script) implies Result
 			homophones: same_homophone_class (a_heard, a_script) implies Result
@@ -190,6 +193,12 @@ feature {NONE} -- Lookup helpers
 			else
 				Result := a_text.to_string_32
 			end
+		end
+
+	has_digit (a_text: READABLE_STRING_32): BOOLEAN
+			-- Does `a_text' contain a digit?
+		do
+			Result := across a_text as ic some ic.is_digit end
 		end
 
 	has_joiner (a_text: READABLE_STRING_32): BOOLEAN

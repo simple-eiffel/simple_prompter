@@ -152,6 +152,30 @@ feature {NONE} -- Take fixtures
 
 feature {NONE} -- Contract checks
 
+	assert_refused (a_tag: READABLE_STRING_GENERAL; a_action: ROUTINE)
+			-- `a_action' must raise (a contract refusal) when contracts are checked. A build without
+			-- contracts (the lean release binary) has nothing to refuse, so the check is skipped
+			-- there and the rest of the test still runs.
+		do
+			if contracts_checked then
+				assert_true (a_tag, raises (a_action))
+			end
+		end
+
+	contracts_checked: BOOLEAN
+			-- Are library preconditions checked in this build?
+		once
+			Result := raises (agent probe_precondition)
+		end
+
+	probe_precondition
+			-- Break one library precondition on purpose (PT_TIME_SPAN.make needs t0 <= t1).
+		local
+			l_span: PT_TIME_SPAN
+		do
+			create l_span.make (2.0, 1.0)
+		end
+
 	raises (a_action: ROUTINE): BOOLEAN
 			-- Does calling `a_action' raise (a contract violation, here)?
 		local

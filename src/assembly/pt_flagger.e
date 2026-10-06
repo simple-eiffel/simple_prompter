@@ -88,6 +88,21 @@ feature -- Basic operations
 			missing_flagged: a_missing.is_empty = (count_of ({PT_FLAG_KIND}.Missing) = 0)
 		end
 
+	flag_misreads (a_misreads: LIST [PT_MISREAD]; a_cuts: PT_CUT_LIST)
+			-- Add a Misread flag for each misread that lies in the final video (T18). Misreads in
+			-- takes that were not used do not matter to the viewer.
+		do
+			across a_misreads as ic loop
+				if a_cuts.is_kept (0, ic.span.t0) then
+					last_flags.extend (create {PT_FLAG}.make ({PT_FLAG_KIND}.Misread, ic.span, ic.word, ic.word,
+						{STRING_32} "you said '" + ic.heard_text + {STRING_32} "' (script: '" + ic.script_text + {STRING_32} "')"))
+				end
+			end
+		ensure
+			misreads_flagged: count_of ({PT_FLAG_KIND}.Misread) = old count_of ({PT_FLAG_KIND}.Misread) + kept_count (a_misreads, a_cuts)
+			only_misreads_added: last_flags.count = old last_flags.count + kept_count (a_misreads, a_cuts)
+		end
+
 feature -- Constants
 
 	Low_confidence_level: REAL_64 = 0.35
@@ -109,6 +124,18 @@ feature {NONE} -- Implementation
 		end
 
 feature -- Contract helpers
+
+	kept_count (a_misreads: LIST [PT_MISREAD]; a_cuts: PT_CUT_LIST): INTEGER
+			-- Misreads whose start lies in the final video.
+		do
+			across a_misreads as ic loop
+				if a_cuts.is_kept (0, ic.span.t0) then
+					Result := Result + 1
+				end
+			end
+		ensure
+			bounded: Result >= 0 and Result <= a_misreads.count
+		end
 
 	tight_count (a_cuts: PT_CUT_LIST): INTEGER
 		do

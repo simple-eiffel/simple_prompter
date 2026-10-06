@@ -14,3 +14,16 @@
 6. **SCOOP consumer test:** creating a separate object while passing local reference arguments is a traitor error; the
    template should use expanded arguments only (or a factory on the target processor).
 7. **MML models are not ITERABLE**: templates using `across model as ic` don't compile; use index loops.
+
+## /eiffel.verify (queued 2026-10-05, Phase 5 of simple_prompter)
+- Step 4 still shows `ec.sh -batch ... -c_compile` and a W_code exe; the wrapper rejects raw
+  flags and only builds F_code. Use `ec.sh test` and EIFGENs/<target>/F_code/<exe>.
+- Step 4 should also run the lean binary from `ec.sh release`: it is the shipping build. Tests
+  that check contract refusals need a helper that skips them when contracts are off
+  (simple_prompter PT_TEST_SET.assert_refused), or every behavior assertion after the first
+  refusal check goes unverified in the lean run.
+- Add a step: replay real recorded data through the whole pipeline, not just units. In
+  simple_prompter, 12 analyzer defects passed every synthetic test and were found only by
+  replaying larry_read_01.
+- Coverage measure that worked: exported features named by a test (coverage.py in the session
+  scratchpad) - fast, honest, and it points straight at the untested features.

@@ -74,8 +74,10 @@ feature -- Tests
 			h: PT_HEARD_WORDS
 		do
 			create v.make (<<0.1, 0.9>>)
-			assert_reals_equal ("frame 1", 0.9, v.speech_probability (silence (512), 0, 512), 1.0e-9)
-			assert_reals_equal ("beyond script", 0.0, v.speech_probability (silence (512), 0, 99_999), 1.0e-9)
+			v.analyze (silence (512), 0, 512)
+			assert_reals_equal ("frame 1", 0.9, v.last_probability, 1.0e-9)
+			v.analyze (silence (512), 0, 99_999)
+			assert_reals_equal ("beyond script", 0.0, v.last_probability, 1.0e-9)
 			create d.make
 			d.script_window (0, <<{STRING_32} "This", {STRING_32} "is">>)
 			h := d.decode (silence (16_000), 16_000, 0, {STRING_32} "")

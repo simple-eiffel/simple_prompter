@@ -64,7 +64,7 @@ feature -- Basic operations
 		local
 			l_final: PT_SCRIPT_REVISION
 			l_choice: ARRAYED_LIST [INTEGER]
-			p, a, l_best, l_run_start, l_run_attempt: INTEGER
+			p, a, l_best, l_run_start, l_run_attempt, l_run_end: INTEGER
 			l_best_starred, l_starred: BOOLEAN
 		do
 			create last_result.make
@@ -101,21 +101,37 @@ feature -- Basic operations
 				l_choice.extend (l_best)
 				p := p + 1
 			end
-				-- Merge runs of consecutive passages read in the same attempt into one cut.
+				-- Merge runs of consecutive passages read in the same attempt into one cut. A passage
+				-- with nothing to read (a cue or heading line) never breaks a run (real voice: a [CUE]
+				-- line split one continuous read into two overlapping cuts).
 			l_run_start := 0
 			from p := 1 until p > l_final.passage_count + 1 loop
-				if p <= l_final.passage_count then
-					a := l_choice [p]
+				if p <= l_final.passage_count and then required_count (l_final, p) = 0 then
+						-- Nothing to read here.
 				else
-					a := 0
-				end
-				if l_run_start > 0 and (a /= l_run_attempt or a = 0) then
-					emit_cut (l_final, l_run_start, p - 1, a_attempts [l_run_attempt], a_timeline)
-					l_run_start := 0
-				end
-				if a > 0 and l_run_start = 0 then
-					l_run_start := p
-					l_run_attempt := a
+					if p <= l_final.passage_count then
+						a := l_choice [p]
+					else
+						a := 0
+					end
+					if l_run_start > 0 and (a /= l_run_attempt or a = 0) then
+						emit_cut (l_final, l_run_start, l_run_end, a_attempts [l_run_attempt], a_timeline)
+						l_run_start := 0
+					elseif l_run_start > 0 and then is_unscripted_gap (l_final, l_run_end, p, a_attempts [a], a_timeline) then
+							-- Same take, but a long stretch between the passages (an ad-lib or dead air):
+							-- leave it out (real voice: a 12 s ad-lib was kept inside one cut).
+						emit_cut (l_final, l_run_start, l_run_end, a_attempts [l_run_attempt], a_timeline)
+						decisions.extend ({STRING_32} "passage " + p.out + ": split from passage " + l_run_end.out
+							+ " (more than " + Max_join_gap.out + " s between them)")
+						l_run_start := 0
+					end
+					if a > 0 then
+						if l_run_start = 0 then
+							l_run_start := p
+							l_run_attempt := a
+						end
+						l_run_end := p
+					end
 				end
 				p := p + 1
 			end
@@ -185,25 +201,78 @@ feature {NONE} -- Implementation
 
 	covers (a_attempt: PT_ATTEMPT; a_final: PT_SCRIPT_REVISION; a_passage: INTEGER; a_history: PT_SCRIPT_HISTORY;
 			a_timeline: PT_WORD_TIMELINE): BOOLEAN
-			-- Did `a_attempt' read every required word of final passage `a_passage', unchanged?
-			-- A word counts when it lies in the attempt's live-mark range or was heard in that attempt
-			-- (analysis timeline). A stale take reads an older revision in which some ids do not exist.
+			-- Did `a_attempt' read final passage `a_passage', unchanged? Every required word must exist
+			-- in the revision the attempt read (a stale take reads an older revision in which some ids
+			-- do not exist), and all but `Unheard_allowance' of them must have been heard: in the
+			-- attempt's live-mark range or in its analysis timeline. Speech recognition garbles a word
+			-- now and then ("26" for "twenty twenty-six" on larry_read_01); one garbled word must not
+			-- discard a whole passage.
 		local
 			l_read: PT_SCRIPT_REVISION
-			i, l_at: INTEGER
+			i, l_at, l_required, l_heard: INTEGER
+			l_present: BOOLEAN
 		do
 			if a_attempt.revision <= a_history.revision_count then
 				l_read := a_history.revision (a_attempt.revision)
-				Result := True
-				from i := a_final.passage (a_passage).first_word until not Result or i > a_final.passage (a_passage).last_word loop
+				l_present := True
+				from i := a_final.passage (a_passage).first_word until not l_present or i > a_final.passage (a_passage).last_word loop
 					if a_final.word (i).is_required then
 						l_at := l_read.index_of (a_final.word (i).id)
-						Result := l_at > 0 and then ((l_at >= a_attempt.first_index and l_at <= a_attempt.last_index)
-							or a_timeline.has_in (a_final.word (i).id, a_attempt.index))
+						if l_at = 0 then
+							l_present := False
+						else
+							l_required := l_required + 1
+							if (l_at >= a_attempt.first_index and l_at <= a_attempt.last_index)
+								or a_timeline.has_in (a_final.word (i).id, a_attempt.index) then
+								l_heard := l_heard + 1
+							end
+						end
 					end
 					i := i + 1
 				end
+				Result := l_present and l_heard > 0 and l_required - l_heard <= unheard_allowance (l_required)
 			end
+		end
+
+	Max_join_gap: REAL_64 = 4.0
+			-- Longest time between the heard words of consecutive passages that one cut may span.
+
+	is_unscripted_gap (a_final: PT_SCRIPT_REVISION; a_before, a_after: INTEGER; a_attempt: PT_ATTEMPT;
+			a_timeline: PT_WORD_TIMELINE): BOOLEAN
+			-- Do more than `Max_join_gap' seconds pass between the last heard word of passage `a_before'
+			-- and the first heard word of passage `a_after' in `a_attempt'? False when either is unheard.
+		require
+			ordered: 1 <= a_before and a_before < a_after and a_after <= a_final.passage_count
+		local
+			i: INTEGER
+			l_end, l_start: REAL_64
+		do
+			l_end := -1.0
+			from i := a_final.passage (a_before).last_word until l_end >= 0 or i < a_final.passage (a_before).first_word loop
+				if attached a_timeline.occurrence_in (a_final.word (i).id, a_attempt.index) as al_o then
+					l_end := al_o.span.t1
+				end
+				i := i - 1
+			end
+			l_start := -1.0
+			from i := a_final.passage (a_after).first_word until l_start >= 0 or i > a_final.passage (a_after).last_word loop
+				if attached a_timeline.occurrence_in (a_final.word (i).id, a_attempt.index) as al_o then
+					l_start := al_o.span.t0
+				end
+				i := i + 1
+			end
+			Result := l_end >= 0 and l_start >= 0 and l_start - l_end > Max_join_gap
+		end
+
+	unheard_allowance (a_required: INTEGER): INTEGER
+			-- Required words of a passage that may go unheard: one in five, none in a passage
+			-- shorter than five words.
+		require
+			non_negative: a_required >= 0
+		do
+			Result := a_required // 5
+		ensure
+			bounded: Result >= 0 and Result <= a_required // 5
 		end
 
 	add_missing (a_final: PT_SCRIPT_REVISION; a_passage: INTEGER)
@@ -225,6 +294,7 @@ feature {NONE} -- Implementation
 			l_ids: ARRAYED_LIST [PT_WORD_ID]
 			l_first, l_last, i: INTEGER
 			l_t0, l_t1: REAL_64
+			l_found: BOOLEAN
 		do
 			l_first := a_final.passage (a_first_passage).first_word
 			l_last := a_final.passage (a_last_passage).last_word
@@ -237,13 +307,23 @@ feature {NONE} -- Implementation
 			end
 			l_t0 := a_attempt.span.t0
 			l_t1 := a_attempt.span.t1
-			if not l_ids.is_empty then
-				if attached a_timeline.occurrence_in (l_ids.first, a_attempt.index) as al_first then
+				-- Span from the first and last words actually heard: an unheard edge word must not
+				-- stretch the cut back to the start (or on to the end) of the whole attempt.
+			l_found := False
+			from i := 1 until l_found or i > l_ids.count loop
+				if attached a_timeline.occurrence_in (l_ids [i], a_attempt.index) as al_first then
 					l_t0 := al_first.span.t0
+					l_found := True
 				end
-				if attached a_timeline.occurrence_in (l_ids.last, a_attempt.index) as al_last then
+				i := i + 1
+			end
+			l_found := False
+			from i := l_ids.count until l_found or i < 1 loop
+				if attached a_timeline.occurrence_in (l_ids [i], a_attempt.index) as al_last then
 					l_t1 := al_last.span.t1
+					l_found := True
 				end
+				i := i - 1
 			end
 			if l_t1 < l_t0 then
 				l_t1 := l_t0

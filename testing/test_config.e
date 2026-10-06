@@ -23,9 +23,9 @@ feature -- Tests: keymap
 
 	test_bare_key_needs_the_recording_flag
 		do
-			assert_true ("bare without flag refused", raises (agent
+			assert_refused ("bare without flag refused", agent
 				local l_b: PT_KEY_BINDING
-				do create l_b.make ({PT_CONTROL}.Clicker_back, 0, 0x21, False) end))
+				do create l_b.make ({PT_CONTROL}.Clicker_back, 0, 0x21, False) end)
 		end
 
 	test_bare_keys_only_while_recording
@@ -48,7 +48,7 @@ feature -- Tests: keymap
 			k: PT_KEYMAP
 		do
 			create k.make
-			assert_true ("refused", raises (agent k.activate_bare_keys))
+			assert_refused ("refused", agent k.activate_bare_keys)
 		end
 
 	test_two_keys_for_one_control
@@ -109,7 +109,7 @@ feature -- Tests: settings
 			s.set_font_size (40)
 			assert_integers_equal ("set", 40, s.font_size)
 			assert_integers_equal ("saved once", 1, s.save_count)
-			assert_true ("out of range refused", raises (agent s.set_font_size (500)))
+			assert_refused ("out of range refused", agent s.set_font_size (500))
 		end
 
 	test_default_mode_waits_for_proof

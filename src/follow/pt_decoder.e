@@ -4,6 +4,11 @@ note
 		through simple_speech (PT_WHISPER_DECODER: greedy, no_context = True,
 		prompt = already-read script, word timestamps; spike gotchas 1-2); tests
 		use PT_SCRIPTED_DECODER.
+
+		`decode' is a query: the words depend only on the samples, the window and
+		the prompt. An implementation must not carry decoding context from one
+		window to the next (whisper: no_context = True), or the same call could
+		return different words (CQS audit, 2026-10-05).
 	]"
 	author: "Larry Rix"
 

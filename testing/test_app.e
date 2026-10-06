@@ -36,6 +36,9 @@ feature {NONE} -- Initialization
 			run_real_voice_tests
 			run_lib_tests_tests
 			run_scoop_consumer_tests
+			run_attempt_alignment_tests
+			run_coverage_take_tests
+			run_coverage_core_tests
 			say ("%N========================%N")
 			say ("Results: " + passed.out + " passed, " + failed.out + " failed%N")
 			if failed > 0 then
@@ -236,6 +239,8 @@ feature {NONE} -- Test sets
 			run_test (agent t.test_tracking_jumps_the_skipped_paragraph, "tracking_jumps_the_skipped_paragraph")
 			run_test (agent t.test_tracking_never_moves_backward, "tracking_never_moves_backward")
 			run_test (agent t.test_aligner_meets_frame_budget, "aligner_meets_frame_budget")
+			run_test (agent t.test_misreads_on_larry_read_01, "misreads_on_larry_read_01")
+			run_test (agent t.test_analysis_of_larry_read_01, "analysis_of_larry_read_01")
 		end
 
 	run_lib_tests_tests
@@ -257,6 +262,95 @@ feature {NONE} -- Test sets
 			section ("SCOOP consumer")
 			create t
 			run_test (agent t.test_separate_recording_clock, "separate_recording_clock")
+		end
+
+	run_attempt_alignment_tests
+		local
+			t: TEST_ATTEMPT_ALIGNMENT
+		do
+			section ("attempt aligner and misreads (phase 5)")
+			create t
+			run_test (agent t.test_long_cue_does_not_stop_alignment, "long_cue_does_not_stop_alignment")
+			run_test (agent t.test_stop_word_does_not_skip_ahead, "stop_word_does_not_skip_ahead")
+			run_test (agent t.test_two_heard_words_for_one_script_word, "two_heard_words_for_one_script_word")
+			run_test (agent t.test_one_heard_token_for_three_script_words, "one_heard_token_for_three_script_words")
+			run_test (agent t.test_one_for_one_substitution_is_a_misread, "one_for_one_substitution_is_a_misread")
+			run_test (agent t.test_homophones_are_not_misreads, "homophones_are_not_misreads")
+			run_test (agent t.test_uneven_gap_is_not_a_misread, "uneven_gap_is_not_a_misread")
+			run_test (agent t.test_digits_are_not_sound_alikes, "digits_are_not_sound_alikes")
+			run_test (agent t.test_ad_lib_word_does_not_pull_the_pointer, "ad_lib_word_does_not_pull_the_pointer")
+			run_test (agent t.test_skipped_paragraph_is_recovered, "skipped_paragraph_is_recovered")
+			run_test (agent t.test_misread_flags_only_inside_the_final_video, "misread_flags_only_inside_the_final_video")
+			run_test (agent t.test_analyzer_raises_the_misread_flag, "analyzer_raises_the_misread_flag")
+			run_test (agent t.test_run_up_lookahead_and_substitution_limits, "run_up_lookahead_and_substitution_limits")
+		end
+
+	run_coverage_take_tests
+		local
+			t: TEST_COVERAGE_TAKE
+		do
+			section ("coverage: take studio, config, recording, facade (phase 5)")
+			create t
+			run_test (agent t.test_session_folder_paths, "session_folder_paths")
+			run_test (agent t.test_recorder_health, "recorder_health")
+			run_test (agent t.test_camera_anchor, "camera_anchor")
+			run_test (agent t.test_scripted_transcriber, "scripted_transcriber")
+			run_test (agent t.test_settings_defaults_and_setters, "settings_defaults_and_setters")
+			run_test (agent t.test_key_binding_codes, "key_binding_codes")
+			run_test (agent t.test_keymap_bare_keys_follow_recording, "keymap_bare_keys_follow_recording")
+			run_test (agent t.test_win32_virtual_key_codes, "win32_virtual_key_codes")
+			run_test (agent t.test_control_resolver_routes, "control_resolver_routes")
+			run_test (agent t.test_controller_marker_count_in_and_queries, "controller_marker_count_in_and_queries")
+			run_test (agent t.test_controller_edit_range_again_and_wrap, "controller_edit_range_again_and_wrap")
+			run_test (agent t.test_transitions_partition_actions, "transitions_partition_actions")
+			run_test (agent t.test_recording_clock_samples_and_interpolation, "recording_clock_samples_and_interpolation")
+			run_test (agent t.test_preflight_reports_problems, "preflight_reports_problems")
+			run_test (agent t.test_capture_plan_fields, "capture_plan_fields")
+			run_test (agent t.test_session_analysis_and_cuts, "session_analysis_and_cuts")
+			run_test (agent t.test_facade_feeds_voice_and_heard, "facade_feeds_voice_and_heard")
+		end
+
+	run_coverage_core_tests
+		local
+			t: TEST_COVERAGE_CORE
+		do
+			section ("coverage: following, pipeline, assembly, outputs, script (phase 5)")
+			create t
+			run_test (agent t.test_time_span_queries, "time_span_queries")
+			run_test (agent t.test_word_timeline_queries, "word_timeline_queries")
+			run_test (agent t.test_equivalence_tables, "equivalence_tables")
+			run_test (agent t.test_matcher_queries, "matcher_queries")
+			run_test (agent t.test_aligner_reanchor_and_constants, "aligner_reanchor_and_constants")
+			run_test (agent t.test_alignment_record, "alignment_record")
+			run_test (agent t.test_constant_follower_speed, "constant_follower_speed")
+			run_test (agent t.test_voice_gated_ramps, "voice_gated_ramps")
+			run_test (agent t.test_tracking_follower_steers_and_coasts, "tracking_follower_steers_and_coasts")
+			run_test (agent t.test_layout_lines_and_scroll, "layout_lines_and_scroll")
+			run_test (agent t.test_spring_rate_and_reset, "spring_rate_and_reset")
+			run_test (agent t.test_pipeline_threshold_decoding_and_frames, "pipeline_threshold_decoding_and_frames")
+			run_test (agent t.test_speech_codec_heard_round_trip, "speech_codec_heard_round_trip")
+			run_test (agent t.test_voice_frame_seconds_and_fakes, "voice_frame_seconds_and_fakes")
+			run_test (agent t.test_cut_and_cut_list_queries, "cut_and_cut_list_queries")
+			run_test (agent t.test_attempt_and_builder, "attempt_and_builder")
+			run_test (agent t.test_take_solver_queries, "take_solver_queries")
+			run_test (agent t.test_flagger_low_confidence_restart_and_pause, "flagger_low_confidence_restart_and_pause")
+			run_test (agent t.test_snapper_pads_and_words_inside, "snapper_pads_and_words_inside")
+			run_test (agent t.test_analysis_records, "analysis_records")
+			run_test (agent t.test_snapper_steps_over_vad_margins, "snapper_steps_over_vad_margins")
+			run_test (agent t.test_silence_searches_and_speech_map, "silence_searches_and_speech_map")
+			run_test (agent t.test_captions_vtt_and_cue_words, "captions_vtt_and_cue_words")
+			run_test (agent t.test_edl_helpers, "edl_helpers")
+			run_test (agent t.test_cut_codec_errors_and_objects, "cut_codec_errors_and_objects")
+			run_test (agent t.test_render_plan_fields, "render_plan_fields")
+			run_test (agent t.test_review_srt_helpers, "review_srt_helpers")
+			run_test (agent t.test_chapter_and_timecode_helpers, "chapter_and_timecode_helpers")
+			run_test (agent t.test_script_edit_kinds, "script_edit_kinds")
+			run_test (agent t.test_restart_policy_units, "restart_policy_units")
+			run_test (agent t.test_script_parser_classification, "script_parser_classification")
+			run_test (agent t.test_revision_and_structure_queries, "revision_and_structure_queries")
+			run_test (agent t.test_history_ids_and_journal_status, "history_ids_and_journal_status")
+			run_test (agent t.test_event_names_and_edit_fields, "event_names_and_edit_fields")
+			run_test (agent t.test_fixed_measure_and_heard_word, "fixed_measure_and_heard_word")
 		end
 
 feature {NONE} -- Implementation

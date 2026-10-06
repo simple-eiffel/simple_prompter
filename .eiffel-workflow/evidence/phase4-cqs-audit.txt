@@ -1,0 +1,141 @@
+# Phase 4.5: CQS Audit Results
+# Project: d:/prod/simple_prompter
+# Date: 2026-10-05
+# Scope: all 88 classes in src/ (run after Phase 5; the workflow order put verify first)
+
+## Method
+1. Mechanical pass (scratchpad cqs_scan.py) over every function (a feature with a result and a
+   `do` body; once, external, deferred and attributes excluded): assignments to attributes,
+   calls of the class's own procedures, mutation of owned containers, I/O (SIMPLE_FILE, io,
+   print, processes), and every call written as an instruction on a target that is not a
+   local, an argument or Result (in Eiffel an instruction call is always a procedure call).
+2. Per-call object creation inside functions (the skill's "embedded creation" flag).
+3. Manual review of every hit, and of the deferred interfaces whose real implementations
+   live outside this library (VAD, decoder, transcriber, clock, text measure).
+
+Raw hits: 20 (first pass) + 15 (instruction calls, overlapping) + 12 creation sites.
+
+## Violations Found
+
+### VIOLATION 1: PT_ALIGNER.speech_tail - FIXED
+**Type:** Query with side effects (function mutating state)
+**Location:** src/follow/pt_aligner.e (was line 231)
+**Issue:** The function appended newly heard words to `recent_words', advanced
+`last_buffered_t0', trimmed the buffer, and returned the last `Recent_heard' words. Calling it
+twice for one decode would have buffered twice; any contract or debug code reading it would
+have changed the aligner.
+**Fix applied:** split into the command `buffer_heard (a_heard)` (ensure: bounded buffer,
+last_buffered_t0 never moves back) and the pure query `recent_tail` (ensure: sized,
+newest_last). `update` calls `buffer_heard (a_heard)` then reads `recent_tail`.
+Private features; no frozen contract touched. Rebuilt: 0 errors, 0 warnings; 183/183 pass.
+**Severity:** HIGH
+
+### VIOLATION 2: PT_VAD.speech_probability - FIXED (contract change approved by Larry)
+**Type:** Deferred query whose real implementation must have side effects
+**Location:** src/follow/pt_vad.e line 19; caller src/follow/pt_speech_pipeline.e line 213
+**Issue:** Silero VAD (the planned simple_speech implementation, Track B) is recurrent: each
+512-sample frame updates a hidden state that the next frame needs. As a function,
+`speech_probability' would have to change that state on every call, so asking twice about the
+same frame gives a different answer and silently corrupts the stream. Today it works only
+because the pipeline asks exactly once per frame, in order. There is also no way to clear
+the state at a new session or after a gap.
+**Fix applied (approved by Larry, 2026-10-05; recorded in spec/10-ADDENDUM-CONTRACTS.md):**
+    analyze (a_samples: SPECIAL [REAL_32]; a_offset: INTEGER; a_first_sample: INTEGER_64)
+            -- Score one frame; stateful detectors advance their state here.
+        require  (unchanged: frame_inside, position_non_negative)
+        deferred
+        ensure
+            probability_range: last_probability >= 0.0 and last_probability <= 1.0
+        end
+    last_probability: REAL_64
+            -- Speech probability of the frame given to the last `analyze'.
+    reset
+            -- Forget state carried between frames (new session, gap in the stream).
+        deferred
+        end
+    invariant probability_range: last_probability >= 0.0 and last_probability <= 1.0
+Pipeline: `vad.analyze (frame_buffer, 0, a_first_sample); l_probability := vad.last_probability'.
+PT_SCRIPTED_VAD: `analyze' looks up its table; `reset' clears and counts (reset_count).
+PT_SPEECH_PIPELINE.make resets its VAD: a new pipeline is a new stream.
+Contract diff vs phase5-contracts-after.txt (cqs-contracts-after.txt): exactly one frozen line
+changed (pt_vad.e probability_range now on last_probability); the rest are additions.
+**Severity:** HIGH (design; no runtime defect until a stateful VAD is plugged in)
+
+## Acceptable Exceptions (Whitelisted)
+
+### EXCEPTION 1: SIMPLE_PROMPTER.with_mode, with_speed_wpm, with_clock, with_measure
+**Type:** Fluent API (builder)
+**Justification:** set configuration and return Current for chaining; precondition
+`no_script_yet' confines them to setup.
+
+### EXCEPTION 2: PT_ALIGNER.cached_match
+**Type:** Memoization (concrete side effect, no abstract side effect)
+**Justification:** fills `match_cache' (private) with results of `matcher.matches'; the
+postcondition `same_as_matcher' states the result equals the unmemoized query, so no client
+can observe the cache. The revision is fixed for an aligner, so entries never go stale.
+
+### EXCEPTION 3: PT_EQUIVALENCES.phonetic_key
+**Type:** Memoization in a once table
+**Justification:** caches deterministic keys in the private once `cached_keys' (bounded at
+20,000 entries); same result with or without the cache.
+
+### EXCEPTION 4: PT_SCRIPTED_DECODER.decode
+**Type:** Test double instrumentation
+**Justification:** records `last_prompt' and `decode_count' so tests can observe what the
+pipeline asked (the prompt must never contain upcoming text). The words returned depend only
+on the arguments. Real decoders carry no such state (see EXCEPTION 9).
+
+### EXCEPTION 5: PT_CHAPTER_WRITER.text calling insert_sorted
+**Type:** Helper procedure on local data
+**Justification:** `insert_sorted' changes only the two local lists passed to it; Current is
+untouched.
+
+### EXCEPTION 6: PT_CAPTURE_PLAN.arguments calling add
+**Type:** Building Result
+**Justification:** `add' extends the list passed to it, which is `Result'.
+
+### EXCEPTION 7: Local working storage created inside functions (12 sites)
+PT_CUT_LIST.floor_spans, PT_ALIGNER.cached_match, PT_SCRIPTED_DECODER.decode,
+PT_SPEECH_CODEC.unescaped, PT_WORD_MATCHER.distance (two rows), PT_CHAPTER_WRITER.text (two
+lists), PT_SCRIPT_HISTORY.lcs_match, PT_SCRIPT_PARSER.ends_sentence, PT_SCRIPT_REVISION.ids_are_unique
+**Type:** Per-call creation
+**Justification:** arrays and lists for one computation. None is a logger, file, process or
+other resource; no I/O happens in any function of the library.
+
+### EXCEPTION 8: PT_CLOCK.now_ms
+**Type:** Environment observation
+**Justification:** returns the current time; consecutive calls differ because time passes,
+not because the call changes anything.
+
+### EXCEPTION 9: PT_DECODER.decode
+**Type:** Deferred query with an implementation obligation
+**Justification:** whisper is run with no_context = True (spike gotcha), so the words depend
+only on the samples, the window and the prompt. The obligation is now written in the class
+note ("must not carry decoding context from one window to the next").
+
+### EXCEPTION 10: Commands with documented I/O or error state
+PT_JOURNAL.append (one SIMPLE_FILE per line, opened and closed each call by design: a crash
+loses at most a torn line), PT_SETTINGS setters (each saves once; `saved' postconditions),
+PT_JOURNAL_CODEC / PT_CUT_CODEC / PT_ANALYSIS_CODEC / PT_SPEECH_CODEC.decode (set last_* and
+last_error; `outcome' postconditions), PT_SESSION_ANALYZER.analyze, PT_PREFLIGHT.check_ready.
+**Type:** Commands
+**Justification:** procedures, not functions: they return nothing and their effects are in
+their postconditions.
+
+## Summary
+
+Violations found: 2
+Critical: 0
+High: 2 (both fixed)
+Medium: 0
+
+Whitelisted exceptions: 10
+
+## Verification after the fixes
+ec.sh test: 0 errors, 0 warnings. ec.sh release: 0 errors, 0 warnings.
+Contract-checked F_code: Results: 183 passed, 0 failed
+Lean F_code:             Results: 183 passed, 0 failed
+Coverage: 754/754 exported features named by a test (88/88 classes).
+Re-scan: remaining hits are exactly the whitelisted exceptions above.
+
+Status: PASS

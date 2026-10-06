@@ -21,6 +21,8 @@ feature {NONE} -- Initialization
 			-- Pipeline using `a_vad' and `a_decoder'; decoding enabled.
 		do
 			vad := a_vad
+			vad.reset
+				-- A new pipeline is a new stream: no detector state carries over.
 			decoder := a_decoder
 			threshold := Default_threshold
 			is_decoding_enabled := True
@@ -210,7 +212,8 @@ feature {NONE} -- Implementation
 			end
 			create l_math
 			l_level := l_math.sqrt (l_sum / Frame_samples).min (1.0)
-			l_probability := vad.speech_probability (frame_buffer, 0, a_first_sample)
+			vad.analyze (frame_buffer, 0, a_first_sample)
+			l_probability := vad.last_probability
 			if l_probability >= threshold then
 				frames_since_speech := 0
 				last_push_had_speech := True

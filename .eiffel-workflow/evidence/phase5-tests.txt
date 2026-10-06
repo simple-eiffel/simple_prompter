@@ -1,0 +1,259 @@
+# Phase 5 Test Evidence
+# Project: d:/prod/simple_prompter
+# Date: 2026-10-05 20:59
+
+## Compile (ec.sh release: lean, then contract-checked)
+```
+=== RELEASE MODE (both lean and fat) ===
+Degree 6: Examining System
+Degree 5: Parsing Classes
+Degree 4: Analyzing Inheritance
+Degree 3: Checking Types
+Degree 2: Generating Byte Code
+Degree 1: Generating Metadata
+Degree -2: Constructing Polymorphic Table
+Degree -3: Generating Optimized Code
+System Recompiled.
+✓ Lean binary saved: /tmp/simple_prompter_lean.exe
+Degree 6: Examining System
+Degree -2: Constructing Polymorphic Table
+Degree -3: Generating Optimized Code
+System Recompiled.
+✓ Lean binary restored to F_code
+✓ DBC binary: EIFGENs/simple_prompter_tests/F_code/simple_prompter_dbc.exe
+=== RELEASE COMPLETE ===
+errors=0 warnings=0
+```
+
+## Contract-checked F_code: EIFGENs/simple_prompter_tests/F_code/simple_prompter_dbc.exe (20.6 s)
+```
+Running simple_prompter tests...
+
+-- script --
+  PASS: word_id_default_is_none
+  PASS: revision_structure_from_fixture
+  PASS: index_of_and_passage_of
+  PASS: revision_rejects_duplicate_ids
+  PASS: id_source_is_monotone
+  PASS: stop_words
+  PASS: parser_finds_words_and_passages
+  PASS: parser_cues_are_not_spoken
+  PASS: history_edit_keeps_untouched_ids
+  PASS: normalizer
+
+-- followers, layout, matcher, aligner --
+  PASS: constant_one_word_per_second_at_60_wpm
+  PASS: held_follower_does_not_move
+  PASS: constant_clamps_at_end
+  PASS: caret_is_the_only_backward_move
+  PASS: rescale_clamps_target
+  PASS: voice_gated_moves_only_while_speaking
+  PASS: voice_gated_stops_within_250_ms
+  PASS: tracking_holds_after_coast_limit
+  PASS: spring_moves_toward_target
+  PASS: fixed_measure
+  PASS: layout_wraps_every_word
+  PASS: scroll_tick_keeps_time
+  PASS: restart_snaps_scroll_back
+  PASS: allowed_distance_tiers
+  PASS: matcher_exact_and_tolerant
+  PASS: equivalent_word_matches
+  PASS: reanchor_places_position
+  PASS: stop_words_alone_never_move
+  PASS: stale_window_is_ignored
+  PASS: aligner_follows_reading
+  PASS: repeated_phrase_picks_the_forward_occurrence
+
+-- equivalences (real voice) --
+  PASS: homophones_from_the_recording
+  PASS: spoken_abbreviations_from_the_recording
+  PASS: numbers_from_the_recording
+  PASS: compounds_from_the_recording
+  PASS: phonetics_from_the_recording
+  PASS: unrelated_words_differ
+
+-- speech pipeline --
+  PASS: push_advances_recording_clock
+  PASS: one_frame_per_512_samples
+  PASS: no_decode_when_disabled
+  PASS: decodes_while_speaking_with_prompt
+  PASS: clear_pending_keeps_clock
+  PASS: scripted_doubles
+  PASS: speech_codec_round_trip
+
+-- take studio state machine and journal --
+  PASS: table_lists_34_pairs
+  PASS: recording_only_and_practice_only
+  PASS: editing_allows_only_commit_or_cancel
+  PASS: record_then_count_in_done_reads
+  PASS: again_counts_in_from_sentence_start
+  PASS: resume_puts_reader_on_the_caret
+  PASS: empty_script_cannot_start
+  PASS: pick_word_moves_caret_without_journal
+  PASS: practice_writes_no_journal
+  PASS: disallowed_action_is_refused
+  PASS: commit_edit_makes_a_revision
+  PASS: journal_append_keeps_order
+  PASS: journal_refuses_time_travel
+  PASS: codec_round_trip
+  PASS: 64000_bytes_is_one_second
+  PASS: clock_refuses_shrinking_file
+  PASS: again_caret_rules
+
+-- assembly --
+  PASS: speech_map_silence
+  PASS: cut_list_output_mapping
+  PASS: cut_list_refuses_script_disorder
+  PASS: floor_is_the_complement
+  PASS: attempt_per_resume
+  PASS: solver_exact_cover_after_cough
+  PASS: analyzer_reports_transcriber_failure
+  PASS: flagger_flags_every_tight_cut
+
+-- outputs and plans --
+  PASS: srt_and_vtt
+  PASS: chapter_and_edl
+  PASS: review_srt_one_cue_per_mark
+  PASS: edl_has_one_event_per_cut
+  PASS: render_plan_follows_the_spike_recipe
+  PASS: cut_codec_round_trip
+  PASS: capture_plan_recording_arguments
+  PASS: capture_plan_sets_a_small_audio_buffer
+  PASS: capture_plan_practice_is_audio_only
+  PASS: preflight_disk_check
+
+-- keymap, controls and settings --
+  PASS: defaults_need_modifiers
+  PASS: bare_key_needs_the_recording_flag
+  PASS: bare_keys_only_while_recording
+  PASS: activation_refused_outside_recording
+  PASS: two_keys_for_one_control
+  PASS: rebinding_a_combo_replaces_it
+  PASS: clicker_back_depends_on_state
+  PASS: hold_toggle_and_wrap_by_mode
+  PASS: setters_save_and_clamp_by_contract
+  PASS: default_mode_waits_for_proof
+
+-- phase 4 acceptance --
+  PASS: read_test_parses_into_sections_and_sentences
+  PASS: edit_insert_strike_and_edges
+  PASS: step_back_and_forward_edges
+  PASS: cough_session_journal
+  PASS: journal_writes_and_replays
+  PASS: silence_around_the_instructed_pause
+  PASS: star_marks_exactly_one_attempt
+  PASS: starred_older_take_wins
+  PASS: edited_passage_needs_the_newer_take
+  PASS: missing_passage_is_reported
+  PASS: snapper_places_cuts_in_silence
+  PASS: analyzer_success_path
+  PASS: captions_respect_limits
+  PASS: chapters_start_at_zero
+  PASS: analysis_codec_round_trip
+  PASS: settings_round_trip
+  PASS: open_read_test_from_disk
+
+-- real voice: larry_read_01 --
+  PASS: tracking_follows_larry_within_a_line
+  PASS: tracking_holds_during_the_ad_lib
+  PASS: tracking_jumps_the_skipped_paragraph
+  PASS: tracking_never_moves_backward
+  PASS: aligner_meets_frame_budget
+  PASS: misreads_on_larry_read_01
+  PASS: analysis_of_larry_read_01
+
+-- facade --
+  PASS: load_wires_everything
+  PASS: fluent_configuration
+  PASS: constant_practice_read_moves
+  PASS: prompt_is_already_read_text_only
+
+-- SCOOP consumer --
+  PASS: separate_recording_clock
+
+-- attempt aligner and misreads (phase 5) --
+  PASS: long_cue_does_not_stop_alignment
+  PASS: stop_word_does_not_skip_ahead
+  PASS: two_heard_words_for_one_script_word
+  PASS: one_heard_token_for_three_script_words
+  PASS: one_for_one_substitution_is_a_misread
+  PASS: homophones_are_not_misreads
+  PASS: uneven_gap_is_not_a_misread
+  PASS: digits_are_not_sound_alikes
+  PASS: ad_lib_word_does_not_pull_the_pointer
+  PASS: skipped_paragraph_is_recovered
+  PASS: misread_flags_only_inside_the_final_video
+  PASS: analyzer_raises_the_misread_flag
+  PASS: run_up_lookahead_and_substitution_limits
+
+-- coverage: take studio, config, recording, facade (phase 5) --
+  PASS: session_folder_paths
+  PASS: recorder_health
+  PASS: camera_anchor
+  PASS: scripted_transcriber
+  PASS: settings_defaults_and_setters
+  PASS: key_binding_codes
+  PASS: keymap_bare_keys_follow_recording
+  PASS: win32_virtual_key_codes
+  PASS: control_resolver_routes
+  PASS: controller_marker_count_in_and_queries
+  PASS: controller_edit_range_again_and_wrap
+  PASS: transitions_partition_actions
+  PASS: recording_clock_samples_and_interpolation
+  PASS: preflight_reports_problems
+  PASS: capture_plan_fields
+  PASS: session_analysis_and_cuts
+  PASS: facade_feeds_voice_and_heard
+
+-- coverage: following, pipeline, assembly, outputs, script (phase 5) --
+  PASS: time_span_queries
+  PASS: word_timeline_queries
+  PASS: equivalence_tables
+  PASS: matcher_queries
+  PASS: aligner_reanchor_and_constants
+  PASS: alignment_record
+  PASS: constant_follower_speed
+  PASS: voice_gated_ramps
+  PASS: tracking_follower_steers_and_coasts
+  PASS: layout_lines_and_scroll
+  PASS: spring_rate_and_reset
+  PASS: pipeline_threshold_decoding_and_frames
+  PASS: speech_codec_heard_round_trip
+  PASS: voice_frame_seconds_and_fakes
+  PASS: cut_and_cut_list_queries
+  PASS: attempt_and_builder
+  PASS: take_solver_queries
+  PASS: flagger_low_confidence_restart_and_pause
+  PASS: snapper_pads_and_words_inside
+  PASS: analysis_records
+  PASS: snapper_steps_over_vad_margins
+  PASS: silence_searches_and_speech_map
+  PASS: captions_vtt_and_cue_words
+  PASS: edl_helpers
+  PASS: cut_codec_errors_and_objects
+  PASS: render_plan_fields
+  PASS: review_srt_helpers
+  PASS: chapter_and_timecode_helpers
+  PASS: script_edit_kinds
+  PASS: restart_policy_units
+  PASS: script_parser_classification
+  PASS: revision_and_structure_queries
+  PASS: history_ids_and_journal_status
+  PASS: event_names_and_edit_fields
+  PASS: fixed_measure_and_heard_word
+
+========================
+Results: 183 passed, 0 failed
+ALL TESTS PASSED
+```
+
+## Lean F_code (the shipping build, no contracts): simple_prompter_lean.exe (0.87 s)
+Refusal checks (assert_refused) are skipped when contracts are off; every behavior assertion runs.
+```
+Results: 183 passed, 0 failed
+ALL TESTS PASSED
+```
+
+Tests run: 183
+Tests passed: 183 (contract-checked) / 183 (lean)
+# Status: PASS

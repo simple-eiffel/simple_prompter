@@ -43,7 +43,7 @@ feature -- Tests: values
 		do
 			create l.make
 			l.extend (create {PT_CUT}.make (0, span (0.0, 2.0), <<id (5)>>, 5, 5, 1, False))
-			assert_true ("earlier words refused", raises (agent l.extend (create {PT_CUT}.make (0, span (3.0, 4.0), <<id (2)>>, 2, 2, 2, False))))
+			assert_refused ("earlier words refused", agent l.extend (create {PT_CUT}.make (0, span (3.0, 4.0), <<id (2)>>, 2, 2, 2, False)))
 		end
 
 	test_floor_is_the_complement

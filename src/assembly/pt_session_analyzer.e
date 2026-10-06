@@ -63,6 +63,7 @@ feature -- Basic operations
 				solver.solve (a_history, builder.last_attempts, l_timeline)
 				snapper.snap (solver.last_result, al_map, l_timeline)
 				flagger.flag (snapper.last_result, solver.missing_words, l_timeline, al_map)
+				flagger.flag_misreads (aligner.last_misreads, snapper.last_result)
 				create last_analysis.make (al_map, l_timeline, builder.last_attempts, snapper.last_result,
 					flagger.last_flags, solver.decisions)
 			elseif attached transcriber.last_error as al_error and then not al_error.is_empty then
