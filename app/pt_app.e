@@ -535,7 +535,9 @@ feature {NONE} -- Speech
 						recording_live := True
 					end
 				end
-				if speech_samples * 4 > prompter.recording_clock.byte_count and a_now >= prompter.recording_clock.observed_at_ms then
+				if not (record_pending and not recording_live)
+					and then speech_samples * 4 > prompter.recording_clock.byte_count and a_now >= prompter.recording_clock.observed_at_ms then
+						-- While a recording is starting, the old stream's samples are not recording time.
 					prompter.recording_clock.observe_bytes (speech_samples * 4, a_now)
 				end
 				if l_reading and then prompter.controller.reader_position /= prompt_at then
@@ -661,6 +663,9 @@ feature {NONE} -- Take Studio (plan Step 4a)
 			else
 				create l_folder.make (new_session_root)
 				prompter.start_session (l_folder)
+					-- Recording time starts now: events journaled before the camera's stream arrives
+					-- read 0, not the listening stream's clock (found in the Step 4a end-to-end run).
+				prompter.recording_clock.restart (clock.now_ms)
 				prompter.perform ({PT_ACTION}.Record)
 				previous_state := {PT_TAKE_STATE}.Idle
 				record_pending := True
