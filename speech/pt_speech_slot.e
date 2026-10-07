@@ -104,9 +104,6 @@ feature -- Access
 			create Result.make_empty
 		end
 
-	analysis_id_base: INTEGER_64
-			-- The id just before the session script's first word (see PT_ANALYSIS_JOB).
-
 	analysis_duration: REAL_64
 			-- The take's length, seconds.
 
@@ -252,15 +249,13 @@ feature -- Window side
 			seen: not recording_finished
 		end
 
-	request_analysis (a_root: separate READABLE_STRING_32; a_id_base: INTEGER_64; a_duration: REAL_64)
+	request_analysis (a_root: separate READABLE_STRING_32; a_duration: REAL_64)
 			-- Analyze the take in session folder `a_root'.
 		require
 			not_analyzing: not analysis_requested
-			base_non_negative: a_id_base >= 0
 			duration_positive: a_duration > 0
 		do
 			create analysis_root.make_from_separate (a_root)
-			analysis_id_base := a_id_base
 			analysis_duration := a_duration
 			analysis_finished := False
 			analysis_requested := True

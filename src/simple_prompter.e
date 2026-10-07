@@ -288,6 +288,7 @@ feature -- Take Studio sessions
 		do
 			a_folder.create_directories
 			l_saved := (create {SIMPLE_FILE}.make (a_folder.revision_path (1))).set_content (history.current_revision.source_text)
+			l_saved := (create {SIMPLE_FILE}.make (a_folder.session_settings_path)).set_content (session_settings_text)
 			create l_journal.make_on_file (a_folder.journal_path)
 			l_count_in := controller.count_in_seconds
 			create controller_cell.make (history, l_journal, recording_clock, clock, follower, policy)
@@ -299,6 +300,33 @@ feature -- Take Studio sessions
 			journaled: controller.journal = session.journal and controller.journal.is_persistent
 			idle: controller.state = {PT_TAKE_STATE}.Idle
 			count_in_kept: controller.count_in_seconds = old controller.count_in_seconds
+		end
+
+	session_id_base: INTEGER_64
+			-- The id just before the current revision's first word: a reader re-parsing the saved
+			-- script issues ids after it, and gets the ids the journal refers to.
+		require
+			loaded: has_script
+		do
+			if history.current_revision.word_count > 0 then
+				Result := history.current_revision.word (1).id.value - 1
+			end
+		ensure
+			non_negative: Result >= 0
+		end
+
+	session_settings_text: STRING_32
+			-- session.toml: the title and `session_id_base' (PT_SESSION_LOADER reads them).
+		require
+			loaded: has_script
+		local
+			l_table, l_root: TOML_TABLE
+		do
+			create l_table.make
+			l_table := l_table.with_string ("title", history.current_revision.title).with_integer ("id_base", session_id_base)
+			create l_root.make
+			l_root := l_root.with_table ("session", l_table)
+			Result := (create {SIMPLE_TOML}).serialize (l_root)
 		end
 
 	end_session

@@ -66,6 +66,39 @@ feature -- Tests
 			assert_false ("no raw output in practice", l_plan.has_pair (l_plan.arguments, "-cluster_time_limit", "500"))
 		end
 
+	test_loader_reads_a_session_back
+			-- A session whose ids do not start at 1 (a second script was loaded first) reads back with
+			-- the same ids, so the journal's and the analysis's references hold.
+		local
+			p: SIMPLE_PROMPTER
+			l_folder: PT_SESSION_FOLDER
+			l_loader: PT_SESSION_LOADER
+		do
+			create p.make_with_settings (create {PT_SETTINGS}.make_in_memory)
+			p.load_script_text ({STRING_32} "first", {STRING_32} "An earlier script uses up some ids.")
+			p.load_script_text ({STRING_32} "Episode", {STRING_32} "One two three. Four five six.")
+			assert_true ("ids do not start at 1", p.history.current_revision.word (1).id.value > 1)
+			create l_folder.make (scratch_root)
+			p.start_session (l_folder)
+			p.perform ({PT_ACTION}.Record)
+			p.perform ({PT_ACTION}.Count_in_done)
+			p.perform ({PT_ACTION}.Wrap)
+			p.perform ({PT_ACTION}.Analysis_done)
+			create l_loader.make
+			l_loader.load (l_folder.root)
+			assert_true ({STRING_32} "loaded: " + l_loader.last_error, l_loader.is_loaded)
+			assert_strings_equal ("title kept", "Episode", l_loader.title)
+			assert_true ("id base saved", l_loader.id_base = p.history.current_revision.word (1).id.value - 1)
+			if attached l_loader.history as al_history and attached l_loader.journal as al_journal then
+				assert_integers_equal ("same words", p.history.current_revision.word_count, al_history.current_revision.word_count)
+				assert_true ("same first id", al_history.current_revision.word (1).id ~ p.history.current_revision.word (1).id)
+				assert_true ("same last id", al_history.current_revision.word (6).id ~ p.history.current_revision.word (6).id)
+				assert_integers_equal ("journal read back", p.controller.journal.count, al_journal.count)
+			end
+			assert_true ("no analysis yet", l_loader.analysis = Void)
+			p.end_session
+		end
+
 feature {NONE} -- Fixtures
 
 	scratch_root: STRING_32

@@ -659,8 +659,6 @@ feature {NONE} -- Take Studio (plan Step 4a)
 		attribute
 			create Result.make_empty
 		end
-	session_id_base: INTEGER_64
-			-- The id just before the session script's first word (the worker re-parses the script).
 	off_road: BOOLEAN
 			-- Speaking for a while with nothing matching the script (Larry's idea I-1)?
 
@@ -680,11 +678,6 @@ feature {NONE} -- Take Studio (plan Step 4a)
 			else
 				create l_folder.make (new_session_root)
 				prompter.start_session (l_folder)
-				if prompter.history.current_revision.word_count > 0 then
-					session_id_base := prompter.history.current_revision.word (1).id.value - 1
-				else
-					session_id_base := 0
-				end
 					-- Recording time starts now: events journaled before the camera's stream arrives
 					-- read 0, not the listening stream's clock (found in the Step 4a end-to-end run).
 				prompter.recording_clock.restart (clock.now_ms)
@@ -717,7 +710,7 @@ feature {NONE} -- Take Studio (plan Step 4a)
 				finish_asked := False
 				if prompter.controller.state = {PT_TAKE_STATE}.Analyzing and recorded_seconds > 0 and prompter.has_session then
 						-- Wrap: the worker analyzes the take (debate 01) before it is complete.
-					ask_analysis (speech_slot, prompter.session.folder.root, session_id_base, recorded_seconds)
+					ask_analysis (speech_slot, prompter.session.folder.root, recorded_seconds)
 					analysis_pending := True
 					take_note := {STRING_32} "Analyzing the take (" + clock_text (recorded_seconds) + {STRING_32} ")..."
 				else
@@ -866,13 +859,12 @@ feature {NONE} -- Speech: separate calls (each locks the slot for one short call
 			a_slot.request_record (a_raw, a_tee)
 		end
 
-	ask_analysis (a_slot: separate PT_SPEECH_SLOT; a_root: STRING_32; a_id_base: INTEGER_64; a_duration: REAL_64)
+	ask_analysis (a_slot: separate PT_SPEECH_SLOT; a_root: STRING_32; a_duration: REAL_64)
 		require
 			idle: not a_slot.analysis_requested
-			base_non_negative: a_id_base >= 0
 			duration_positive: a_duration > 0
 		do
-			a_slot.request_analysis (a_root, a_id_base, a_duration)
+			a_slot.request_analysis (a_root, a_duration)
 		end
 
 	ask_finish (a_slot: separate PT_SPEECH_SLOT)

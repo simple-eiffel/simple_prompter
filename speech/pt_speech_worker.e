@@ -235,7 +235,7 @@ feature {NONE} -- Listening
 			report (a_slot, {PT_SPEECH_SLOT}.Analyzing, {STRING_32} "analyzing the take")
 			l_root := requested_analysis_root (a_slot)
 			if attached analysis_job as al_job then
-				al_job.run (l_root, requested_id_base (a_slot), requested_duration (a_slot))
+				al_job.run (l_root, requested_duration (a_slot))
 				report_analysis (a_slot, al_job.succeeded, al_job.summary)
 			else
 				report_analysis (a_slot, False, {STRING_32} "analysis unavailable: the speech models are not loaded")
@@ -424,11 +424,6 @@ feature {NONE} -- Slot calls: each locks the slot for one short call
 	requested_analysis_root (a_slot: separate PT_SPEECH_SLOT): STRING_32
 		do
 			create Result.make_from_separate (a_slot.analysis_root)
-		end
-
-	requested_id_base (a_slot: separate PT_SPEECH_SLOT): INTEGER_64
-		do
-			Result := a_slot.analysis_id_base
 		end
 
 	requested_duration (a_slot: separate PT_SPEECH_SLOT): REAL_64

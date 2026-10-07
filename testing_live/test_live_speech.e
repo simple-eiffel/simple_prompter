@@ -343,7 +343,7 @@ feature -- Analysis (Step 4b)
 			l_journal.append (create {PT_TAKE_EVENT}.make_wrap (l_duration - 0.5, "user"))
 			create l_job.make (create {PT_WHISPER_TRANSCRIBER}.make (vad.detector, decoder.recognizer))
 			l_t0 := now_ms
-			l_job.run (l_root, 0, l_duration)
+			l_job.run (l_root, l_duration)
 			l_ms := now_ms - l_t0
 			print ("    [analysis] " + l_job.summary.to_string_8 + " in " + l_ms.truncated_to_integer.out + " ms for "
 				+ l_duration.truncated_to_integer.out + " s%N")
