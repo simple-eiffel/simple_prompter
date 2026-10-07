@@ -116,6 +116,7 @@ feature -- Execution
 						report (al_slot, {PT_SPEECH_SLOT}.Ready, {STRING_32} "speech ready (" + load_seconds.out + " s to load)")
 						vad := l_vad
 						decoder := l_decoder
+						create analysis_job.make (create {PT_WHISPER_TRANSCRIBER}.make (l_vad.detector, l_decoder.recognizer))
 						from
 						until
 							stop_wanted (al_slot) or failed
@@ -128,6 +129,8 @@ feature -- Execution
 							end
 							if not is_recording and then record_wanted (al_slot) then
 								start_recording (al_slot)
+							elseif not is_recording and then analysis_wanted (al_slot) then
+								run_analysis (al_slot)
 							elseif not is_listening and then listen_wanted (al_slot) then
 								start_listening (al_slot)
 							end
@@ -180,6 +183,9 @@ feature {NONE} -- Listening
 	stream: INTEGER
 			-- The current capture's number (see PT_SPEECH_SLOT.stream).
 
+	analysis_job: detachable PT_ANALYSIS_JOB
+			-- Analyzes wrapped takes on the loaded models (debate 01).
+
 	current_tee: STRING_32
 			-- The tee file of the running capture.
 
@@ -215,6 +221,30 @@ feature {NONE} -- Listening
 			if is_listening then
 				is_recording := True
 				finish_at := 0.0
+			end
+		end
+
+	run_analysis (a_slot: separate PT_SPEECH_SLOT)
+			-- Analyze the requested take (blocking this processor for seconds, holding no slot),
+			-- report it, and listen again on a fresh stream (the audio heard meanwhile is stale).
+		require
+			not_recording: not is_recording
+		local
+			l_root: STRING_32
+		do
+			report (a_slot, {PT_SPEECH_SLOT}.Analyzing, {STRING_32} "analyzing the take")
+			l_root := requested_analysis_root (a_slot)
+			if attached analysis_job as al_job then
+				al_job.run (l_root, requested_id_base (a_slot), requested_duration (a_slot))
+				report_analysis (a_slot, al_job.succeeded, al_job.summary)
+			else
+				report_analysis (a_slot, False, {STRING_32} "analysis unavailable: the speech models are not loaded")
+			end
+			if is_listening then
+				stop_listening
+			end
+			if listen_wanted (a_slot) then
+				start_listening (a_slot)
 			end
 		end
 
@@ -384,6 +414,31 @@ feature {NONE} -- Slot calls: each locks the slot for one short call
 	listen_wanted (a_slot: separate PT_SPEECH_SLOT): BOOLEAN
 		do
 			Result := a_slot.listen_requested
+		end
+
+	analysis_wanted (a_slot: separate PT_SPEECH_SLOT): BOOLEAN
+		do
+			Result := a_slot.analysis_requested
+		end
+
+	requested_analysis_root (a_slot: separate PT_SPEECH_SLOT): STRING_32
+		do
+			create Result.make_from_separate (a_slot.analysis_root)
+		end
+
+	requested_id_base (a_slot: separate PT_SPEECH_SLOT): INTEGER_64
+		do
+			Result := a_slot.analysis_id_base
+		end
+
+	requested_duration (a_slot: separate PT_SPEECH_SLOT): REAL_64
+		do
+			Result := a_slot.analysis_duration
+		end
+
+	report_analysis (a_slot: separate PT_SPEECH_SLOT; a_succeeded: BOOLEAN; a_summary: STRING_32)
+		do
+			a_slot.put_analysis_finished (a_succeeded, a_summary)
 		end
 
 	record_wanted (a_slot: separate PT_SPEECH_SLOT): BOOLEAN

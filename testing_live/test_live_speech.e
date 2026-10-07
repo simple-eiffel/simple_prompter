@@ -311,6 +311,82 @@ feature -- Load time
 			end
 		end
 
+feature -- Analysis (Step 4b)
+
+	test_analysis_job_on_a_real_take
+			-- The read-test recording as a session (script, tee, journal) analyzed by the job the worker
+			-- runs after Wrap: real Silero and whisper, analysis.json and review.srt written, within the
+			-- NFR-T03 budget (25%% of the take's length).
+		local
+			l_root: STRING_32
+			l_folder: PT_SESSION_FOLDER
+			l_parser: PT_SCRIPT_PARSER
+			l_journal: PT_JOURNAL
+			l_job: PT_ANALYSIS_JOB
+			l_codec: PT_ANALYSIS_CODEC
+			l_duration, l_t0, l_ms: REAL_64
+			l_ok: BOOLEAN
+		do
+			samples := wav_samples (Read_wav)
+			l_duration := samples.count / Rate
+			l_root := tee_path + {STRING_32} ".analysis"
+			create l_folder.make (l_root)
+			l_ok := (create {SIMPLE_FILE}.make (l_folder.journal_path)).delete
+			l_folder.create_directories
+			l_ok := (create {SIMPLE_FILE}.make (l_folder.revision_path (1))).set_content (file_text (Read_script))
+			write_tee (l_folder.tee_path)
+			create l_parser.make
+			l_parser.parse ({STRING_32} "s", file_text (Read_script), 1, create {PT_ID_SOURCE}.make)
+			create l_journal.make_on_file (l_folder.journal_path)
+			l_journal.append (create {PT_TAKE_EVENT}.make_session_start (0.0, 1, {STRING_32} "tracking"))
+			l_journal.append (create {PT_TAKE_EVENT}.make_resume (0.5, l_parser.last_revision.word (1).id, 1))
+			l_journal.append (create {PT_TAKE_EVENT}.make_wrap (l_duration - 0.5, "user"))
+			create l_job.make (create {PT_WHISPER_TRANSCRIBER}.make (vad.detector, decoder.recognizer))
+			l_t0 := now_ms
+			l_job.run (l_root, 0, l_duration)
+			l_ms := now_ms - l_t0
+			print ("    [analysis] " + l_job.summary.to_string_8 + " in " + l_ms.truncated_to_integer.out + " ms for "
+				+ l_duration.truncated_to_integer.out + " s%N")
+			assert_true ({STRING_32} "succeeded: " + l_job.summary, l_job.succeeded)
+			assert_true ("analysis.json written", (create {SIMPLE_FILE}.make (l_job.analysis_path (l_folder))).exists)
+			assert_true ("review.srt written", (create {SIMPLE_FILE}.make (l_folder.review_srt_path)).exists)
+			create l_codec.make
+			l_codec.decode (byte_file (l_job.analysis_path (l_folder)))
+			assert_true ("analysis decodes", l_codec.last_analysis.is_success)
+			assert_true ("at least one cut", l_codec.last_analysis.cuts.count >= 1)
+			assert_true ("words heard", l_codec.last_analysis.timeline.count >= 150)
+			assert_true ("within 25%% of the length: " + l_ms.out, l_ms < l_duration * 250.0)
+			l_ok := (create {SIMPLE_FILE}.make (l_root)).delete_directory_recursive
+		end
+
+feature {NONE} -- Analysis support
+
+	write_tee (a_path: STRING_32)
+			-- `samples' as 16 kHz float32 little endian, as ffmpeg's tee writes it.
+		local
+			l_file: RAW_FILE
+			l_bytes: MANAGED_POINTER
+			i: INTEGER
+		do
+			create l_bytes.make (samples.count * 4)
+			from i := 0 until i >= samples.count loop
+				l_bytes.put_real_32_le (samples [i], i * 4)
+				i := i + 1
+			end
+			create l_file.make_with_name (a_path)
+			l_file.open_write
+			l_file.put_managed_pointer (l_bytes, 0, samples.count * 4)
+			l_file.close
+		end
+
+	byte_file (a_path: STRING_32): STRING_8
+		do
+			create Result.make (4096)
+			across (create {SIMPLE_FILE}.make (a_path)).binary_content as ic loop
+				Result.append_character (ic.to_character_8)
+			end
+		end
+
 feature -- Worker
 
 	test_worker_listens_to_the_microphone

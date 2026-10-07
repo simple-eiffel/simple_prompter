@@ -39,6 +39,7 @@ feature -- Constants
 	Listening: INTEGER = 3
 	Failed: INTEGER = 4
 	Recording: INTEGER = 5
+	Analyzing: INTEGER = 6
 
 	Max_record_bytes: INTEGER = 1_000_000
 			-- Records beyond this (the window stalled) replace what is waiting.
@@ -89,11 +90,37 @@ feature -- Access
 	recorded_seconds: REAL_64
 			-- Length of the last finished recording, from its tee.
 
+	analysis_requested: BOOLEAN
+			-- Should the worker analyze the take in `analysis_root'?
+
+	analysis_finished: BOOLEAN
+			-- Has the worker finished the last analysis (successfully or not)?
+
+	analysis_succeeded: BOOLEAN
+
+	analysis_root: STRING_32
+			-- Session folder of the requested analysis.
+		attribute
+			create Result.make_empty
+		end
+
+	analysis_id_base: INTEGER_64
+			-- The id just before the session script's first word (see PT_ANALYSIS_JOB).
+
+	analysis_duration: REAL_64
+			-- The take's length, seconds.
+
+	analysis_summary: STRING_32
+			-- The worker's one-line outcome.
+		attribute
+			create Result.make_empty
+		end
+
 feature -- Worker side
 
 	put_state (a_state: INTEGER; a_text: separate READABLE_STRING_32)
 		require
-			known: a_state >= Loading and a_state <= Recording
+			known: a_state >= Loading and a_state <= Analyzing
 		do
 			state := a_state
 			create status_text.make_from_separate (a_text)
@@ -134,6 +161,17 @@ feature -- Worker side
 		ensure
 			set: stream = a_stream
 			fresh: records.is_empty and samples_heard = 0
+		end
+
+	put_analysis_finished (a_succeeded: BOOLEAN; a_summary: separate READABLE_STRING_32)
+			-- The analysis is over.
+		do
+			analysis_requested := False
+			analysis_finished := True
+			analysis_succeeded := a_succeeded
+			create analysis_summary.make_from_separate (a_summary)
+		ensure
+			finished: analysis_finished and not analysis_requested
 		end
 
 	put_recording_finished (a_seconds: REAL_64)
@@ -214,8 +252,32 @@ feature -- Window side
 			seen: not recording_finished
 		end
 
+	request_analysis (a_root: separate READABLE_STRING_32; a_id_base: INTEGER_64; a_duration: REAL_64)
+			-- Analyze the take in session folder `a_root'.
+		require
+			not_analyzing: not analysis_requested
+			base_non_negative: a_id_base >= 0
+			duration_positive: a_duration > 0
+		do
+			create analysis_root.make_from_separate (a_root)
+			analysis_id_base := a_id_base
+			analysis_duration := a_duration
+			analysis_finished := False
+			analysis_requested := True
+		ensure
+			requested: analysis_requested and not analysis_finished
+		end
+
+	acknowledge_analysis
+			-- The window has seen `analysis_finished'.
+		do
+			analysis_finished := False
+		ensure
+			seen: not analysis_finished
+		end
+
 invariant
-	known_state: state >= Loading and state <= Recording
+	known_state: state >= Loading and state <= Analyzing
 	finish_only_while_recording: finish_requested implies record_requested
 	clock_non_negative: samples_heard >= 0
 

@@ -187,6 +187,7 @@ feature {NONE} -- The clock
 					previous_state := prompter.controller.state
 				end
 				prompter.tick (l_now)
+				follow_road
 				if pill.is_shift_held /= grips_shown then
 					grips_shown := not grips_shown
 					pill.set_shows_grips (grips_shown)
@@ -295,12 +296,15 @@ feature {NONE} -- Pill content
 			when {PT_TAKE_STATE}.Idle then
 				Result := {STRING_32} "Ctrl+Alt+P"
 			when {PT_TAKE_STATE}.Analyzing, {PT_TAKE_STATE}.Wrapped then
-				Result := {STRING_32} "SAVING"
+				Result := (if analysis_pending then {STRING_32} "ANALYZING" else {STRING_32} "SAVING" end)
 			else
 				create Result.make_empty
 			end
 			if prompter.controller.is_recording then
 				Result := {STRING_32} "REC " + clock_text (prompter.recording_clock.rt) + (if Result.is_empty then {STRING_32} "" else {STRING_32} "  " + Result end)
+			end
+			if off_road then
+				Result := (if Result.is_empty then {STRING_32} "" else Result + {STRING_32} "  " end) + {STRING_32} "OFF SCRIPT"
 			end
 			if prompter.mode /= {PT_FOLLOW_MODE}.Constant and speech_state /= {PT_SPEECH_SLOT}.Listening
 				and prompter.controller.state /= {PT_TAKE_STATE}.Idle then
@@ -649,6 +653,19 @@ feature {NONE} -- Take Studio (plan Step 4a)
 	finish_asked: BOOLEAN
 	recording_finished: BOOLEAN
 	recorded_seconds: REAL_64
+	analysis_pending: BOOLEAN
+	analysis_finished: BOOLEAN
+	analysis_summary: STRING_32
+		attribute
+			create Result.make_empty
+		end
+	session_id_base: INTEGER_64
+			-- The id just before the session script's first word (the worker re-parses the script).
+	off_road: BOOLEAN
+			-- Speaking for a while with nothing matching the script (Larry's idea I-1)?
+
+	Off_road_s: REAL_64 = 2.0
+			-- Seconds of speech without a matched word before the pill says OFF SCRIPT.
 	speech_stream, stream_seen: INTEGER
 
 	start_take
@@ -663,6 +680,11 @@ feature {NONE} -- Take Studio (plan Step 4a)
 			else
 				create l_folder.make (new_session_root)
 				prompter.start_session (l_folder)
+				if prompter.history.current_revision.word_count > 0 then
+					session_id_base := prompter.history.current_revision.word (1).id.value - 1
+				else
+					session_id_base := 0
+				end
 					-- Recording time starts now: events journaled before the camera's stream arrives
 					-- read 0, not the listening stream's clock (found in the Step 4a end-to-end run).
 				prompter.recording_clock.restart (clock.now_ms)
@@ -693,18 +715,54 @@ feature {NONE} -- Take Studio (plan Step 4a)
 				record_pending := False
 				recording_live := False
 				finish_asked := False
-				if prompter.controller.state = {PT_TAKE_STATE}.Analyzing then
-						-- Step 4b runs the analysis job here; until then the take is complete as recorded.
-					prompter.perform ({PT_ACTION}.Analysis_done)
-				end
-				if prompter.has_session and then not prompter.controller.is_recording then
-					take_note := {STRING_32} "Take saved (" + clock_text (recorded_seconds) + {STRING_32} "): " + prompter.session.folder.root
-					prompter.end_session
-					previous_state := prompter.controller.state
-					geometry := new_geometry
+				if prompter.controller.state = {PT_TAKE_STATE}.Analyzing and recorded_seconds > 0 and prompter.has_session then
+						-- Wrap: the worker analyzes the take (debate 01) before it is complete.
+					ask_analysis (speech_slot, prompter.session.folder.root, session_id_base, recorded_seconds)
+					analysis_pending := True
+					take_note := {STRING_32} "Analyzing the take (" + clock_text (recorded_seconds) + {STRING_32} ")..."
+				else
+					complete_take ({STRING_32} "not analyzed")
 				end
 				last_signature := -1
 				window.request_render
+			end
+			if analysis_finished then
+				analysis_finished := False
+				analysis_pending := False
+				complete_take (analysis_summary)
+				last_signature := -1
+				window.request_render
+			end
+		end
+
+	complete_take (a_outcome: READABLE_STRING_32)
+			-- The take is done: close the session (Analysis_done first if it was waiting).
+		do
+			if prompter.controller.state = {PT_TAKE_STATE}.Analyzing then
+				prompter.perform ({PT_ACTION}.Analysis_done)
+			end
+			if prompter.has_session and then not prompter.controller.is_recording then
+				take_note := {STRING_32} "Take saved (" + clock_text (recorded_seconds) + {STRING_32} ", " + a_outcome + {STRING_32} "): "
+					+ prompter.session.folder.root
+				prompter.end_session
+				previous_state := prompter.controller.state
+				geometry := new_geometry
+			end
+		end
+
+	follow_road
+			-- Larry's idea I-1: say OFF SCRIPT while he speaks with nothing matching the script, and
+			-- clear it the moment the script matches again (the follower already holds still).
+		do
+			if prompter.controller.state = {PT_TAKE_STATE}.Reading and then prompter.mode = {PT_FOLLOW_MODE}.Tracking
+				and then attached {PT_TRACKING_FOLLOWER} prompter.follower as al_t then
+				if al_t.is_speaking and al_t.has_alignment and al_t.seconds_since_anchor > Off_road_s then
+					off_road := True
+				elseif al_t.seconds_since_anchor < 0.5 then
+					off_road := False
+				end
+			else
+				off_road := False
 			end
 		end
 
@@ -771,6 +829,11 @@ feature {NONE} -- Speech: separate calls (each locks the slot for one short call
 				recorded_seconds := a_slot.recorded_seconds
 				a_slot.acknowledge_finished
 			end
+			if a_slot.analysis_finished then
+				analysis_finished := True
+				create analysis_summary.make_from_separate (a_slot.analysis_summary)
+				a_slot.acknowledge_analysis
+			end
 			if not a_slot.records.is_empty then
 				incoming.append (create {STRING_8}.make_from_separate (a_slot.records))
 				a_slot.clear_records
@@ -801,6 +864,15 @@ feature {NONE} -- Speech: separate calls (each locks the slot for one short call
 			not_recording: not a_slot.record_requested
 		do
 			a_slot.request_record (a_raw, a_tee)
+		end
+
+	ask_analysis (a_slot: separate PT_SPEECH_SLOT; a_root: STRING_32; a_id_base: INTEGER_64; a_duration: REAL_64)
+		require
+			idle: not a_slot.analysis_requested
+			base_non_negative: a_id_base >= 0
+			duration_positive: a_duration > 0
+		do
+			a_slot.request_analysis (a_root, a_id_base, a_duration)
 		end
 
 	ask_finish (a_slot: separate PT_SPEECH_SLOT)

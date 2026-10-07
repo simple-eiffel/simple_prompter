@@ -22,6 +22,7 @@ feature {NONE} -- Initialization
 			run_test (agent t.test_live_path_follows_larry, "live_path_follows_larry")
 			run_test (agent t.test_live_path_follows_a_sermon, "live_path_follows_a_sermon")
 			run_test (agent t.test_long_script_loads_fast, "long_script_loads_fast")
+			run_test (agent t.test_analysis_job_on_a_real_take, "analysis_job_on_a_real_take")
 			run_test (agent t.test_worker_listens_to_the_microphone, "worker_listens_to_the_microphone")
 			run_test (agent t.test_worker_records_a_take, "worker_records_a_take")
 			say ("%NResults: " + passed.out + " passed, " + failed.out + " failed%N")
