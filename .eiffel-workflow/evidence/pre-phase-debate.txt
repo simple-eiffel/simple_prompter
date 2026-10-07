@@ -1,0 +1,25 @@
+# Pre-Phase Debate Evidence
+# Project: D:\prod\simple_prompter
+# Date: 2026-10-07
+# ROE: General Research ROE v1.0 (read 2026-10-07)
+
+Decisions debated: debate/01 - Analysis placement (Step 4)
+Mode: code-lite (first budgeted cycle)
+Agents: 5 seats   Adversarial condition: C3 (C2 under the executed-evidence proposal)
+Budget (tokens from each agent's completion notice):
+  gather       general-purpose / Sonnet (agent types not yet loaded)   63,441
+  BLUE         general-purpose / Sonnet                                61,536
+  RED          debate-seat / Sonnet, medium effort                     41,657
+  rebuttal     debate-seat / Sonnet, medium effort                     29,324
+  adjudicator  debate-adjudicator / Opus, high effort                  78,298
+  total seats  274,256 tokens (Opus 78,298 = 29%; Sonnet 195,958)
+  not measured: the orchestrator's own turns (session model Opus 5.5, declared)
+Record size: 24,294 bytes of seat files + 9,178-byte verdict + 1,617-byte spike = 35 KB
+  (simple_bible 2026-10-06: ~350 KB per fork, 9 Opus seats per fork; tokens not measured then)
+Spikes: S1 load time (orchestrator, P1-raw: model load + warm-up = 1 s; launch-to-mic 32.5 s);
+        S2 GPU footprint (adjudicator, P1-raw: live worker resident +1,067..1,093 MiB)
+Decisions: Analysis placement - B (job in PT_SPEECH_WORKER after Wrap) - PREFERRED - 0.65 / 0.80
+Do-not-assume entries: 8
+Larry's gate: awaiting (adoption)
+
+# Status: AWAITING GATE
