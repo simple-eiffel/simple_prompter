@@ -56,6 +56,8 @@ feature {NONE} -- Initialization
 			create mode_note.make_empty
 			create take_note.make_empty
 			create speech_slot.make
+			ffmpeg_path := resolved_ffmpeg
+			create edit_floor.make (ffmpeg_path)
 			geometry := new_geometry
 			create status_canvas.make (Window_height * theme.text_scale)
 			l_title := {STRING_32} "simple_prompter"
@@ -74,6 +76,7 @@ feature {NONE} -- Initialization
 			window.set_on_tick (agent on_heartbeat)
 			window.run
 				-- The window closed: give everything back.
+			edit_floor.close
 			stop_speech
 			router.release_all
 			pill.close
@@ -85,7 +88,8 @@ feature -- Constants
 			-- Shown in the control window; keep in step with installer/simple_prompter.iss.
 
 	Tick_ms: INTEGER = 16
-	Window_width: INTEGER = 520
+	Window_width: INTEGER = 1040
+			-- Two columns: the prompter's controls, and the Edit Floor (Step 4c).
 	Window_height: INTEGER = 560
 
 feature -- Access
@@ -172,6 +176,7 @@ feature {NONE} -- The clock
 			if is_started then
 				l_now := clock.now_ms
 				poll_speech (l_now)
+				edit_floor.tick
 				l_state := prompter.controller.state
 				if l_state = {PT_TAKE_STATE}.Count_in and previous_state /= {PT_TAKE_STATE}.Count_in then
 					count_in_started_ms := l_now
@@ -243,6 +248,10 @@ feature {NONE} -- Opening scripts
 			if a_x >= open_button_x and a_x <= open_button_x + open_button_width
 				and a_y >= open_button_y and a_y <= open_button_y + open_button_height then
 				choose_script
+			else
+				edit_floor.press (a_x, a_y)
+				last_status := {STRING_32} ""
+				refresh_status
 			end
 		end
 
@@ -330,6 +339,7 @@ feature {NONE} -- Control window
 		do
 			l_status := state_name + settings.speed_wpm.out + pill.is_shown.out + pill.is_click_through.out + pill.capture_note
 				+ prompter.mode.out + speech_status + mode_note + take_note
+				+ edit_floor.renderer.status + edit_floor.status_note + edit_floor.has_take.out
 			if not l_status.same_string (last_status) then
 				last_status := l_status
 				window.request_render
@@ -416,6 +426,10 @@ feature {NONE} -- Control window
 			l_y := l_y + 30 * k
 			p.set_color (theme.ink_muted)
 			p.text (a_x + 18 * k, l_y, {STRING_32} "Close this window to quit.")
+				-- The Edit Floor, in the right-hand column (rows are hit-tested in canvas coordinates).
+			p.set_color (theme.outline)
+			p.fill_rect (a_x + 520 * k, a_y + 16 * k, 1, Window_height * k - 32 * k)
+			edit_floor.paint (p, 540 * k, 0, 480 * k, k)
 		end
 
 	state_name: STRING_32
@@ -487,20 +501,16 @@ feature {NONE} -- Speech
 			-- Start the speech worker on its own processor; it loads the models there,
 			-- so the window opens at once.
 		local
-			l_model, l_vad, l_ffmpeg: STRING_32
+			l_model, l_vad: STRING_32
 			l_worker: separate PT_SPEECH_WORKER
 		do
 			l_model := first_existing (<<program_folder + {STRING_32} "\models\" + Model_name, Developer_models + Model_name>>)
 			l_vad := first_existing (<<program_folder + {STRING_32} "\models\" + Vad_name, Developer_models + Vad_name>>)
-			l_ffmpeg := first_existing (<<program_folder + {STRING_32} "\ffmpeg.exe", Chocolatey_ffmpeg>>)
-			if l_ffmpeg.is_empty then
-				l_ffmpeg := {STRING_32} "ffmpeg.exe"
-			end
 			if l_model.is_empty or l_vad.is_empty then
 				speech_state := {PT_SPEECH_SLOT}.Failed
 				speech_status := {STRING_32} "the speech models were not found (" + Model_name + {STRING_32} ", " + Vad_name + {STRING_32} ")"
 			else
-				create l_worker.make (l_ffmpeg, settings.camera_name, settings.microphone_name, tee_path, l_model, l_vad)
+				create l_worker.make (ffmpeg_path, settings.camera_name, settings.microphone_name, tee_path, l_model, l_vad)
 				launch (l_worker, speech_slot)
 				speech_started := True
 			end
@@ -629,6 +639,23 @@ feature {NONE} -- Speech
 			end
 		end
 
+	ffmpeg_path: STRING_32
+			-- The ffmpeg the speech worker and the Edit Floor run.
+
+	edit_floor: PT_EDIT_FLOOR
+			-- The last take: cuts, things to check, preview, render (Step 4c).
+
+	resolved_ffmpeg: STRING_32
+			-- ffmpeg beside the program, else Chocolatey's, else ffmpeg.exe on PATH.
+		do
+			Result := first_existing (<<program_folder + {STRING_32} "\ffmpeg.exe", Chocolatey_ffmpeg>>)
+			if Result.is_empty then
+				Result := {STRING_32} "ffmpeg.exe"
+			end
+		ensure
+			present: not Result.is_empty
+		end
+
 	tee_path: STRING_32
 			-- Where ffmpeg writes the microphone for the worker (removed when it stops).
 		do
@@ -737,6 +764,7 @@ feature {NONE} -- Take Studio (plan Step 4a)
 			if prompter.has_session and then not prompter.controller.is_recording then
 				take_note := {STRING_32} "Take saved (" + clock_text (recorded_seconds) + {STRING_32} ", " + a_outcome + {STRING_32} "): "
 					+ prompter.session.folder.root
+				edit_floor.show (prompter.session.folder.root)
 				prompter.end_session
 				previous_state := prompter.controller.state
 				geometry := new_geometry

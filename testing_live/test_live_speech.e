@@ -356,10 +356,66 @@ feature -- Analysis (Step 4b)
 			assert_true ("at least one cut", l_codec.last_analysis.cuts.count >= 1)
 			assert_true ("words heard", l_codec.last_analysis.timeline.count >= 150)
 			assert_true ("within 25%% of the length: " + l_ms.out, l_ms < l_duration * 250.0)
+			render_and_check (l_folder, l_codec.last_analysis)
 			l_ok := (create {SIMPLE_FILE}.make (l_root)).delete_directory_recursive
 		end
 
 feature {NONE} -- Analysis support
+
+	render_and_check (a_folder: PT_SESSION_FOLDER; a_analysis: PT_ANALYSIS)
+			-- Step 4c: a raw.mkv made from the recording plus a test pattern, rendered from the
+			-- analysis: final.mp4 as long as the cut list, captions and chapters beside it.
+		local
+			l_loader: PT_SESSION_LOADER
+			l_renderer: PT_RENDERER
+			l_make: SIMPLE_ASYNC_PROCESS
+			l_waited, l_exit: INTEGER
+			l_probe: STRING_32
+		do
+			create l_make.make
+			l_make.start ({STRING_32} "%"" + Ffmpeg_path + {STRING_32} "%" -hide_banner -loglevel error -y -f lavfi -i testsrc2=size=640x360:rate=30 -i %""
+				+ Read_wav + {STRING_32} "%" -shortest -c:v h264_nvenc -c:a pcm_s16le %"" + a_folder.raw_path + {STRING_32} "%"")
+			l_exit := l_make.wait (120_000)
+			assert_true ("test raw.mkv made", (create {SIMPLE_FILE}.make (a_folder.raw_path)).exists)
+			create l_loader.make
+			l_loader.load (a_folder.root)
+			assert_true ({STRING_32} "session reads back: " + l_loader.last_error, l_loader.is_loaded and attached l_loader.analysis)
+			if attached l_loader.history as al_history and attached l_loader.journal as al_journal and attached l_loader.analysis as al_analysis then
+				create l_renderer.make (Ffmpeg_path)
+				l_renderer.start (a_folder, al_history.current_revision, al_analysis, al_journal)
+				from until not l_renderer.is_rendering or l_waited > 120_000 loop
+					sleep_ms (100)
+					l_waited := l_waited + 100
+					l_renderer.poll
+				end
+				print ("    [render] " + l_renderer.status.to_string_8 + "%N")
+				assert_true ({STRING_32} "rendered: " + l_renderer.status, l_renderer.succeeded)
+				l_probe := probe_duration (a_folder.out_dir + {STRING_32} "\final.mp4")
+				print ("    [render] final.mp4 " + l_probe.to_string_8 + " s; cut list " + al_analysis.cuts.output_duration.out + " s%N")
+				assert_true ("final as long as the cuts (within 0.5 s)", l_probe.is_double and then (l_probe.to_double - al_analysis.cuts.output_duration).abs < 0.5)
+				assert_true ("captions", (create {SIMPLE_FILE}.make (a_folder.out_dir + {STRING_32} "\final.srt")).exists
+					and (create {SIMPLE_FILE}.make (a_folder.out_dir + {STRING_32} "\final.vtt")).exists)
+				assert_true ("chapters", (create {SIMPLE_FILE}.make (a_folder.out_dir + {STRING_32} "\chapters.txt")).exists)
+			end
+		end
+
+	probe_duration (a_file: STRING_32): STRING_32
+			-- ffprobe's duration of `a_file', seconds.
+		local
+			l_probe: SIMPLE_ASYNC_PROCESS
+			l_exit: INTEGER
+		do
+			create l_probe.make
+			l_probe.start ({STRING_32} "%"" + Ffmpeg_path.substring (1, Ffmpeg_path.count - 10) + {STRING_32} "ffprobe.exe%" -v error -show_entries format=duration -of csv=p=0 %"" + a_file + {STRING_32} "%"")
+			l_exit := l_probe.wait (30_000)
+			if attached l_probe.read_available_output as al_out then
+				Result := al_out.twin
+			else
+				Result := l_probe.accumulated_output.twin
+			end
+			Result.left_adjust
+			Result.right_adjust
+		end
 
 	write_tee (a_path: STRING_32)
 			-- `samples' as 16 kHz float32 little endian, as ffmpeg's tee writes it.
