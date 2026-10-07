@@ -115,6 +115,16 @@ captions, plus a short list of things to check.
 
 An Inno Setup installer for the app with the whisper DLLs and models (done early, 0.1.0-0.2.1).
 
+## Feature ideas (Larry, 2026-10-07) - backlog, first read
+
+| # | Idea (Larry's words, condensed) | First read | Where it lands |
+|---|---|---|---|
+| I-1 | **Off road:** notice when I go off script, show a cue that it knows (and that is okay), wait for me to come back | The tracking follower already holds still during an ad-lib (no anchored alignment for 1.5 s while speaking -> coast stops). What is missing is the *cue*: an "OFF SCRIPT" badge on the pill (and a journal mark) while speech goes on without anchors, cleared when alignment returns | Live following; small. Could go into 4a/4b |
+| I-2 | **Backup = splice:** when I back up, drop the A/V between where I backed up from and where I backed up to | This is F-01's core design: Hold/Again and the attempt aligner find the abandoned attempt; assembly keeps the last good reading of each passage and cuts the rest. A spoken restart without keys is the flagger's fallback | 4b analysis + 4c assembly (already specified) |
+| I-3 | **Delay removal:** drop thinking pauses, breaths, coughs, throat-clearing so the video flows | The analysis has the Silero speech map and silence snapping already; new is a **pause-tightening** pass that shortens long silences to a natural gap (and cuts coughs flagged as non-speech) | 4b/4c, new rule in assembly |
+| I-4 | **Posture smoothing at cuts:** AI smoothing so a viewer never sees the body shift at a joint | The editing industry's answer is a "morph cut": synthesize the frames across a jump cut. Locally that means GPU frame interpolation across each joint. Quality varies with how far the posture moved; needs a spike on real joints | After 4c (render); spike + likely a debate cycle (which interpolation approach) |
+| I-5 | **Reading eye movement:** smooth the eyes so reading does not show | Hard in post, as Larry says. **But the camera list on this machine includes "Camera (NVIDIA Broadcast)"** (spike S-R1, P1); from memory (P3, unverified) NVIDIA Broadcast has an *Eye Contact* effect that redirects gaze live on RTX GPUs. If so, recording through that camera device solves it at capture, with no post-process. Check the Broadcast app's camera effects first | Device choice in settings; a 1-minute test by Larry |
+
 ## Open decisions (Larry)
 
 - Keep headings that were read aloud in the final cut? (Phase 5 carry-over; affects Step 4.)
@@ -136,7 +146,11 @@ An Inno Setup installer for the app with the whisper DLLs and models (done early
 | 2+3 | App 0.2.0: follow mode from settings (default: your voice, word by word), Ctrl+Alt+M switches voice / constant speed, Speech status line, MIC OFF badge, 5 visible lines by default | done; installer 0.2.0 ships the CUDA whisper DLLs and the Silero model (the 574 MB whisper model and the CUDA 13 runtime stay on the machine); installed copy verified listening at 64,000 bytes/s and stopping cleanly. Larry: "THAT WORKED WELL!!" |
 | 2+3 | Pill handles (Larry 2026-10-06): hold Shift - grips show; drag the middle to move, an edge or corner to size; height snaps to whole lines, width sets the text column; both remembered | done in 0.2.1: simple_shell 1.12.0 (SHELL_PANEL set_resizable, grip_at, event 48, sync_geometry; 30/30, SCOOP 4/4); facade set_column_width (relayout in place); headless 202/202; installed. Native edge resize awaits Larry's first try |
 | next | Startup to "listening" measured at ~30 s from launch on the installed copy (models load on the worker; the window is usable meanwhile) | to investigate: the status line now keeps the load time |
-| 4 | Take Studio: recording, analysis worker, Edit Floor | pending |
+| 4 | V1 (debate 01 queue): full-file decode time | PASS: 8 ms per second of audio (budget 250); simple_speech `decode_passage` (own token cap) |
+| 4a | Recording: spike S-R1 (live camera + mic, killed MKV survives; ~0.7 s lost without small clusters; camera gave ~15.6 fps in low light); sessions on disk (facade start/end_session, folder, journal.jsonl, script copy); worker records (one ffmpeg, new stream per capture, 1 s tail, waits for exit, keeps tee); app Ctrl+Alt+R / Wrap / Star / Reject / Marker, REC badge; recording clock from Record | done: end-to-end take through the app (raw.mkv 1080p + audio, tee, journal on the recording's clock); live worker test 3/3; headless 205/205. Fixed on the way: ffmpeg path aliasing, stale tee, kill/exit race, 30 s start (simple_mml 1.0.2: pairwise range/no_duplicates under contracts) |
+| 4a | Still open | recorder health line (measured fps, so a low-light 15 fps shows before a take); live script edit on the pill (PT_INLINE_EDITOR); device picker from `ffmpeg -list_devices` |
+| 4b | Analysis job in PT_SPEECH_WORKER (debate 01) | next |
+| 4c-4d | Edit Floor, render; use gate | pending |
 
 Notes from 1c:
 - The pill is DPI-scaled (settings stay in design pixels; 150% display = 1.5x).
