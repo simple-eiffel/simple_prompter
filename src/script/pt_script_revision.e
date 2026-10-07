@@ -149,11 +149,20 @@ feature -- Access
 feature -- Model
 
 	ids_model: MML_SEQUENCE [PT_WORD_ID]
-			-- Word ids in script order.
+			-- Word ids in script order. Built once: a revision never changes after `make', and
+			-- contracts that call this per word made a long script take 25 s to parse (2026-10-07).
+		local
+			l_ids: ARRAYED_LIST [PT_WORD_ID]
 		do
-			create Result
-			across word_list as ic loop
-				Result := Result & ic.id
+			if attached ids_model_cache as al_cached then
+				Result := al_cached
+			else
+				create l_ids.make (word_list.count)
+				across word_list as ic loop
+					l_ids.extend (ic.id)
+				end
+				create Result.from_iterable (l_ids)
+				ids_model_cache := Result
 			end
 		ensure
 			same_count: Result.count = word_count
@@ -161,12 +170,21 @@ feature -- Model
 
 	spoken_ids_model: MML_SEQUENCE [PT_WORD_ID]
 			-- Ids of words required in the final cut (cue and heading words excluded), in order.
+			-- Built once, like `ids_model'.
+		local
+			l_ids: ARRAYED_LIST [PT_WORD_ID]
 		do
-			create Result
-			across word_list as ic loop
-				if ic.is_required then
-					Result := Result & ic.id
+			if attached spoken_ids_model_cache as al_cached then
+				Result := al_cached
+			else
+				create l_ids.make (word_list.count)
+				across word_list as ic loop
+					if ic.is_required then
+						l_ids.extend (ic.id)
+					end
 				end
+				create Result.from_iterable (l_ids)
+				spoken_ids_model_cache := Result
 			end
 		ensure
 			not_longer: Result.count <= word_count
@@ -224,6 +242,11 @@ feature {NONE} -- Implementation
 	passage_list: ARRAYED_LIST [PT_PASSAGE]
 	section_list: ARRAYED_LIST [PT_SECTION]
 	index_by_id: HASH_TABLE [INTEGER, INTEGER_64]
+
+feature {NONE} -- Model caches (a revision is immutable after `make')
+
+	ids_model_cache: detachable MML_SEQUENCE [PT_WORD_ID]
+	spoken_ids_model_cache: detachable MML_SEQUENCE [PT_WORD_ID]
 
 invariant
 	number_positive: number >= 1

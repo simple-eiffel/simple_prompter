@@ -2,7 +2,9 @@ note
 	description: "[
 		Text measurement with the pill's real font: cairo text extents through
 		SW_PAINTER on a private 8x8 surface, so layout wraps exactly where the
-		renderer will draw.
+		renderer will draw. Widths are cached per text: a cairo measurement costs
+		milliseconds, and laying out an 8,740-word sermon measured every word, which
+		held the app's start (and the microphone) for about 30 s (2026-10-07).
 	]"
 	author: "Larry Rix"
 
@@ -24,6 +26,7 @@ feature {NONE} -- Initialization
 			size_positive: a_font_size > 0
 		do
 			font_size := a_font_size
+			create widths.make (4096)
 			create surface.make (8, 8)
 			create context.make (surface)
 			create painter.make (context, a_theme)
@@ -50,7 +53,13 @@ feature -- Measurement
 			-- Advance of `a_text' in the pill font.
 		do
 			if not a_text.is_empty then
-				Result := painter.advance (a_text).max (0.0)
+				widths.search (a_text.to_string_32)
+				if widths.found then
+					Result := widths.found_item
+				else
+					Result := painter.advance (a_text).max (0.0)
+					widths.force (Result, a_text.to_string_32.twin)
+				end
 			end
 		end
 
@@ -61,6 +70,9 @@ feature -- Measurement
 			-- Distance between baselines.
 
 feature {NONE} -- Implementation
+
+	widths: HASH_TABLE [REAL_64, STRING_32]
+			-- Measured advances by text (memo: the font never changes after `make').
 
 	surface: CAIRO_SURFACE
 	context: CAIRO_CONTEXT

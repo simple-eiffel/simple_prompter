@@ -15,6 +15,11 @@ inherit
 			default_create
 		end
 
+	HASHABLE
+		redefine
+			default_create
+		end
+
 create
 	default_create, make
 
@@ -42,6 +47,12 @@ feature -- Access
 
 	value: INTEGER_64
 			-- Raw identity.
+
+	hash_code: INTEGER
+			-- Hash of `value' (equal ids hash alike, so MML sets of ids find duplicates by bucket).
+		do
+			Result := value.hash_code
+		end
 
 feature -- Status
 

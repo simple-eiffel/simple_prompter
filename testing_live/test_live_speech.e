@@ -43,7 +43,11 @@ feature -- Replay
 			assert_integers_equal ("never backward", 0, backward_moves)
 			assert_true ("decoded while speaking", decodes > 100)
 			assert_true ("keeps up with real time: " + wall_s.out + " s", wall_s < samples.count / Rate * 0.6)
-			assert_true ("worst decode inside a step: " + worst_ms.out, worst_ms < 250.0)
+			print ("    [live] decode p95 " + p95_decode_ms.truncated_to_integer.out + " ms, worst " + worst_ms.truncated_to_integer.out + " ms%N")
+				-- NFR-002: tracking update latency <= 700 ms p95. A decode longer than one 250 ms step
+				-- only delays the next step, so the step bounds the 95th percentile and NFR-002 the worst.
+			assert_true ("decode p95 inside a step: " + p95_decode_ms.out, p95_decode_ms < 250.0)
+			assert_true ("worst decode within NFR-002 (700 ms): " + worst_ms.out, worst_ms < 700.0)
 		end
 
 	test_live_path_follows_a_sermon
@@ -69,7 +73,11 @@ feature -- Replay
 				assert_true ({STRING_32} "within one line at 90%% of the checkpoints" + l_failures, l_missed * 10 <= l_checked)
 				assert_integers_equal ("never backward", 0, backward_moves)
 				assert_true ("keeps up with real time: " + wall_s.out + " s", wall_s < samples.count / Rate * 0.6)
-				assert_true ("worst decode inside a step: " + worst_ms.out, worst_ms < 250.0)
+				print ("    [live] decode p95 " + p95_decode_ms.truncated_to_integer.out + " ms, worst " + worst_ms.truncated_to_integer.out + " ms%N")
+				-- NFR-002: tracking update latency <= 700 ms p95. A decode longer than one 250 ms step
+				-- only delays the next step, so the step bounds the 95th percentile and NFR-002 the worst.
+			assert_true ("decode p95 inside a step: " + p95_decode_ms.out, p95_decode_ms < 250.0)
+			assert_true ("worst decode within NFR-002 (700 ms): " + worst_ms.out, worst_ms < 700.0)
 			end
 		end
 
@@ -103,6 +111,7 @@ feature {NONE} -- Replay
 			create l_buffer.make_filled (0.0, {PT_SPEECH_WORKER}.Chunk_samples)
 			create steps.make (2000)
 			create aligned.make (2000)
+			create decode_times.make (2000)
 			decodes := 0
 			worst_ms := 0
 			start_tee
@@ -118,6 +127,7 @@ feature {NONE} -- Replay
 				from l_tail.read_into (l_buffer) until l_tail.last_count = 0 loop
 					l_pipeline.push (l_buffer, l_tail.last_count)
 					if l_pipeline.pending_heard_count > 0 then
+						decode_times.extend (decoder.recognizer.last_decode_ms)
 						decodes := decodes + l_pipeline.pending_heard_count
 						l_decode_ms := l_decode_ms + decoder.recognizer.last_decode_ms
 						worst_ms := worst_ms.max (decoder.recognizer.last_decode_ms)
@@ -207,6 +217,26 @@ feature {NONE} -- Replay
 	decodes, backward_moves: INTEGER
 	wall_s, worst_ms: REAL_64
 
+	decode_times: ARRAYED_LIST [REAL_64]
+			-- Each decode's wall time, ms.
+		attribute
+			create Result.make (0)
+		end
+
+	p95_decode_ms: REAL_64
+			-- 95th percentile of `decode_times'.
+		local
+			l_sorted: SORTED_TWO_WAY_LIST [REAL_64]
+		do
+			create l_sorted.make
+			across decode_times as ic loop
+				l_sorted.extend (ic)
+			end
+			if not l_sorted.is_empty then
+				Result := l_sorted [((l_sorted.count * 95) // 100).max (1)]
+			end
+		end
+
 	distinctive_words: ARRAYED_LIST [STRING_32]
 			-- Heard words of seven letters or more, not stop words, said once and written once.
 		local
@@ -238,6 +268,49 @@ feature {NONE} -- Replay
 			end
 		end
 
+feature -- Load time
+
+	test_long_script_loads_fast
+			-- An 8,000-word sermon must load in well under a second: the app lays it out before its
+			-- window and its speech worker start (a 30 s start was found on 2026-10-07).
+		local
+			p: SIMPLE_PROMPTER
+			l_parser: PT_SCRIPT_PARSER
+			l_text: STRING_32
+			l_t0, l_parse, l_load: REAL_64
+			l_was: BOOLEAN
+			l_count: INTEGER
+		do
+			if not (create {SIMPLE_FILE}.make (Sermon_script)).exists then
+				print ("    [load] fixture absent here (private script): skipped%N")
+			else
+				l_text := file_text (Sermon_script)
+				l_t0 := now_ms
+				create l_parser.make
+				l_parser.parse ({STRING_32} "s", l_text, 1, create {PT_ID_SOURCE}.make)
+				l_parse := now_ms - l_t0
+					-- Where the time goes: the same parse with contract checking off, then one
+					-- postcondition's expression alone.
+				l_was := {ISE_RUNTIME}.check_assert (False)
+				l_t0 := now_ms
+				create l_parser.make
+				l_parser.parse ({STRING_32} "s", l_text, 1, create {PT_ID_SOURCE}.make)
+				print ("    [load] parse with contracts off: " + (now_ms - l_t0).truncated_to_integer.out + " ms%N")
+				l_t0 := now_ms
+				l_count := l_parser.last_revision.ids_model.range.count
+				print ("    [load] ids_model.range.count (postcondition ids_unique) alone: " + (now_ms - l_t0).truncated_to_integer.out + " ms for " + l_count.out + " ids%N")
+				l_was := {ISE_RUNTIME}.check_assert (l_was)
+				create p.make_with_settings (create {PT_SETTINGS}.make_in_memory)
+				p := p.with_measure (create {PT_FIXED_MEASURE}.make (10.0, 20.0), 560.0)
+				l_t0 := now_ms
+				p.load_script_text ({STRING_32} "s", l_text)
+				l_load := now_ms - l_t0
+				print ("    [load] " + p.history.current_revision.word_count.out + " words: parse " + l_parse.truncated_to_integer.out
+					+ " ms; full load (parse, history, layout, aligner, controller) " + l_load.truncated_to_integer.out + " ms%N")
+				assert_true ("loads in under a second: " + l_load.out, l_load < 1000.0)
+			end
+		end
+
 feature -- Worker
 
 	test_worker_listens_to_the_microphone
@@ -248,7 +321,7 @@ feature -- Worker
 			l_waited: INTEGER
 		do
 			create l_slot.make
-			create l_worker.make (Ffmpeg_path, {STRING_32} "Microphone (FHD Camera Microphone)", tee_path, Model, Vad_model)
+			create l_worker.make (Ffmpeg_path, {STRING_32} "FHD Camera", {STRING_32} "Microphone (FHD Camera Microphone)", tee_path, Model, Vad_model)
 			launch (l_worker, l_slot)
 			from until slot_state (l_slot) /= {PT_SPEECH_SLOT}.Loading or l_waited > 60_000 loop
 				sleep_ms (100)
@@ -273,6 +346,76 @@ feature -- Worker
 			end
 			assert_true ("stopped", slot_stopped (l_slot))
 			assert_false ("tee file removed", (create {SIMPLE_FILE}.make (tee_path)).exists)
+		end
+
+	test_worker_records_a_take
+			-- Step 4a: the worker switches its one ffmpeg to camera + microphone, records into a
+			-- session's raw.mkv and tee.f32, finishes after its tail, and listens again on a new stream.
+		local
+			l_slot: separate PT_SPEECH_SLOT
+			l_worker: separate PT_SPEECH_WORKER
+			l_waited, l_listen_stream, l_record_stream: INTEGER
+			l_dir, l_raw, l_tee: STRING_32
+			l_ok: BOOLEAN
+			l_finish_ms: REAL_64
+		do
+			l_dir := tee_path + {STRING_32} ".take"
+			l_ok := (create {SIMPLE_FILE}.make (l_dir)).create_directory_recursive
+			l_raw := l_dir + {STRING_32} "\raw.mkv"
+			l_tee := l_dir + {STRING_32} "\tee.f32"
+				-- Leftovers of an earlier failed run must not be mistaken for this recording.
+			l_ok := (create {SIMPLE_FILE}.make (l_raw)).delete
+			l_ok := (create {SIMPLE_FILE}.make (l_tee)).delete
+			create l_slot.make
+			create l_worker.make (Ffmpeg_path, {STRING_32} "FHD Camera", {STRING_32} "Microphone (FHD Camera Microphone)", tee_path, Model, Vad_model)
+			launch (l_worker, l_slot)
+			request_listen (l_slot)
+			from until slot_state (l_slot) = {PT_SPEECH_SLOT}.Listening or slot_state (l_slot) = {PT_SPEECH_SLOT}.Failed or l_waited > 60_000 loop
+				sleep_ms (100)
+				l_waited := l_waited + 100
+			end
+			assert_true ({STRING_32} "listening first: " + slot_status (l_slot), slot_state (l_slot) = {PT_SPEECH_SLOT}.Listening)
+			l_listen_stream := slot_stream (l_slot)
+			request_record (l_slot, l_raw, l_tee)
+			l_waited := 0
+			from until (slot_state (l_slot) = {PT_SPEECH_SLOT}.Recording and slot_samples (l_slot) >= 64_000) or slot_state (l_slot) = {PT_SPEECH_SLOT}.Failed or l_waited > 20_000 loop
+				sleep_ms (100)
+				l_waited := l_waited + 100
+			end
+			l_record_stream := slot_stream (l_slot)
+			print ("    [record] " + slot_status (l_slot).to_string_8 + "; stream " + l_listen_stream.out + " -> " + l_record_stream.out + "; " + slot_samples (l_slot).out + " samples after " + l_waited.out + " ms%N")
+			assert_true ({STRING_32} "recording: " + slot_status (l_slot), slot_state (l_slot) = {PT_SPEECH_SLOT}.Recording)
+			assert_true ("a new stream for the recording", l_record_stream > l_listen_stream)
+			request_finish (l_slot)
+			l_finish_ms := now_ms
+			l_waited := 0
+			from until slot_finished (l_slot) or slot_state (l_slot) = {PT_SPEECH_SLOT}.Failed or l_waited > 10_000 loop
+				sleep_ms (50)
+				l_waited := l_waited + 50
+			end
+			l_waited := (now_ms - l_finish_ms).truncated_to_integer
+			assert_true ("recording finished", slot_finished (l_slot))
+			print ("    [record] finished after " + l_waited.out + " ms: " + slot_recorded (l_slot).out + " s recorded; raw.mkv "
+				+ (create {RAW_FILE}.make_with_name (l_raw)).count.out + " bytes; tee " + ((create {RAW_FILE}.make_with_name (l_tee)).count // 64_000).out + " s%N")
+			assert_true ("tail kept (at least 1 s past the request)", l_waited >= 900)
+			assert_true ("raw.mkv written", (create {RAW_FILE}.make_with_name (l_raw)).exists and then (create {RAW_FILE}.make_with_name (l_raw)).count > 100_000)
+			assert_true ("tee kept for analysis", (create {RAW_FILE}.make_with_name (l_tee)).exists and then (create {RAW_FILE}.make_with_name (l_tee)).count >= 4 * 64_000)
+			l_waited := 0
+			from until (slot_state (l_slot) = {PT_SPEECH_SLOT}.Listening and slot_stream (l_slot) > l_record_stream) or l_waited > 15_000 loop
+				sleep_ms (100)
+				l_waited := l_waited + 100
+			end
+			assert_true ("listening again on a new stream", slot_state (l_slot) = {PT_SPEECH_SLOT}.Listening and slot_stream (l_slot) > l_record_stream)
+			request_stop (l_slot)
+			l_waited := 0
+			from until slot_stopped (l_slot) or l_waited > 10_000 loop
+				sleep_ms (50)
+				l_waited := l_waited + 50
+			end
+			assert_true ("stopped", slot_stopped (l_slot))
+			l_ok := (create {SIMPLE_FILE}.make (l_raw)).delete
+			l_ok := (create {SIMPLE_FILE}.make (l_tee)).delete
+			l_ok := (create {SIMPLE_FILE}.make (l_dir)).delete_directory
 		end
 
 feature {NONE} -- Separate calls
@@ -306,6 +449,35 @@ feature {NONE} -- Separate calls
 	slot_stopped (a_slot: separate PT_SPEECH_SLOT): BOOLEAN
 		do
 			Result := a_slot.has_stopped
+		end
+
+	request_record (a_slot: separate PT_SPEECH_SLOT; a_raw, a_tee: STRING_32)
+		require
+			idle: not a_slot.record_requested
+		do
+			a_slot.request_record (a_raw, a_tee)
+		end
+
+	request_finish (a_slot: separate PT_SPEECH_SLOT)
+		require
+			recording: a_slot.record_requested
+		do
+			a_slot.request_finish
+		end
+
+	slot_finished (a_slot: separate PT_SPEECH_SLOT): BOOLEAN
+		do
+			Result := a_slot.recording_finished
+		end
+
+	slot_recorded (a_slot: separate PT_SPEECH_SLOT): REAL_64
+		do
+			Result := a_slot.recorded_seconds
+		end
+
+	slot_stream (a_slot: separate PT_SPEECH_SLOT): INTEGER
+		do
+			Result := a_slot.stream
 		end
 
 	request_listen (a_slot: separate PT_SPEECH_SLOT)

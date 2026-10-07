@@ -5,7 +5,10 @@ note
 		append, so neither side ever queues behind the other's work (the
 		simple_taskman TM_FRAME_SLOT pattern). Voice frames and heard words cross as
 		PT_SPEECH_CODEC records, one per line; the already-read prompt crosses the
-		other way, numbered so the worker knows when to fetch it.
+		other way, numbered so the worker knows when to fetch it. Recording (plan
+		Step 4a) is requested here too: the worker switches its one ffmpeg from the
+		microphone alone to camera + microphone, and every new capture is a new
+		`stream' (records cleared, sample clock back to zero).
 	]"
 	author: "Larry Rix"
 
@@ -35,6 +38,7 @@ feature -- Constants
 	Ready: INTEGER = 2
 	Listening: INTEGER = 3
 	Failed: INTEGER = 4
+	Recording: INTEGER = 5
 
 	Max_record_bytes: INTEGER = 1_000_000
 			-- Records beyond this (the window stalled) replace what is waiting.
@@ -64,11 +68,32 @@ feature -- Access
 	stop_requested: BOOLEAN
 	has_stopped: BOOLEAN
 
+	stream: INTEGER
+			-- Bumped by the worker at every new capture (listening or recording).
+
+	record_requested: BOOLEAN
+			-- Should the worker record (camera + microphone) into `record_raw' and `record_tee'?
+
+	finish_requested: BOOLEAN
+			-- Should the worker finish the recording (after its short tail)?
+
+	recording_finished: BOOLEAN
+			-- Has the worker closed the last recording (raw file complete as far as a kill allows)?
+
+	record_raw, record_tee: STRING_32
+			-- Where the requested recording goes.
+		attribute
+			create Result.make_empty
+		end
+
+	recorded_seconds: REAL_64
+			-- Length of the last finished recording, from its tee.
+
 feature -- Worker side
 
 	put_state (a_state: INTEGER; a_text: separate READABLE_STRING_32)
 		require
-			known: a_state >= Loading and a_state <= Failed
+			known: a_state >= Loading and a_state <= Recording
 		do
 			state := a_state
 			create status_text.make_from_separate (a_text)
@@ -96,6 +121,32 @@ feature -- Worker side
 			has_stopped := True
 		ensure
 			stopped: has_stopped
+		end
+
+	put_stream (a_stream: INTEGER)
+			-- A new capture began: what is waiting belongs to the old one.
+		require
+			newer: a_stream > stream
+		do
+			stream := a_stream
+			records.wipe_out
+			samples_heard := 0
+		ensure
+			set: stream = a_stream
+			fresh: records.is_empty and samples_heard = 0
+		end
+
+	put_recording_finished (a_seconds: REAL_64)
+			-- The recording is closed; it ran `a_seconds'.
+		require
+			length_non_negative: a_seconds >= 0
+		do
+			record_requested := False
+			finish_requested := False
+			recording_finished := True
+			recorded_seconds := a_seconds
+		ensure
+			finished: recording_finished and not record_requested and not finish_requested
 		end
 
 feature -- Window side
@@ -131,8 +182,41 @@ feature -- Window side
 			requested: stop_requested
 		end
 
+	request_record (a_raw, a_tee: separate READABLE_STRING_32)
+			-- Record camera + microphone into `a_raw' (and the 16 kHz tee `a_tee').
+		require
+			not_recording: not record_requested
+		do
+			create record_raw.make_from_separate (a_raw)
+			create record_tee.make_from_separate (a_tee)
+			record_requested := True
+			finish_requested := False
+			recording_finished := False
+		ensure
+			requested: record_requested and not recording_finished
+		end
+
+	request_finish
+			-- End the recording (the worker keeps a short tail first).
+		require
+			recording: record_requested
+		do
+			finish_requested := True
+		ensure
+			requested: finish_requested
+		end
+
+	acknowledge_finished
+			-- The window has seen `recording_finished'.
+		do
+			recording_finished := False
+		ensure
+			seen: not recording_finished
+		end
+
 invariant
-	known_state: state >= Loading and state <= Failed
+	known_state: state >= Loading and state <= Recording
+	finish_only_while_recording: finish_requested implies record_requested
 	clock_non_negative: samples_heard >= 0
 
 end

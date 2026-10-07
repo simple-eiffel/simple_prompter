@@ -5,6 +5,9 @@ note
 class
 	LIVE_TEST_APP
 
+inherit
+	ARGUMENTS_32
+
 create
 	make
 
@@ -18,7 +21,9 @@ feature {NONE} -- Initialization
 			say ("simple_prompter live speech tests%N")
 			run_test (agent t.test_live_path_follows_larry, "live_path_follows_larry")
 			run_test (agent t.test_live_path_follows_a_sermon, "live_path_follows_a_sermon")
+			run_test (agent t.test_long_script_loads_fast, "long_script_loads_fast")
 			run_test (agent t.test_worker_listens_to_the_microphone, "worker_listens_to_the_microphone")
+			run_test (agent t.test_worker_records_a_take, "worker_records_a_take")
 			say ("%NResults: " + passed.out + " passed, " + failed.out + " failed%N")
 		end
 
@@ -27,10 +32,11 @@ feature {NONE} -- Implementation
 	passed, failed: INTEGER
 
 	run_test (a_test: PROCEDURE; a_name: STRING)
+			-- Run `a_test' unless a command-line filter is given and `a_name' does not contain it.
 		local
 			l_retried: BOOLEAN
 		do
-			if not l_retried then
+			if not l_retried and then (argument_count = 0 or else a_name.has_substring (argument (1))) then
 				a_test.call (Void)
 				say ("  PASS: " + a_name + "%N")
 				passed := passed + 1

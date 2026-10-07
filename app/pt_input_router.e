@@ -42,6 +42,8 @@ feature -- Constants
 	Vk_o: INTEGER = 0x4F
 	Mode_id: INTEGER = 103
 	Vk_m: INTEGER = 0x4D
+	Record_id: INTEGER = 104
+	Vk_r: INTEGER = 0x52
 	Speed_step: INTEGER = 10
 			-- Words per minute per press.
 
@@ -85,6 +87,7 @@ feature -- Commands
 			claim (Speed_down_id, hotkeys.Mod_control | hotkeys.Mod_alt, Vk_down, 0, {STRING_32} "slower")
 			claim (Open_id, hotkeys.Mod_control | hotkeys.Mod_alt, Vk_o, 0, {STRING_32} "open a script")
 			claim (Mode_id, hotkeys.Mod_control | hotkeys.Mod_alt, Vk_m, 0, {STRING_32} "follow mode: voice / constant speed (when stopped)")
+			claim (Record_id, hotkeys.Mod_control | hotkeys.Mod_alt, Vk_r, 0, {STRING_32} "record a take (when stopped)")
 		end
 
 	set_on_open (a_action: PROCEDURE)
@@ -109,6 +112,17 @@ feature -- Commands
 	on_mode: detachable PROCEDURE
 			-- Called for the follow-mode hotkey.
 
+	set_on_record (a_action: PROCEDURE)
+			-- What Ctrl+Alt+R does.
+		do
+			on_record := a_action
+		ensure
+			set: on_record = a_action
+		end
+
+	on_record: detachable PROCEDURE
+			-- Called for the record hotkey.
+
 	release_all
 		do
 			hotkeys.unregister_all
@@ -128,6 +142,10 @@ feature -- Commands
 			elseif a_id = Mode_id then
 				if attached on_mode as al_mode then
 					al_mode.call (Void)
+				end
+			elseif a_id = Record_id then
+				if attached on_record as al_record then
+					al_record.call (Void)
 				end
 			elseif controls.has (a_id) then
 				on_control (controls [a_id])
@@ -186,7 +204,9 @@ feature -- Status
 			-- Controls live in plan Step 1, in registration (hotkey id) order.
 		once
 			Result := <<{PT_CONTROL}.Play_stop, {PT_CONTROL}.Hold_toggle, {PT_CONTROL}.Again, {PT_CONTROL}.Go,
-				{PT_CONTROL}.Back, {PT_CONTROL}.Forward, {PT_CONTROL}.Hide, {PT_CONTROL}.Click_through>>
+				{PT_CONTROL}.Back, {PT_CONTROL}.Forward, {PT_CONTROL}.Hide, {PT_CONTROL}.Click_through,
+				{PT_CONTROL}.Wrap, {PT_CONTROL}.Star, {PT_CONTROL}.Reject, {PT_CONTROL}.Marker>>
+				-- Step 4a appended the take controls at the end, so earlier hotkey ids stay put.
 		end
 
 	is_step_one_control (a_control: INTEGER): BOOLEAN
@@ -254,6 +274,10 @@ feature {NONE} -- Implementation
 			when {PT_CONTROL}.Play_stop then Result := {STRING_32} "play / stop"
 			when {PT_CONTROL}.Hide then Result := {STRING_32} "hide / show the pill"
 			when {PT_CONTROL}.Click_through then Result := {STRING_32} "click-through on / off"
+			when {PT_CONTROL}.Wrap then Result := {STRING_32} "wrap the take (recording) / stop (practice)"
+			when {PT_CONTROL}.Star then Result := {STRING_32} "star: keep this take (recording)"
+			when {PT_CONTROL}.Reject then Result := {STRING_32} "reject this take (recording)"
+			when {PT_CONTROL}.Marker then Result := {STRING_32} "marker (recording)"
 			else
 				Result := {STRING_32} "control " + a_control.out
 			end

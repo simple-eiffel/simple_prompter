@@ -54,6 +54,7 @@ feature {NONE} -- Initialization
 			create incoming.make (4096)
 			create speech_status.make_from_string ({STRING_32} "loading the speech models")
 			create mode_note.make_empty
+			create take_note.make_empty
 			create speech_slot.make
 			geometry := new_geometry
 			create status_canvas.make (Window_height * theme.text_scale)
@@ -66,6 +67,7 @@ feature {NONE} -- Initialization
 			status_canvas.set_on_files (agent on_files)
 			router.set_on_open (agent choose_script)
 			router.set_on_mode (agent switch_mode)
+			router.set_on_record (agent start_take)
 			start_speech
 			window.set_root (status_canvas)
 			window.set_on_shell_event (agent on_shell_event)
@@ -177,7 +179,10 @@ feature {NONE} -- The clock
 				previous_state := l_state
 				if l_state = {PT_TAKE_STATE}.Count_in
 					and then l_now - count_in_started_ms >= prompter.controller.count_in_seconds * 1000
+					and then (not prompter.controller.is_recording or recording_live)
 					and then prompter.controller.is_allowed ({PT_ACTION}.Count_in_done) then
+						-- While recording, reading starts only once the camera's stream is live: the
+						-- aligner re-anchors here on the recording's own sample clock.
 					prompter.perform ({PT_ACTION}.Count_in_done)
 					previous_state := prompter.controller.state
 				end
@@ -289,8 +294,13 @@ feature {NONE} -- Pill content
 				Result := l_left.out
 			when {PT_TAKE_STATE}.Idle then
 				Result := {STRING_32} "Ctrl+Alt+P"
+			when {PT_TAKE_STATE}.Analyzing, {PT_TAKE_STATE}.Wrapped then
+				Result := {STRING_32} "SAVING"
 			else
 				create Result.make_empty
+			end
+			if prompter.controller.is_recording then
+				Result := {STRING_32} "REC " + clock_text (prompter.recording_clock.rt) + (if Result.is_empty then {STRING_32} "" else {STRING_32} "  " + Result end)
 			end
 			if prompter.mode /= {PT_FOLLOW_MODE}.Constant and speech_state /= {PT_SPEECH_SLOT}.Listening
 				and prompter.controller.state /= {PT_TAKE_STATE}.Idle then
@@ -315,7 +325,7 @@ feature {NONE} -- Control window
 			l_status: STRING_32
 		do
 			l_status := state_name + settings.speed_wpm.out + pill.is_shown.out + pill.is_click_through.out + pill.capture_note
-				+ prompter.mode.out + speech_status + mode_note
+				+ prompter.mode.out + speech_status + mode_note + take_note
 			if not l_status.same_string (last_status) then
 				last_status := l_status
 				window.request_render
@@ -363,6 +373,10 @@ feature {NONE} -- Control window
 				p.set_color (theme.danger)
 				p.text (a_x + 18 * k, l_y, mode_note)
 				p.set_color (theme.ink_muted)
+				l_y := l_y + 22 * k
+			end
+			if not take_note.is_empty then
+				p.text (a_x + 18 * k, l_y, take_note)
 				l_y := l_y + 22 * k
 			end
 			p.text (a_x + 18 * k, l_y, {STRING_32} "Pill: " + (if pill.is_shown then {STRING_32} "shown" else {STRING_32} "hidden" end)
@@ -482,7 +496,7 @@ feature {NONE} -- Speech
 				speech_state := {PT_SPEECH_SLOT}.Failed
 				speech_status := {STRING_32} "the speech models were not found (" + Model_name + {STRING_32} ", " + Vad_name + {STRING_32} ")"
 			else
-				create l_worker.make (l_ffmpeg, settings.microphone_name, tee_path, l_model, l_vad)
+				create l_worker.make (l_ffmpeg, settings.camera_name, settings.microphone_name, tee_path, l_model, l_vad)
 				launch (l_worker, speech_slot)
 				speech_started := True
 			end
@@ -512,6 +526,15 @@ feature {NONE} -- Speech
 						end
 					end
 				end
+				if speech_stream /= stream_seen then
+						-- A new capture: its sample clock starts at zero.
+					stream_seen := speech_stream
+					prompter.recording_clock.restart (a_now)
+					prompt_at := 0
+					if record_pending then
+						recording_live := True
+					end
+				end
 				if speech_samples * 4 > prompter.recording_clock.byte_count and a_now >= prompter.recording_clock.observed_at_ms then
 					prompter.recording_clock.observe_bytes (speech_samples * 4, a_now)
 				end
@@ -523,6 +546,7 @@ feature {NONE} -- Speech
 					ask_listen (speech_slot)
 					listen_asked := True
 				end
+				follow_take (a_now)
 			end
 			if speech_state = {PT_SPEECH_SLOT}.Failed and not fell_back and prompter.mode /= {PT_FOLLOW_MODE}.Constant
 				and prompter.controller.state = {PT_TAKE_STATE}.Idle then
@@ -609,6 +633,120 @@ feature {NONE} -- Speech
 			end
 		end
 
+feature {NONE} -- Take Studio (plan Step 4a)
+
+	take_note: STRING_32
+			-- The current or last take, for the control window.
+
+	record_pending: BOOLEAN
+			-- Has a recording been requested and not yet finished?
+
+	recording_live: BOOLEAN
+			-- Has the recording's stream started (so reading may begin)?
+
+	finish_asked: BOOLEAN
+	recording_finished: BOOLEAN
+	recorded_seconds: REAL_64
+	speech_stream, stream_seen: INTEGER
+
+	start_take
+			-- Ctrl+Alt+R: open a session folder and record a take (camera + microphone).
+		local
+			l_folder: PT_SESSION_FOLDER
+		do
+			if prompter.controller.state /= {PT_TAKE_STATE}.Idle or record_pending then
+				mode_note := {STRING_32} "Stop first (Ctrl+Alt+P), then record (Ctrl+Alt+R)."
+			elseif not speech_started or speech_state = {PT_SPEECH_SLOT}.Failed then
+				mode_note := {STRING_32} "Recording needs the speech worker (see Speech:)."
+			else
+				create l_folder.make (new_session_root)
+				prompter.start_session (l_folder)
+				prompter.perform ({PT_ACTION}.Record)
+				previous_state := {PT_TAKE_STATE}.Idle
+				record_pending := True
+				recording_live := False
+				finish_asked := False
+				recording_finished := False
+				ask_record (speech_slot, l_folder.raw_path, l_folder.tee_path)
+				mode_note := {STRING_32} ""
+				take_note := {STRING_32} "Recording to " + l_folder.root
+				last_signature := -1
+			end
+			window.request_render
+			on_tick
+		end
+
+	follow_take (a_now: REAL_64)
+			-- Each tick: after Wrap or Abort, finish the recording; when it is closed, complete the take.
+		do
+			if record_pending and not finish_asked and prompter.has_session and not prompter.controller.is_recording then
+				ask_finish (speech_slot)
+				finish_asked := True
+			end
+			if recording_finished then
+				recording_finished := False
+				record_pending := False
+				recording_live := False
+				finish_asked := False
+				if prompter.controller.state = {PT_TAKE_STATE}.Analyzing then
+						-- Step 4b runs the analysis job here; until then the take is complete as recorded.
+					prompter.perform ({PT_ACTION}.Analysis_done)
+				end
+				if prompter.has_session and then not prompter.controller.is_recording then
+					take_note := {STRING_32} "Take saved (" + clock_text (recorded_seconds) + {STRING_32} "): " + prompter.session.folder.root
+					prompter.end_session
+					previous_state := prompter.controller.state
+					geometry := new_geometry
+				end
+				last_signature := -1
+				window.request_render
+			end
+		end
+
+	new_session_root: STRING_32
+			-- A fresh folder: <sessions root>\<date time> - <script title>.
+		local
+			l_base, l_title: STRING_32
+			l_now: SIMPLE_DATE_TIME
+		do
+			if not settings.sessions_root.is_empty then
+				l_base := settings.sessions_root.twin
+			elseif attached (create {EXECUTION_ENVIRONMENT}).item ("USERPROFILE") as al_home then
+				l_base := al_home + {STRING_32} "\Videos\simple_prompter"
+			else
+				l_base := program_folder + {STRING_32} "\sessions"
+			end
+			create l_now.make_now
+			l_title := prompter.history.current_revision.title.twin
+			across <<'\', '/', ':', '*', '?', '"', '<', '>', '|'>> as ic loop
+				l_title.replace_substring_all (create {STRING_32}.make_filled (ic, 1), {STRING_32} "-")
+			end
+			if l_title.count > 60 then
+				l_title.keep_head (60)
+			end
+			Result := l_base + {STRING_32} "\" + l_now.year.out + {STRING_32} "-" + two (l_now.month) + {STRING_32} "-" + two (l_now.day)
+				+ {STRING_32} " " + two (l_now.hour) + two (l_now.minute) + two (l_now.second) + {STRING_32} " - " + l_title
+		ensure
+			no_trailing_separator: Result [Result.count] /= '\'
+		end
+
+	two (a_n: INTEGER): STRING_32
+		do
+			Result := a_n.out.to_string_32
+			if a_n < 10 then
+				Result.prepend_character ('0')
+			end
+		end
+
+	clock_text (a_seconds: REAL_64): STRING_32
+			-- m:ss
+		local
+			l_s: INTEGER
+		do
+			l_s := a_seconds.truncated_to_integer.max (0)
+			Result := (l_s // 60).out.to_string_32 + {STRING_32} ":" + two (l_s \\ 60)
+		end
+
 feature {NONE} -- Speech: separate calls (each locks the slot for one short call)
 
 	launch (a_worker: separate PT_SPEECH_WORKER; a_slot: separate PT_SPEECH_SLOT)
@@ -622,6 +760,12 @@ feature {NONE} -- Speech: separate calls (each locks the slot for one short call
 			-- Copy what is waiting into `incoming' and the worker's state into this processor.
 		do
 			incoming.wipe_out
+			speech_stream := a_slot.stream
+			if a_slot.recording_finished then
+				recording_finished := True
+				recorded_seconds := a_slot.recorded_seconds
+				a_slot.acknowledge_finished
+			end
 			if not a_slot.records.is_empty then
 				incoming.append (create {STRING_8}.make_from_separate (a_slot.records))
 				a_slot.clear_records
@@ -645,6 +789,20 @@ feature {NONE} -- Speech: separate calls (each locks the slot for one short call
 	ask_stop (a_slot: separate PT_SPEECH_SLOT)
 		do
 			a_slot.request_stop
+		end
+
+	ask_record (a_slot: separate PT_SPEECH_SLOT; a_raw, a_tee: STRING_32)
+		require
+			not_recording: not a_slot.record_requested
+		do
+			a_slot.request_record (a_raw, a_tee)
+		end
+
+	ask_finish (a_slot: separate PT_SPEECH_SLOT)
+		do
+			if a_slot.record_requested then
+				a_slot.request_finish
+			end
 		end
 
 feature {NONE} -- Setup
