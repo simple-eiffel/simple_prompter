@@ -1,7 +1,7 @@
 note
 	description: "[
 		Headless entry point to simple_prompter: script, following, Take Studio
-		and assembly. The GUI app and the worker exe are clients; tests drive it
+		and assembly. The GUI app (with its speech worker) is the client; tests drive it
 		with a fake clock and a fixed-width measure (simple_speed_reader's
 		headless-facade pattern).
 	]"

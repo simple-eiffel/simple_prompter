@@ -29,7 +29,7 @@ Date: 2026-10-05. Validates 01-07. Nothing compiled yet: this checks the design,
 | Criterion | Status | Evidence |
 |-----------|--------|----------|
 | Void-safe | ✓ | Optional event fields `detachable` with kind-based invariants; results with failure use XOR |
-| SCOOP-compatible | ✓ | One `separate` speech worker + slot; batch analysis in a worker exe; GUI never waits (06 §6) |
+| SCOOP-compatible | ✓ | One `separate` speech worker + slot; batch analysis as a job in that worker after Wrap (debate 01); GUI never waits (06 §6) |
 | simple_* first | ✓ | 03 "Design Constraints Validated"; tokenizer extracted from simple_speed_reader rather than rewritten (A-103) |
 | MML postconditions | ✓ | 05 model table (11 models). The non-iterability of models was caught and fixed (rule 11; oracle gotcha recorded) |
 | Invariants O(1) | ✓ | Reviewed every invariant in 05/07: scalars, counts, attachment checks only |
@@ -91,7 +91,7 @@ Date: 2026-10-05. Validates 01-07. Nothing compiled yet: this checks the design,
 | NFR-001 pause ≤ 250 ms | VAD 32 ms frames + `Ramp_down_s` 0.20 | P1 | ✓ (measure) |
 | NFR-002 tracking ≤ 700 ms | 250 ms step + ~60 ms decode (spike) | P2 | ✓ (measure) |
 | NFR-003 frame time | SCOOP worker; GUI never waits; cached text strip | P1 | ✓ (measure S-3) |
-| NFR-004 GPU ≤ 2 GB | 573 MB live + 573 MB analysis worker | P2/T3 | ✓ |
+| NFR-004 GPU ≤ 2 GB | One resident whisper: ~1.08 GB measured (debate 01, S2); analysis reuses it. *Was "573 + 573 ✓": 573 MB is the file size* | P1 | ✓ |
 | NFR-006 privacy | No network code; Ollama not in scope | all | ✓ |
 | NFR-007 startup | Worker warms model in background | P1 | ✓ |
 | NFR-008 CPU fallback | base.en CPU; voice-gated needs no ASR | P2 | ✓ |
@@ -99,7 +99,7 @@ Date: 2026-10-05. Validates 01-07. Nothing compiled yet: this checks the design,
 | NFR-010 1-hour | Bounded slot; no accumulating buffers (tail source reads fixed chunks) | P1 | ✓ (measure) |
 | NFR-T01 Again ≤ 50 ms | GUI-local controller + follower hold | T1 | ✓ |
 | NFR-T02 no interruption | Tail file: ffmpeg never waits on the GUI (A-101) | T1 | ✓ |
-| NFR-T03 analysis ≤ 25% | Worker exe on GPU | T3 | ◐ (unmeasured, A-110) |
+| NFR-T03 analysis ≤ 25% | Job in the live speech worker (debate 01) | T3 | ◐ (unmeasured; debate 01 V1 runs it before Step 4 builds) |
 | NFR-T04 render ≤ 30% | NVENC one pass (720p spike ≈ 5%) | T2 | ✓ |
 | NFR-T05 raw untouched | Outputs written to `out/`; no writer opens raw.mkv for write | T2 | ✓ |
 

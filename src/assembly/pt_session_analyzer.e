@@ -2,8 +2,8 @@ note
 	description: "[
 		The analysis pass (spec F-01 section 6): transcribe the recording, build
 		attempts from the journal, align heard words per attempt, choose takes,
-		snap cuts into silence, raise flags. Runs in the worker exe; pure logic
-		over an injected PT_TRANSCRIBER.
+		snap cuts into silence, raise flags. Runs as a job on the speech worker's
+		processor after Wrap (debate 01); pure logic over an injected PT_TRANSCRIBER.
 	]"
 	author: "Larry Rix"
 

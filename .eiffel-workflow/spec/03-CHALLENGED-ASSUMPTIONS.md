@@ -62,6 +62,12 @@ sr_app.e:781-851) is a proven ecosystem pattern. Running it as a child process i
 - **Rendering:** ffmpeg child.
 **Action:** add a `prompter_worker` target (an extending target, as speed_reader does). VRAM: two model copies ≈ 1.15 GB, within NFR-004.
 
+> **SUPERSEDED for the analysis half (2026-10-07, adopted by Larry):** debate 01 (`.eiffel-workflow/debate/01 - Analysis placement (Step 4)/04 - VERDICT.md`)
+> measured the live worker at ~1.08 GB of GPU (573 MB is the model *file*), so a second whisper copy totals ~2.15 GiB and
+> breaks NFR-004; "two copies ≈ 1.15 GB" is DISPROVEN. **Analysis runs as a job in `PT_SPEECH_WORKER` after Wrap**, mic
+> stopped, on the already-loaded model (PREFERRED, 0.65 / 0.80). No `prompter_worker` target. The worker exe stays the
+> documented fallback (A') if a verdict trigger fires. Live speech and the ffmpeg render child are unchanged.
+
 ### A-106: "Settings in TOML" (D-011)
 **Challenge:** simple_speed_reader's `SR_SETTINGS` (src/store/sr_settings.e) uses simple_config (JSON)
 with clamped getters (`bounded`, :223) and save-on-set. That's a proven pattern.
@@ -165,7 +171,7 @@ parser has to recognize them regardless.
 | Constraint | Valid? | Notes |
 |------------|--------|-------|
 | simple_* first | YES | simple_text_structure (new, extracted from speed_reader), simple_markdown (+to_plain_text), simple_speech, simple_audio, simple_shell, simple_widgets, simple_cairo, simple_toml, simple_json (journal, cut.json), simple_file, simple_process, simple_ffmpeg, simple_testing, simple_mml |
-| SCOOP-compatible | YES | One separate speech worker (live); analysis in a worker exe; GUI never waits |
+| SCOOP-compatible | YES | One separate speech worker (live, and analysis as a job after Wrap: debate 01); GUI never waits |
 | Void-safe | YES | All value objects attached; optional event fields detachable with kind-based preconditions |
 | Invariants O(1) | YES | Collection rules are postconditions (02 DR table) |
 | Per-target assertions | YES | C-010 |

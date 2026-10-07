@@ -1,7 +1,7 @@
 note
 	description: "[
-		Outcome of the analysis pass, written by the worker exe to
-		analysis/*.json and read by the Edit Floor. Success XOR error.
+		Outcome of the analysis pass, written by the speech worker's analysis job
+		(debate 01) to analysis/*.json and read by the Edit Floor. Success XOR error.
 	]"
 	author: "Larry Rix"
 

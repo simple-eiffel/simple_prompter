@@ -1,7 +1,7 @@
 note
 	description: "[
 		Full-recording speech pass for analysis: a VAD speech map plus every word
-		heard, with absolute times (window start 0). The worker exe supplies
+		heard, with absolute times (window start 0). The speech worker supplies
 		whisper through simple_speech (PT_WHISPER_TRANSCRIBER); tests use
 		PT_SCRIPTED_TRANSCRIBER.
 	]"

@@ -20,6 +20,6 @@ Spikes: S1 load time (orchestrator, P1-raw: model load + warm-up = 1 s; launch-t
         S2 GPU footprint (adjudicator, P1-raw: live worker resident +1,067..1,093 MiB)
 Decisions: Analysis placement - B (job in PT_SPEECH_WORKER after Wrap) - PREFERRED - 0.65 / 0.80
 Do-not-assume entries: 8
-Larry's gate: awaiting (adoption)
+Larry's gate: ADOPTED 2026-10-07 - "adopt B and approve the ROE card"
 
-# Status: AWAITING GATE
+# Status: GATED

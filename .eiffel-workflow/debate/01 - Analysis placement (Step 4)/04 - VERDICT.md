@@ -1,6 +1,6 @@
 # Debate 01 - 04 VERDICT: where the post-take analysis runs (Step 4)
 
-**Adjudicator:** debate-adjudicator (Opus), 2026-10-07. **Status:** AWAITING GATE (Larry: adoption only).
+**Adjudicator:** debate-adjudicator (Opus), 2026-10-07. **Status:** GATED - **adopted by Larry 2026-10-07** ("adopt B"). Condition C1 for adoption (thesis-holder on the record).
 
 ## 0. Declarations
 
@@ -110,7 +110,7 @@ Grounds: C3 rules out D, C-ctx and A as filed. Between A' and B, B wins C1 and C
 
 | # | Item |
 |---|---|
-| 1 | Adopt B (gate). Accepting B accepts the C5 trade: an in-process crash ends the app, not the take |
-| 2 | The ROE card (`ROE-CARD.md`) is **DRAFT**. Seats read the General ROE directly |
+| 1 | ~~Adopt B (gate).~~ **Adopted 2026-10-07 (Larry: "adopt B").** Accepted with it: the C5 trade (an in-process crash ends the app, not the take) |
+| 2 | ~~The ROE card is DRAFT.~~ **Approved by Larry 2026-10-07** (card v1.0); later cycles' seats read it |
 | 3 | The executed-evidence reading (C3 -> C2) is a skill **(proposal)**, ungated |
 | 4 | For the orchestrator, not a question: an **orphan ffmpeg (PID 36524, started 2026-10-06 09:50)** holds the microphone and is writing scratchpad `live_spike.f32` (5.19 GB so far). Separately, `CloseMainWindow` did not close the app within 6 s during S2. I force-killed it and removed my own orphan ffmpeg child; the GPU returned to baseline |

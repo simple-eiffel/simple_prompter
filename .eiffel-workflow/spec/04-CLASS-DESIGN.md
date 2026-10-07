@@ -178,7 +178,7 @@ simple_speed_reader migrates onto this later; not a blocker for simple_prompter.
 | `PT_SPEECH_WORKER` | SCOOP processor | VAD frames + rolling whisper; deposits encoded records into slot; accepts prompt text |
 | `PT_SPEECH_SLOT` | Mailbox (separate) | Non-blocking queue of encoded records (simple_chat/taskman pattern) |
 | `PT_SPEECH_CODEC` | Codec | `PT_VOICE_FRAME` / `PT_HEARD_WORDS` ↔ compact STRING_8 (values cross processors as strings) |
-| `PT_WHISPER_TRANSCRIBER` | Effective `PT_TRANSCRIBER` | Full-file pass via simple_speech (worker exe) |
+| `PT_WHISPER_TRANSCRIBER` | Effective `PT_TRANSCRIBER` | Full-file pass via simple_speech, as a job in `PT_SPEECH_WORKER` (debate 01) |
 
 ### 1.5 runtime/ cluster (app target)
 | Class | Role | Responsibility |
@@ -186,7 +186,7 @@ simple_speed_reader migrates onto this later; not a blocker for simple_prompter.
 | `PT_QPC_CLOCK` | Effective `PT_CLOCK` | `SHELL_DESKTOP.now_ms` (QPC, shell_desktop.e:75-82) |
 | `PT_RECORDER` | Runtime | Launch ffmpeg with `PT_CAPTURE_PLAN` (SIMPLE_ASYNC_PROCESS), parse stderr progress, stop (stdin `q` if available, else terminate), health |
 | `PT_RENDERER` | Runtime | Run render plan; progress |
-| `PT_WORKER_LAUNCHER` | Runtime | Start `prompter_worker --analyze`, poll mailbox (SR pattern, sr_app.e:781-851) |
+| ~~`PT_WORKER_LAUNCHER`~~ | ~~Runtime~~ | **Dropped by debate 01** (no worker exe; analysis is a job in `PT_SPEECH_WORKER`). Fallback only if a verdict trigger fires |
 | `PT_PREVIEW_PLAYER` | Runtime | ffplay for take/joint ranges |
 
 ### 1.6 app/ cluster (GUI; simple_shell, simple_widgets, simple_cairo)
