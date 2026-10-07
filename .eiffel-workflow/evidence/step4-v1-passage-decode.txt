@@ -1,0 +1,17 @@
+# Step 4 - V1 (debate 01 verification queue): full-file decode time
+# Date: 2026-10-07   Harness: JACKJACK, RTX 5070 Ti, simple_speech_gpu tests (F_code), ggml-large-v3-turbo-q5_0
+# Method: fixed 24 s passages, each decode_passage-prompted with the previous passage's text
+
+  PASS: decode_a_window_on_the_gpu
+  PASS: no_context_is_stable
+  PASS: already_read_prompt_is_harmless
+    [passage] larry_read_01: 144 s of audio, 7 passages, 236 words in 1083 ms (8 ms per second of audio; budget 250)
+    [passage] larry_sermon_01: 334 s of audio, 14 passages, 778 words in 2640 ms (8 ms per second of audio; budget 250)
+  PASS: passage_pass_fits_the_analysis_budget
+  PASS: vad_hears_speech_and_silence
+  PASS: vad_streaming_cost
+Results: 6 passed, 0 failed
+
+Budget NFR-T03: <= 25% of length (250 ms per second of audio). Measured: 8 ms/s (~0.8%).
+Words: read test 236 vs offline 251 (94%); sermon 778 vs offline 727. Fixed 24 s cuts lose words at boundaries: the real pass cuts at VAD silences.
+# Status: V1 PASS

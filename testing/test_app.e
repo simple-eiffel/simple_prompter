@@ -42,6 +42,7 @@ feature {NONE} -- Initialization
 			run_pill_tests
 			run_heard_stabilizer_tests
 			run_live_alignment_tests
+			run_sessions_tests
 			say ("%N========================%N")
 			say ("Results: " + passed.out + " passed, " + failed.out + " failed%N")
 			if failed > 0 then
@@ -397,6 +398,17 @@ feature {NONE} -- Test sets
 			run_test (agent t.test_close_words_of_one_window_all_count, "close_words_of_one_window_all_count")
 			run_test (agent t.test_restamped_words_are_not_buffered_twice, "restamped_words_are_not_buffered_twice")
 			run_test (agent t.test_column_width_relays_out_in_place, "column_width_relays_out_in_place")
+		end
+
+	run_sessions_tests
+		local
+			t: TEST_SESSIONS
+		do
+			section ("Take Studio sessions (Step 4a)")
+			create t
+			run_test (agent t.test_session_on_disk, "session_on_disk")
+			run_test (agent t.test_recording_clock_restarts, "recording_clock_restarts")
+			run_test (agent t.test_raw_recording_has_small_clusters, "raw_recording_has_small_clusters")
 		end
 
 feature {NONE} -- Implementation

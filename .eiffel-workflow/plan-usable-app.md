@@ -20,8 +20,8 @@ Every step ends at a **use gate**: Larry runs the app and uses it. A step is not
    then the use gate.
 5. **Commit** per step; push to GitHub when the step passes its use gate.
 
-New ECF targets: `simple_prompter_app` (GUI exe: app/, runtime/, speech/ clusters) and, in Step 4,
-`simple_prompter_worker` (analysis exe). The library target stays pure and its 183 tests keep passing.
+New ECF targets: `simple_prompter_app` (GUI exe: app/, runtime/, speech/ clusters). The Step 4
+`simple_prompter_worker` analysis exe was dropped by debate 01 (analysis runs in the speech worker). The library target stays pure and its 183 tests keep passing.
 
 ## Inventory this plan starts from (survey 2026-10-06)
 
@@ -102,16 +102,18 @@ captions, plus a short list of things to check.
 4a. **Recording:** `PT_RECORDER` (camera + mic per `PT_CAPTURE_PLAN`, kill-safe MKV), REC dot, session
    folder under Videos\simple_prompter, journal on disk, live marks (Again, Star, Reject, Marker),
    `PT_INLINE_EDITOR` for live script edits; device names from `ffmpeg -list_devices`.
-4b. **Analysis:** `simple_prompter_worker --analyze <session>` (`PT_WORKER_APP`,
-   `PT_WHISPER_TRANSCRIBER` full-file on the GPU), `PT_WORKER_LAUNCHER` polls its result.
+4b. **Analysis (changed by debate 01, adopted 2026-10-07):** a job in `PT_SPEECH_WORKER` after Wrap, mic
+   stopped, on the already-loaded model (`PT_WHISPER_TRANSCRIBER`, VAD-chunked full-file decode with its own
+   params); no worker exe, no `PT_WORKER_LAUNCHER`. The job holds no slot during a decode, checks for stop
+   between chunks, and starts only after the recording file is closed. Verification queue V1-V7 from the
+   verdict (V1, full-file decode time, before building).
 4c. **Minimal Edit Floor (approved default):** cuts and flags, preview a cut or a joint with ffplay,
    star a different take, Render (`PT_RENDERER`) to final.mp4 with SRT/VTT captions and chapters.
 4d. **Use gate:** the cough test plays right in VLC with review.srt; then you edit a real episode.
 
 ## Step 5: Installer (approved: after T2)
 
-An Inno Setup installer for the app and worker with the whisper DLLs and models, once Step 4 has
-produced a real episode.
+An Inno Setup installer for the app with the whisper DLLs and models (done early, 0.1.0-0.2.1).
 
 ## Open decisions (Larry)
 

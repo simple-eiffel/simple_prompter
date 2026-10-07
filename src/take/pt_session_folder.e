@@ -48,6 +48,24 @@ feature -- Access
 			inside: Result.starts_with (script_dir)
 		end
 
+feature -- Commands
+
+	create_directories
+			-- Make the session folder and its script, analysis and out folders (existing ones are kept).
+		local
+			l_dir: DIRECTORY
+		do
+			across << root, script_dir, analysis_dir, out_dir >> as ic loop
+				create l_dir.make (ic)
+				if not l_dir.exists then
+					l_dir.recursive_create_dir
+				end
+			end
+		ensure
+			root_exists: (create {DIRECTORY}.make (root)).exists
+			script_dir_exists: (create {DIRECTORY}.make (script_dir)).exists
+		end
+
 feature {NONE} -- Implementation
 
 	under (a_name: READABLE_STRING_32): STRING_32

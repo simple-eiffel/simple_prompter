@@ -255,6 +255,72 @@ feature -- Script
 			still_loaded: old has_script implies has_script
 		end
 
+feature -- Take Studio sessions
+
+	has_session: BOOLEAN
+			-- Is a Take Studio session open (so a Record is journaled to disk)?
+		do
+			Result := attached session_cell
+		end
+
+	session: PT_SESSION
+			-- The open session.
+		require
+			open: has_session
+		do
+			check attached session_cell as al_session then
+				Result := al_session
+			end
+		end
+
+	start_session (a_folder: PT_SESSION_FOLDER)
+			-- Open a Take Studio session in `a_folder' (created if absent): the current revision is
+			-- saved as its script\r1.md, and the take journal is written to its journal.jsonl. The
+			-- controller starts again, idle, on that journal; the count-in is kept.
+		require
+			loaded: has_script
+			idle: controller.state = {PT_TAKE_STATE}.Idle
+			no_session: not has_session
+		local
+			l_journal: PT_JOURNAL
+			l_count_in: REAL_64
+			l_saved: BOOLEAN
+		do
+			a_folder.create_directories
+			l_saved := (create {SIMPLE_FILE}.make (a_folder.revision_path (1))).set_content (history.current_revision.source_text)
+			create l_journal.make_on_file (a_folder.journal_path)
+			l_count_in := controller.count_in_seconds
+			create controller_cell.make (history, l_journal, recording_clock, clock, follower, policy)
+			controller.set_count_in (l_count_in)
+			create session_cell.make (a_folder, history, l_journal)
+		ensure
+			open: has_session
+			folder_set: session.folder = a_folder
+			journaled: controller.journal = session.journal and controller.journal.is_persistent
+			idle: controller.state = {PT_TAKE_STATE}.Idle
+			count_in_kept: controller.count_in_seconds = old controller.count_in_seconds
+		end
+
+	end_session
+			-- Close the session (after Wrap, or before recording): later takes are practice again,
+			-- on a fresh in-memory journal; the controller starts again, idle; the count-in is kept.
+		require
+			open: has_session
+			not_recording: not controller.is_recording
+		local
+			l_count_in: REAL_64
+		do
+			l_count_in := controller.count_in_seconds
+			session_cell := Void
+			create controller_cell.make (history, create {PT_JOURNAL}.make_in_memory, recording_clock, clock, follower, policy)
+			controller.set_count_in (l_count_in)
+		ensure
+			closed: not has_session
+			practice: not controller.journal.is_persistent
+			idle: controller.state = {PT_TAKE_STATE}.Idle
+			count_in_kept: controller.count_in_seconds = old controller.count_in_seconds
+		end
+
 feature -- Layout
 
 	set_column_width (a_width: REAL_64)
@@ -352,6 +418,9 @@ feature {NONE} -- Implementation
 	scroll_cell: detachable PT_SCROLL_MODEL
 	controller_cell: detachable PT_TAKE_CONTROLLER
 	aligner_cell: detachable PT_ALIGNER
+
+	session_cell: detachable PT_SESSION
+			-- The open Take Studio session, if any.
 
 	rewire
 			-- Follow the current revision: new aligner, rebuilt layout, rescaled follower.

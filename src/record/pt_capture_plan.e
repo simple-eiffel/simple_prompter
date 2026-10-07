@@ -52,6 +52,8 @@ feature -- Constants
 	Tee_rate: INTEGER = 16_000
 	Gop_frames: INTEGER = 30
 	Audio_buffer_ms: INTEGER = 50
+	Cluster_ms: INTEGER = 500
+			-- Longest Matroska cluster in the raw recording; bounds what a hard kill can lose.
 			-- dshow audio device buffer; the device default can be large and adds directly
 			-- to tee latency (review H6; measure in spike T-0).
 
@@ -82,6 +84,11 @@ feature -- Access
 				add (Result, <<"-map", "0:v", "-map", "0:a", "-c:v", "h264_nvenc", "-preset", "p5", "-cq", "18", "-g">>)
 				Result.extend (Gop_frames.out.to_string_32)
 				add (Result, <<"-c:a", "pcm_s16le">>)
+					-- Clusters of at most 0.5 s, flushed as written: a hard kill loses at most the
+					-- last cluster (spike S-R1, 2026-10-07: ~0.7 s lost without this).
+				add (Result, <<"-cluster_time_limit">>)
+				Result.extend (Cluster_ms.out.to_string_32)
+				add (Result, <<"-flush_packets", "1">>)
 				Result.extend (raw_path)
 			end
 			add (Result, <<"-map", "0:a", "-ar">>)
@@ -94,6 +101,7 @@ feature -- Access
 			mjpeg_when_recording: not is_audio_only implies has_pair (Result, "-vcodec", "mjpeg")
 			pcm_when_recording: not is_audio_only implies has_pair (Result, "-c:a", "pcm_s16le")
 			raw_when_recording: not is_audio_only implies across Result as ic some ic.same_string (raw_path) end
+			small_clusters_when_recording: not is_audio_only implies has_pair (Result, "-cluster_time_limit", Cluster_ms.out)
 			no_raw_in_practice: is_audio_only implies not has_pair (Result, "-c:v", "h264_nvenc")
 			tee_format: has_pair (Result, "-f", "f32le") and has_pair (Result, "-ar", "16000") and has_pair (Result, "-ac", "1")
 			tee_flushed: has_pair (Result, "-flush_packets", "1")

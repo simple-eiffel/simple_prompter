@@ -60,6 +60,20 @@ feature -- Access
 
 feature -- Element change
 
+	restart (a_at_ms: REAL_64)
+			-- A new tee stream began at clock time `a_at_ms' (recording started, or listening resumed):
+			-- its byte count, and so recording time, start again from zero.
+		require
+			time_ok: a_at_ms >= 0
+		do
+			byte_count := 0
+			observed_at_ms := a_at_ms
+			rt := 0
+		ensure
+			reset: byte_count = 0 and rt = 0
+			time_set: observed_at_ms = a_at_ms
+		end
+
 	observe_bytes (a_total: INTEGER_64; a_at_ms: REAL_64)
 			-- The tee file holds `a_total' bytes at clock time `a_at_ms'.
 		require
