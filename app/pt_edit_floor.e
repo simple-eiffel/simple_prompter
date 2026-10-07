@@ -93,7 +93,7 @@ feature -- Display
 	paint (p: SW_PAINTER; a_x, a_y, a_w: REAL_64; k: REAL_64)
 			-- Draw the panel from (`a_x', `a_y'), `a_w' wide.
 		local
-			l_y: REAL_64
+			l_y, l_top: REAL_64
 			l_flag: PT_FLAG
 		do
 			rows.wipe_out
@@ -105,12 +105,9 @@ feature -- Display
 			p.set_color (Muted)
 			if attached take as al_take and then attached al_take.folder as al_folder and then attached al_take.analysis as al_analysis
 				and then attached al_take.history as al_history then
-				l_y := l_y + 22 * k
-				p.text (a_x, l_y, short (folder_name (al_folder.root), 60))
-				l_y := l_y + 20 * k
-				p.text (a_x, l_y, {STRING_32} "final " + clock (al_analysis.cuts.output_duration) + {STRING_32} " in "
-					+ al_analysis.cuts.count.out + {STRING_32} " cuts  -  " + al_analysis.flags.count.out + {STRING_32} " things to check")
-				l_y := l_y + 30 * k
+				l_y := wrapped (p, a_x, l_y + 22 * k, a_w, folder_name (al_folder.root), 20 * k)
+				l_y := wrapped (p, a_x, l_y, a_w, {STRING_32} "final " + clock (al_analysis.cuts.output_duration) + {STRING_32} " in "
+					+ al_analysis.cuts.count.out + {STRING_32} " cuts  -  " + al_analysis.flags.count.out + {STRING_32} " things to check", 20 * k) + 10 * k
 				button (p, a_x, l_y - 18 * k, 92 * k, 26 * k, (if renderer.is_rendering then {STRING_32} "Rendering" else {STRING_32} "Render" end), Action_render, k)
 				button (p, a_x + 100 * k, l_y - 18 * k, 92 * k, 26 * k, {STRING_32} "Play final", Action_play_final, k)
 				button (p, a_x + 200 * k, l_y - 18 * k, 104 * k, 26 * k, {STRING_32} "Open folder", Action_open_folder, k)
@@ -118,14 +115,12 @@ feature -- Display
 				p.font (p.Role_ui, 12, False)
 				p.set_color (Muted)
 				if not renderer.status.is_empty then
-					p.text (a_x, l_y, short (renderer.status, 70))
-					l_y := l_y + 20 * k
+					l_y := wrapped (p, a_x, l_y, a_w, renderer.status, 20 * k)
 				end
 				if not status_note.is_empty then
 					p.set_color (Danger)
-					p.text (a_x, l_y, short (status_note, 70))
+					l_y := wrapped (p, a_x, l_y, a_w, status_note, 20 * k)
 					p.set_color (Muted)
-					l_y := l_y + 20 * k
 				end
 				l_y := l_y + 8 * k
 				p.font (p.Role_ui, 13, True)
@@ -155,10 +150,10 @@ feature -- Display
 				end
 				across 1 |..| al_analysis.flags.count.min (Max_rows) as ic loop
 					l_flag := al_analysis.flags [ic]
-					l_y := l_y + 19 * k
 					p.set_color (Flag_ink)
-					p.text (a_x, l_y, clock (l_flag.span.t0) + {STRING_32} "  " + short (l_flag.message, 56))
-					rows.extend ([a_x, l_y - 14 * k, a_w, 19 * k, Action_preview_flag, ic])
+					l_top := l_y + 5 * k
+					l_y := wrapped (p, a_x, l_y + 19 * k, a_w, clock (l_flag.span.t0) + {STRING_32} "  " + l_flag.message, 19 * k) - 19 * k
+					rows.extend ([a_x, l_top, a_w, l_y - l_top + 5 * k, Action_preview_flag, ic])
 				end
 			else
 				l_y := l_y + 22 * k
@@ -168,7 +163,7 @@ feature -- Display
 					p.text (a_x, l_y, {STRING_32} "its cuts and things to check appear here.")
 				else
 					p.set_color (Danger)
-					p.text (a_x, l_y, short (status_note, 70))
+					l_y := wrapped (p, a_x, l_y, a_w, status_note, 20 * k)
 				end
 			end
 		end
@@ -274,6 +269,21 @@ feature {NONE} -- Implementation
 	Danger: NATURAL_32 = 0xF87171
 	Flag_ink: NATURAL_32 = 0xFBBF24
 	Button_fill: NATURAL_32 = 0x3B82F6
+
+	wrapped (p: SW_PAINTER; a_x, a_y, a_w: REAL_64; a_text: READABLE_STRING_32; a_step: REAL_64): REAL_64
+			-- Draw `a_text' from (`a_x', `a_y') wrapped to `a_w'; answer the y below it.
+		local
+			l_y: REAL_64
+		do
+			l_y := a_y
+			across (create {PT_WRAP}).lines (p, a_text, a_w) as ic loop
+				p.text (a_x, l_y, ic)
+				l_y := l_y + a_step
+			end
+			Result := l_y
+		ensure
+			moved_down: Result > a_y
+		end
 
 	button (p: SW_PAINTER; a_x, a_y, a_w, a_h: REAL_64; a_label: STRING_32; a_action: INTEGER; k: REAL_64)
 		do

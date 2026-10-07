@@ -84,7 +84,7 @@ feature {NONE} -- Initialization
 
 feature -- Constants
 
-	Version: STRING_32 = "0.2.1"
+	Version: STRING_32 = "0.3.0"
 			-- Shown in the control window; keep in step with installer/simple_prompter.iss.
 
 	Tick_ms: INTEGER = 16
@@ -360,8 +360,7 @@ feature {NONE} -- Control window
 			l_y := l_y + 28 * k
 			p.font (p.Role_ui, 13, False)
 			p.set_color (theme.ink_muted)
-			p.text (a_x + 18 * k, l_y, script_note)
-			l_y := l_y + 12 * k
+			l_y := wrapped (p, a_x + 18 * k, l_y, script_note, 20 * k) - 8 * k
 			open_button_x := 18 * k
 			open_button_y := l_y - a_y
 			open_button_width := 150 * k
@@ -375,28 +374,23 @@ feature {NONE} -- Control window
 			p.set_color (theme.ink_muted)
 			p.text (a_x + open_button_x + open_button_width + 14 * k, a_y + open_button_y + 19 * k, {STRING_32} "or drop a .md / .txt file here")
 			l_y := l_y + open_button_height + 26 * k
-			p.text (a_x + 18 * k, l_y, {STRING_32} "State: " + state_name + {STRING_32} "    Follows: " + mode_name)
-			l_y := l_y + 22 * k
+			l_y := wrapped (p, a_x + 18 * k, l_y, {STRING_32} "State: " + state_name + {STRING_32} "    Follows: " + mode_name, 22 * k)
 			if speech_state = {PT_SPEECH_SLOT}.Failed then
 				p.set_color (theme.danger)
 			end
-			p.text (a_x + 18 * k, l_y, {STRING_32} "Speech: " + speech_status)
+			l_y := wrapped (p, a_x + 18 * k, l_y, {STRING_32} "Speech: " + speech_status, 22 * k)
 			p.set_color (theme.ink_muted)
-			l_y := l_y + 22 * k
 			if not mode_note.is_empty then
 				p.set_color (theme.danger)
-				p.text (a_x + 18 * k, l_y, mode_note)
+				l_y := wrapped (p, a_x + 18 * k, l_y, mode_note, 22 * k)
 				p.set_color (theme.ink_muted)
-				l_y := l_y + 22 * k
 			end
 			if not take_note.is_empty then
-				p.text (a_x + 18 * k, l_y, take_note)
-				l_y := l_y + 22 * k
+				l_y := wrapped (p, a_x + 18 * k, l_y, take_note, 22 * k)
 			end
-			p.text (a_x + 18 * k, l_y, {STRING_32} "Pill: " + (if pill.is_shown then {STRING_32} "shown" else {STRING_32} "hidden" end)
+			l_y := wrapped (p, a_x + 18 * k, l_y, {STRING_32} "Pill: " + (if pill.is_shown then {STRING_32} "shown" else {STRING_32} "hidden" end)
 				+ {STRING_32} ", " + pill.capture_note
-				+ (if pill.is_click_through then {STRING_32} ", click-through" else {STRING_32} "" end))
-			l_y := l_y + 32 * k
+				+ (if pill.is_click_through then {STRING_32} ", click-through" else {STRING_32} "" end), 22 * k) + 10 * k
 			p.font (p.Role_ui, 13, True)
 			p.set_color (theme.ink)
 			p.text (a_x + 18 * k, l_y, {STRING_32} "Keys (work in any program)")
@@ -419,9 +413,8 @@ feature {NONE} -- Control window
 			l_y := l_y + 20 * k
 			p.text (a_x + 30 * k, l_y, {STRING_32} "hold Shift: drag to move, drag an edge or corner to size")
 			across router.refused as ic loop
-				l_y := l_y + 22 * k
 				p.set_color (theme.danger)
-				p.text (a_x + 18 * k, l_y, ic)
+				l_y := wrapped (p, a_x + 18 * k, l_y + 22 * k, ic, 22 * k) - 22 * k
 			end
 			l_y := l_y + 30 * k
 			p.set_color (theme.ink_muted)
@@ -430,6 +423,24 @@ feature {NONE} -- Control window
 			p.set_color (theme.outline)
 			p.fill_rect (a_x + 520 * k, a_y + 16 * k, 1, Window_height * k - 32 * k)
 			edit_floor.paint (p, 540 * k, 0, 480 * k, k)
+		end
+
+	Left_column_width: REAL_64 = 486.0
+			-- Text width of the left column, design pixels (the divider is at 520).
+
+	wrapped (p: SW_PAINTER; a_x, a_y: REAL_64; a_text: READABLE_STRING_32; a_step: REAL_64): REAL_64
+			-- Draw `a_text' from (`a_x', `a_y'), wrapped to the left column; answer the y below it.
+		local
+			l_y: REAL_64
+		do
+			l_y := a_y
+			across (create {PT_WRAP}).lines (p, a_text, Left_column_width * theme.text_scale) as ic loop
+				p.text (a_x, l_y, ic)
+				l_y := l_y + a_step
+			end
+			Result := l_y
+		ensure
+			moved_down: Result > a_y
 		end
 
 	state_name: STRING_32
@@ -762,8 +773,7 @@ feature {NONE} -- Take Studio (plan Step 4a)
 				prompter.perform ({PT_ACTION}.Analysis_done)
 			end
 			if prompter.has_session and then not prompter.controller.is_recording then
-				take_note := {STRING_32} "Take saved (" + clock_text (recorded_seconds) + {STRING_32} ", " + a_outcome + {STRING_32} "): "
-					+ prompter.session.folder.root
+				take_note := {STRING_32} "Take saved (" + clock_text (recorded_seconds) + {STRING_32} "), " + a_outcome
 				edit_floor.show (prompter.session.folder.root)
 				prompter.end_session
 				previous_state := prompter.controller.state
@@ -812,6 +822,16 @@ feature {NONE} -- Take Studio (plan Step 4a)
 				+ {STRING_32} " " + two (l_now.hour) + two (l_now.minute) + two (l_now.second) + {STRING_32} " - " + l_title
 		ensure
 			no_trailing_separator: Result [Result.count] /= '\'
+		end
+
+	folder_leaf (a_root: STRING_32): STRING_32
+			-- The last part of `a_root'.
+		do
+			if attached (create {PATH}.make_from_string (a_root)).entry as al_entry then
+				Result := al_entry.name
+			else
+				Result := a_root
+			end
 		end
 
 	two (a_n: INTEGER): STRING_32
