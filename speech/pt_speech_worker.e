@@ -40,6 +40,7 @@ feature {NONE} -- Initialization
 			create buffer.make_filled (0.0, Chunk_samples)
 			create tail.make (tee_path)
 			create process.make
+			create recording_devices.make (camera, microphone, 1920, 1080, 30)
 		ensure
 			idle: not is_running and not is_listening
 		end
@@ -112,6 +113,7 @@ feature -- Execution
 						report (al_slot, {PT_SPEECH_SLOT}.Failed, l_decoder.recognizer.last_error)
 					else
 						l_decoder.warm_up
+						probe_devices
 						load_seconds := ((now_ms - l_start) / 1000).rounded
 						report (al_slot, {PT_SPEECH_SLOT}.Ready, {STRING_32} "speech ready (" + load_seconds.out + " s to load)")
 						vad := l_vad
@@ -183,6 +185,22 @@ feature {NONE} -- Listening
 	stream: INTEGER
 			-- The current capture's number (see PT_SPEECH_SLOT.stream).
 
+	recording_devices: PT_DEVICE_CHOICE
+			-- How the camera is recorded: MJPEG when it offers it, else its own mode (OBS Virtual
+			-- Camera, NVIDIA Broadcast; see `probe_devices').
+
+	probe_devices
+			-- Ask ffmpeg which modes `camera' offers and decide how to record it (PT_DEVICE_PROBE).
+		local
+			l_listing: STRING_32
+		do
+			if not camera.is_empty then
+				l_listing := (create {SIMPLE_PROCESS}.make).command_output (quoted (ffmpeg)
+					+ {STRING_32} " -hide_banner -f dshow -list_options true -i " + quoted ({STRING_32} "video=" + camera))
+				recording_devices := (create {PT_DEVICE_PROBE}).choice (l_listing, camera, microphone)
+			end
+		end
+
 	analysis_job: detachable PT_ANALYSIS_JOB
 			-- Analyzes wrapped takes on the loaded models (debate 01).
 
@@ -216,8 +234,9 @@ feature {NONE} -- Listening
 			stop_listening
 			l_raw := requested_raw (a_slot)
 			l_tee := requested_tee (a_slot)
-			start_capture (a_slot, create {PT_CAPTURE_PLAN}.make_recording (ffmpeg, create {PT_DEVICE_CHOICE}.make (camera, microphone, 1920, 1080, 30), l_raw, l_tee),
-				l_tee, {PT_SPEECH_SLOT}.Recording, {STRING_32} "RECORDING: " + camera + {STRING_32} " + " + microphone)
+			start_capture (a_slot, create {PT_CAPTURE_PLAN}.make_recording (ffmpeg, recording_devices, l_raw, l_tee),
+				l_tee, {PT_SPEECH_SLOT}.Recording, {STRING_32} "RECORDING: " + camera + (if recording_devices.uses_mjpeg then {STRING_32} "" else {STRING_32} " (its own format)" end)
+				+ {STRING_32} " + " + microphone)
 			if is_listening then
 				is_recording := True
 				finish_at := 0.0
@@ -335,7 +354,7 @@ feature {NONE} -- Listening
 			else
 				l_text := process.read_available_output
 				failed := True
-				report (a_slot, {PT_SPEECH_SLOT}.Failed, {STRING_32} "the microphone stopped (ffmpeg ended)" + tail_of (l_text))
+				report (a_slot, {PT_SPEECH_SLOT}.Failed, stop_reason (l_text) + tail_of (l_text))
 			end
 			if not failed and not tail.is_open then
 				if (create {SIMPLE_FILE}.make (current_tee)).exists then
@@ -481,6 +500,21 @@ feature {NONE} -- Slot calls: each locks the slot for one short call
 		end
 
 feature {NONE} -- Implementation
+
+	stop_reason (a_output: detachable READABLE_STRING_32): STRING_32
+			-- Why the capture ended, for the control window. A device another program holds (OBS
+			-- using the webcam) shows up as "other application" in ffmpeg's error (OBS test, 2026-10-07).
+		do
+			if attached a_output as al_o and then al_o.as_lower.has_substring ({STRING_32} "other application") then
+				Result := {STRING_32} "another program is using the "
+					+ (if is_recording then camera + {STRING_32} " or " else {STRING_32} "" end) + microphone
+					+ (if is_recording then {STRING_32} " (if OBS has the webcam, set camera = %"OBS Virtual Camera%")" else {STRING_32} "" end)
+			elseif is_recording then
+				Result := {STRING_32} "the recording stopped (ffmpeg ended)"
+			else
+				Result := {STRING_32} "the microphone stopped (ffmpeg ended)"
+			end
+		end
 
 	quoted (a_text: READABLE_STRING_32): STRING_32
 			-- `a_text' as one command-line argument, always a new string: `to_string_32' on a

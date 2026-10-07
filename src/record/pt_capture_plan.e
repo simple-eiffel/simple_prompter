@@ -64,6 +64,17 @@ feature -- Access
 	raw_path: STRING_32
 	tee_path: STRING_32
 
+	audio_stream: STRING_32
+			-- The microphone's stream: in the one dshow input, or the second input for a camera
+			-- recorded in its own mode.
+		do
+			if not is_audio_only and not devices.uses_mjpeg then
+				Result := {STRING_32} "1:a"
+			else
+				Result := {STRING_32} "0:a"
+			end
+		end
+
 	arguments: ARRAYED_LIST [STRING_32]
 			-- Arguments after the ffmpeg executable.
 		do
@@ -75,13 +86,29 @@ feature -- Access
 				Result.extend ({STRING_32} "-i")
 				Result.extend ({STRING_32} "audio=" + devices.microphone)
 			else
-				add (Result, <<"-vcodec", "mjpeg", "-video_size">>)
-				Result.extend ((devices.width.out + "x" + devices.height.out).to_string_32)
-				Result.extend ({STRING_32} "-framerate")
-				Result.extend (devices.fps.out.to_string_32)
-				Result.extend ({STRING_32} "-i")
-				Result.extend ({STRING_32} "video=" + devices.camera + {STRING_32} ":audio=" + devices.microphone)
-				add (Result, <<"-map", "0:v", "-map", "0:a", "-c:v", "h264_nvenc", "-preset", "p5", "-cq", "18", "-g">>)
+				if devices.uses_mjpeg then
+					add (Result, <<"-vcodec", "mjpeg", "-video_size">>)
+					Result.extend ((devices.width.out + "x" + devices.height.out).to_string_32)
+					Result.extend ({STRING_32} "-framerate")
+					Result.extend (devices.fps.out.to_string_32)
+					Result.extend ({STRING_32} "-i")
+					Result.extend ({STRING_32} "video=" + devices.camera + {STRING_32} ":audio=" + devices.microphone)
+				else
+						-- The device's own mode (OBS Virtual Camera, NVIDIA Broadcast), as its own input:
+						-- a virtual camera stamps frames on its own clock (OBS: ~231,000 s against the
+						-- microphone's 0), and in one input ffmpeg held every frame back waiting for the
+						-- audio, so a hard stop wrote none (OBS test, 2026-10-07). Separate inputs each
+						-- start at 0; the microphone keeps its own clock, which the tee's samples follow.
+					Result.extend ({STRING_32} "-i")
+					Result.extend ({STRING_32} "video=" + devices.camera)
+					add (Result, <<"-f", "dshow", "-audio_buffer_size">>)
+					Result.extend (Audio_buffer_ms.out.to_string_32)
+					Result.extend ({STRING_32} "-i")
+					Result.extend ({STRING_32} "audio=" + devices.microphone)
+				end
+				add (Result, <<"-map", "0:v", "-map">>)
+				Result.extend (audio_stream)
+				add (Result, <<"-c:v", "h264_nvenc", "-preset", "p5", "-cq", "18", "-g">>)
 				Result.extend (Gop_frames.out.to_string_32)
 				add (Result, <<"-c:a", "pcm_s16le">>)
 					-- Clusters of at most 0.5 s, flushed as written: a hard kill loses at most the
@@ -91,14 +118,19 @@ feature -- Access
 				add (Result, <<"-flush_packets", "1">>)
 				Result.extend (raw_path)
 			end
-			add (Result, <<"-map", "0:a", "-ar">>)
+			add (Result, <<"-map">>)
+			Result.extend (audio_stream)
+			add (Result, <<"-ar">>)
 			Result.extend (Tee_rate.out.to_string_32)
 			add (Result, <<"-ac", "1", "-f", "f32le", "-flush_packets", "1">>)
 			Result.extend (tee_path)
 		ensure
 			dshow_input: has_pair (Result, "-f", "dshow")
 			small_audio_buffer: has_pair (Result, "-audio_buffer_size", Audio_buffer_ms.out)
-			mjpeg_when_recording: not is_audio_only implies has_pair (Result, "-vcodec", "mjpeg")
+			mjpeg_when_offered: (not is_audio_only and devices.uses_mjpeg) implies has_pair (Result, "-vcodec", "mjpeg")
+			device_mode_otherwise: (not is_audio_only and not devices.uses_mjpeg) implies not has_pair (Result, "-vcodec", "mjpeg")
+			own_inputs_otherwise: (not is_audio_only and not devices.uses_mjpeg) implies (has_pair (Result, "-i", {STRING_32} "video=" + devices.camera)
+				and has_pair (Result, "-i", {STRING_32} "audio=" + devices.microphone))
 			pcm_when_recording: not is_audio_only implies has_pair (Result, "-c:a", "pcm_s16le")
 			raw_when_recording: not is_audio_only implies across Result as ic some ic.same_string (raw_path) end
 			small_clusters_when_recording: not is_audio_only implies has_pair (Result, "-cluster_time_limit", Cluster_ms.out)

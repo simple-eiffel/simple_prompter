@@ -186,6 +186,9 @@ feature {NONE} -- Test sets
 			run_test (agent t.test_capture_plan_recording_arguments, "capture_plan_recording_arguments")
 			run_test (agent t.test_capture_plan_sets_a_small_audio_buffer, "capture_plan_sets_a_small_audio_buffer")
 			run_test (agent t.test_capture_plan_practice_is_audio_only, "capture_plan_practice_is_audio_only")
+			run_test (agent t.test_webcam_is_recorded_as_mjpeg, "webcam_is_recorded_as_mjpeg")
+			run_test (agent t.test_obs_virtual_camera_uses_its_own_mode, "obs_virtual_camera_uses_its_own_mode")
+			run_test (agent t.test_empty_listing_uses_device_mode, "empty_listing_uses_device_mode")
 			run_test (agent t.test_preflight_disk_check, "preflight_disk_check")
 		end
 

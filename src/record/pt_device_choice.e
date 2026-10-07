@@ -6,7 +6,7 @@ class
 	PT_DEVICE_CHOICE
 
 create
-	make, make_default
+	make, make_default, make_device_mode
 
 feature {NONE} -- Initialization
 
@@ -21,9 +21,29 @@ feature {NONE} -- Initialization
 			width := a_width
 			height := a_height
 			fps := a_fps
+			uses_mjpeg := True
 		ensure
 			devices_set: camera.same_string (a_camera) and microphone.same_string (a_microphone)
 			mode_set: width = a_width and height = a_height and fps = a_fps
+			mjpeg: uses_mjpeg
+		end
+
+	make_device_mode (a_camera, a_microphone: READABLE_STRING_32)
+			-- Record `a_camera' in its own format and frame rate: a virtual camera (OBS Virtual
+			-- Camera: raw 1080p at OBS's frame rate; NVIDIA Broadcast: raw BGR) offers no MJPEG, so
+			-- nothing is forced (Larry approved the capture-plan contract change, 2026-10-07).
+		require
+			microphone_present: not a_microphone.is_empty
+		do
+			camera := a_camera.to_string_32
+			microphone := a_microphone.to_string_32
+			width := 1920
+			height := 1080
+			fps := 30
+			uses_mjpeg := False
+		ensure
+			devices_set: camera.same_string (a_camera) and microphone.same_string (a_microphone)
+			device_mode: not uses_mjpeg
 		end
 
 	make_default
@@ -39,6 +59,11 @@ feature -- Access
 	microphone: STRING_32
 			-- dshow audio device name.
 	width, height, fps: INTEGER
+			-- The mode requested when `uses_mjpeg' (otherwise the device's own mode is used).
+
+	uses_mjpeg: BOOLEAN
+			-- Is the camera asked for MJPEG at `width' x `height', `fps'? (A webcam offers it;
+			-- virtual cameras do not - see PT_DEVICE_PROBE.)
 
 feature -- Status
 

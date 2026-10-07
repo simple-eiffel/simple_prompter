@@ -399,6 +399,16 @@ feature {NONE} -- Analysis support
 			end
 		end
 
+	test_camera: STRING_32
+			-- The camera the recording tests use: FHD Camera, or PT_TEST_CAMERA (e.g. "OBS Virtual Camera").
+		do
+			if attached (create {EXECUTION_ENVIRONMENT}).item ("PT_TEST_CAMERA") as al_c and then not al_c.is_empty then
+				Result := al_c.to_string_32
+			else
+				Result := {STRING_32} "FHD Camera"
+			end
+		end
+
 	probe_duration (a_file: STRING_32): STRING_32
 			-- ffprobe's duration of `a_file', seconds.
 		local
@@ -453,7 +463,7 @@ feature -- Worker
 			l_waited: INTEGER
 		do
 			create l_slot.make
-			create l_worker.make (Ffmpeg_path, {STRING_32} "FHD Camera", {STRING_32} "Microphone (FHD Camera Microphone)", tee_path, Model, Vad_model)
+			create l_worker.make (Ffmpeg_path, test_camera, {STRING_32} "Microphone (FHD Camera Microphone)", tee_path, Model, Vad_model)
 			launch (l_worker, l_slot)
 			from until slot_state (l_slot) /= {PT_SPEECH_SLOT}.Loading or l_waited > 60_000 loop
 				sleep_ms (100)
@@ -499,7 +509,7 @@ feature -- Worker
 			l_ok := (create {SIMPLE_FILE}.make (l_raw)).delete
 			l_ok := (create {SIMPLE_FILE}.make (l_tee)).delete
 			create l_slot.make
-			create l_worker.make (Ffmpeg_path, {STRING_32} "FHD Camera", {STRING_32} "Microphone (FHD Camera Microphone)", tee_path, Model, Vad_model)
+			create l_worker.make (Ffmpeg_path, test_camera, {STRING_32} "Microphone (FHD Camera Microphone)", tee_path, Model, Vad_model)
 			launch (l_worker, l_slot)
 			request_listen (l_slot)
 			from until slot_state (l_slot) = {PT_SPEECH_SLOT}.Listening or slot_state (l_slot) = {PT_SPEECH_SLOT}.Failed or l_waited > 60_000 loop
@@ -545,9 +555,13 @@ feature -- Worker
 				l_waited := l_waited + 50
 			end
 			assert_true ("stopped", slot_stopped (l_slot))
-			l_ok := (create {SIMPLE_FILE}.make (l_raw)).delete
-			l_ok := (create {SIMPLE_FILE}.make (l_tee)).delete
-			l_ok := (create {SIMPLE_FILE}.make (l_dir)).delete_directory
+			if attached (create {EXECUTION_ENVIRONMENT}).item ("PT_TEST_KEEP") then
+				print ("    [record] kept " + l_raw.to_string_8 + "%N")
+			else
+				l_ok := (create {SIMPLE_FILE}.make (l_raw)).delete
+				l_ok := (create {SIMPLE_FILE}.make (l_tee)).delete
+				l_ok := (create {SIMPLE_FILE}.make (l_dir)).delete_directory
+			end
 		end
 
 feature {NONE} -- Separate calls

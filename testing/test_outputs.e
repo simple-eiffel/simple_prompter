@@ -122,6 +122,59 @@ feature -- Tests: capture plan and preflight
 			assert_true ("16 kHz tee", p.has_pair (p.arguments, "-ar", "16000"))
 		end
 
+	test_webcam_is_recorded_as_mjpeg
+			-- FHD Camera's listing (ffmpeg -list_options, 2026-10-07) offers MJPEG at 1080p.
+		local
+			d: PT_DEVICE_CHOICE
+			p: PT_CAPTURE_PLAN
+		do
+			d := (create {PT_DEVICE_PROBE}).choice (Webcam_listing, {STRING_32} "FHD Camera", {STRING_32} "Mic")
+			assert_true ("mjpeg chosen", d.uses_mjpeg)
+			create p.make_recording ({STRING_32} "ffmpeg", d, {STRING_32} "raw.mkv", {STRING_32} "tee.f32")
+			assert_true ("mjpeg asked", p.has_pair (p.arguments, "-vcodec", "mjpeg"))
+			assert_true ("size asked", p.has_pair (p.arguments, "-video_size", "1920x1080"))
+			assert_true ("one input", p.has_pair (p.arguments, "-i", "video=FHD Camera:audio=Mic"))
+			assert_false ("no second input", p.has_pair (p.arguments, "-map", "1:a"))
+		end
+
+	test_obs_virtual_camera_uses_its_own_mode
+			-- OBS Virtual Camera's listing (OBS 32, 2026-10-07): raw 1080p60 only, no MJPEG.
+		local
+			d: PT_DEVICE_CHOICE
+			p: PT_CAPTURE_PLAN
+		do
+			d := (create {PT_DEVICE_PROBE}).choice (Obs_listing, {STRING_32} "OBS Virtual Camera", {STRING_32} "Mic")
+			assert_false ("no mjpeg", d.uses_mjpeg)
+			create p.make_recording ({STRING_32} "ffmpeg", d, {STRING_32} "raw.mkv", {STRING_32} "tee.f32")
+			assert_false ("no mjpeg asked", p.has_pair (p.arguments, "-vcodec", "mjpeg"))
+			assert_false ("no size forced", p.has_pair (p.arguments, "-video_size", "1920x1080"))
+			assert_true ("still nvenc", p.has_pair (p.arguments, "-c:v", "h264_nvenc"))
+			assert_true ("video input alone", p.has_pair (p.arguments, "-i", "video=OBS Virtual Camera"))
+			assert_true ("microphone input alone", p.has_pair (p.arguments, "-i", "audio=Mic"))
+			assert_true ("audio from the second input", p.has_pair (p.arguments, "-map", "1:a"))
+		end
+
+	test_empty_listing_uses_device_mode
+			-- ffmpeg missing or the camera gone: nothing to match, so nothing is forced.
+		do
+			assert_false ("device mode", (create {PT_DEVICE_PROBE}).choice ("", {STRING_32} "X", {STRING_32} "Mic").uses_mjpeg)
+		end
+
+	Webcam_listing: STRING_32 = "[
+[dshow @ 0000] DirectShow video device options (from video devices)
+[dshow @ 0000]  Pin "Capture" (alternative pin name "0")
+[dshow @ 0000]   vcodec=mjpeg  min s=1920x1080 fps=5 max s=1920x1080 fps=60.0002
+[dshow @ 0000]   pixel_format=yuyv422  min s=1920x1080 fps=5 max s=1920x1080 fps=5
+]"
+
+	Obs_listing: STRING_32 = "[
+[dshow @ 0000] DirectShow video device options (from video devices)
+[dshow @ 0000]  Pin "Video" (alternative pin name "0")
+[dshow @ 0000]   pixel_format=nv12  min s=1920x1080 fps=60.0002 max s=1920x1080 fps=60.0002
+[dshow @ 0000]   pixel_format=yuv420p  min s=1920x1080 fps=60.0002 max s=1920x1080 fps=60.0002
+[dshow @ 0000]   pixel_format=yuyv422  min s=1920x1080 fps=60.0002 max s=1920x1080 fps=60.0002
+]"
+
 	test_preflight_disk_check
 		local
 			f: PT_PREFLIGHT
