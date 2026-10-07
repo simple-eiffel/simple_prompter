@@ -1,4 +1,4 @@
-simple_prompter 0.2.1
+simple_prompter 0.3.0
 =====================
 
 A teleprompter that sits under your webcam and follows your voice: read
@@ -31,6 +31,9 @@ Keys (work in any program)
   Ctrl+Alt+M          follow mode: your voice / constant speed (while stopped)
   Ctrl+Alt+H          hide / show the pill
   Ctrl+Alt+I          click-through on / off (clicks go to what is under it)
+  Ctrl+Alt+R          record a take (count-in, then camera + microphone)
+  Ctrl+Alt+End        wrap the take (while recording) / stop (practice)
+  Ctrl+Alt+S / X / N  star (keep) / reject / marker, while recording
 
 Mouse on the pill
   click: hold. While held: click a word to start there, the wheel steps back
@@ -50,14 +53,33 @@ Following your voice
   The whisper model (ggml-large-v3-turbo-q5_0.bin) is looked for in the
   "models" folder of the install, then in D:\prod\simple_speech\models.
 
+Recording a take (new in 0.3.0)
+  Ctrl+Alt+R starts a session in Videos\simple_prompter\<date time> - <script>:
+  the camera and microphone are recorded (raw.mkv) while the pill follows you.
+  Stumble? Just back up a sentence or two and read it again - the program
+  works out which reading to keep. Ctrl+Alt+End wraps the take; it is then
+  analyzed on the GPU (a few seconds) and the "Last take" panel on the right
+  of the control window lists the cuts and the places worth checking. Click
+  one to preview it. Render makes out\final.mp4 with captions (final.srt,
+  final.vtt) and chapters.txt; Play final and Open folder do what they say.
+  review.srt in the session folder marks every cut for a check in VLC.
+
+Recording through OBS
+  OBS can be the camera: in OBS click Start Virtual Camera, and set
+    camera = "OBS Virtual Camera"
+  in settings.toml (program closed). What OBS shows - layout, crops, filters -
+  is what gets recorded; OBS itself does not need to record. Only one program
+  can use the webcam at a time: if OBS has it, simple_prompter must use the
+  OBS Virtual Camera. The microphone still goes straight to simple_prompter.
+
 Screen sharing and recording
   The pill is left out of screen captures: meeting apps, recorders and
   screenshots show what is behind it, not the pill.
 
 Settings
   %APPDATA%\simple_prompter\settings.toml - font size, column width, lines,
-  opacity, speed, count-in, pill position, last script, follow mode, and
-  microphone. Edit with the program closed. Uninstalling keeps this file.
+  opacity, speed, count-in, pill position, last script, follow mode,
+  camera and microphone. Edit with the program closed. Uninstalling keeps this file.
 
 If it closes unexpectedly
   This build checks its own contracts and stops on a broken one, leaving

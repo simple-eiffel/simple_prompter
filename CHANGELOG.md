@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-10-07
+
+### Added
+- Take Studio (plan Step 4): Ctrl+Alt+R records a session (camera + microphone
+  into raw.mkv, NVENC) while the pill follows; Wrap, Star, Reject and Marker
+  keys; the take is analyzed on the GPU after Wrap (whisper passage decode,
+  Silero speech map, retake solver) into cuts and things to check.
+- The "Last take" panel (Edit Floor): cuts and flags with ffplay previews;
+  Render writes out\final.mp4 with captions (SRT, VTT) and chapters in one pass.
+- Recording through OBS Virtual Camera (or any camera without MJPEG): the
+  camera's modes are probed; a virtual camera is opened as its own input so its
+  clock does not hold the video back.
+
+### Changed
+- Startup on a long script went from ~26 s to under 0.1 s (simple_mml 1.0.2
+  hash-bucketed range/no_duplicates; hashable word ids; cached models).
+- Control window is two columns; long lines wrap instead of running over.
+- A camera or microphone held by another program now says so.
+
+
 ## [0.1.0] - 2026-10-06
 
 ### Added
