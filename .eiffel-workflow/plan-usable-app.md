@@ -149,8 +149,9 @@ An Inno Setup installer for the app with the whisper DLLs and models (done early
 | 4 | V1 (debate 01 queue): full-file decode time | PASS: 8 ms per second of audio (budget 250); simple_speech `decode_passage` (own token cap) |
 | 4a | Recording: spike S-R1 (live camera + mic, killed MKV survives; ~0.7 s lost without small clusters; camera gave ~15.6 fps in low light); sessions on disk (facade start/end_session, folder, journal.jsonl, script copy); worker records (one ffmpeg, new stream per capture, 1 s tail, waits for exit, keeps tee); app Ctrl+Alt+R / Wrap / Star / Reject / Marker, REC badge; recording clock from Record | done: end-to-end take through the app (raw.mkv 1080p + audio, tee, journal on the recording's clock); live worker test 3/3; headless 205/205. Fixed on the way: ffmpeg path aliasing, stale tee, kill/exit race, 30 s start (simple_mml 1.0.2: pairwise range/no_duplicates under contracts) |
 | 4a | Still open | recorder health line (measured fps, so a low-light 15 fps shows before a take); live script edit on the pill (PT_INLINE_EDITOR); device picker from `ffmpeg -list_devices` |
-| 4b | Analysis job in PT_SPEECH_WORKER (debate 01) | next |
-| 4c-4d | Edit Floor, render; use gate | pending |
+| 4b | Analysis job in PT_SPEECH_WORKER (debate 01) + OFF SCRIPT badge (I-1) | done: real take analyzed in 1.6% of its length (3 cuts, 4 flags, 214 words); app end to end writes analysis.json + review.srt. simple_speech score_all (whole-recording VAD, 144 s in 394 ms). Verdict queue: V1 PASS, V6 done (ffmpeg exit awaited); V3/V4 to measure; V5 soak before ship; V7 with the Edit Floor |
+| 4c | Minimal Edit Floor: cuts and flags, preview, star a different take, render final.mp4 + captions + chapters | next |
+| 4d | Use gate: cough test in VLC with review.srt; a real episode | pending |
 
 Notes from 1c:
 - The pill is DPI-scaled (settings stay in design pixels; 150% display = 1.5x).
