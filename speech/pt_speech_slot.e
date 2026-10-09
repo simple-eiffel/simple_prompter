@@ -113,6 +113,30 @@ feature -- Access
 			create Result.make_empty
 		end
 
+	camera_verdict: INTEGER
+			-- The last camera check's verdict (a PT_CAMERA_CHECK constant; Unchecked until the first).
+
+	camera_dark: BOOLEAN
+			-- Was the last camera check live but dim?
+
+	camera_text: STRING_32
+			-- The last camera check, for the Camera line.
+		attribute
+			create Result.make_empty
+		end
+
+	video_frames: INTEGER
+			-- Video frames the running recording has written.
+
+	video_stalled: BOOLEAN
+			-- Has the running recording's video stopped (or not started in time)?
+
+	video_text: STRING_32
+			-- The running recording's video, for the Video line (empty when not recording).
+		attribute
+			create Result.make_empty
+		end
+
 feature -- Worker side
 
 	put_state (a_state: INTEGER; a_text: separate READABLE_STRING_32)
@@ -155,9 +179,38 @@ feature -- Worker side
 			stream := a_stream
 			records.wipe_out
 			samples_heard := 0
+			video_frames := 0
+			video_stalled := False
+			create video_text.make_empty
 		ensure
 			set: stream = a_stream
 			fresh: records.is_empty and samples_heard = 0
+			no_video_yet: video_frames = 0 and not video_stalled and video_text.is_empty
+		end
+
+	put_camera (a_verdict: INTEGER; a_dark: BOOLEAN; a_text: separate READABLE_STRING_32)
+			-- A camera check finished.
+		require
+			known: a_verdict >= {PT_CAMERA_CHECK}.Unchecked and a_verdict <= {PT_CAMERA_CHECK}.No_picture
+			dark_only_when_live: a_dark implies a_verdict = {PT_CAMERA_CHECK}.Live
+		do
+			camera_verdict := a_verdict
+			camera_dark := a_dark
+			create camera_text.make_from_separate (a_text)
+		ensure
+			set: camera_verdict = a_verdict and camera_dark = a_dark
+		end
+
+	put_video (a_frames: INTEGER; a_stalled: BOOLEAN; a_text: separate READABLE_STRING_32)
+			-- How the running recording's video is doing.
+		require
+			frames_non_negative: a_frames >= 0
+		do
+			video_frames := a_frames
+			video_stalled := a_stalled
+			create video_text.make_from_separate (a_text)
+		ensure
+			set: video_frames = a_frames and video_stalled = a_stalled
 		end
 
 	put_analysis_finished (a_succeeded: BOOLEAN; a_summary: separate READABLE_STRING_32)
@@ -273,6 +326,8 @@ feature -- Window side
 
 invariant
 	known_state: state >= Loading and state <= Analyzing
+	known_camera_verdict: camera_verdict >= {PT_CAMERA_CHECK}.Unchecked and camera_verdict <= {PT_CAMERA_CHECK}.No_picture
+	video_frames_non_negative: video_frames >= 0
 	finish_only_while_recording: finish_requested implies record_requested
 	clock_non_negative: samples_heard >= 0
 

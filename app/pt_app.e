@@ -53,6 +53,8 @@ feature {NONE} -- Initialization
 			create codec.make
 			create incoming.make (4096)
 			create speech_status.make_from_string ({STRING_32} "loading the speech models")
+			create camera_status.make_from_string ({STRING_32} "checked once the speech models are loaded")
+			create video_status.make_empty
 			create mode_note.make_empty
 			create take_note.make_empty
 			create speech_slot.make
@@ -84,7 +86,7 @@ feature {NONE} -- Initialization
 
 feature -- Constants
 
-	Version: STRING_32 = "0.3.0"
+	Version: STRING_32 = "0.3.1"
 			-- Shown in the control window; keep in step with installer/simple_prompter.iss.
 
 	Tick_ms: INTEGER = 16
@@ -311,6 +313,11 @@ feature {NONE} -- Pill content
 			end
 			if prompter.controller.is_recording then
 				Result := {STRING_32} "REC " + clock_text (prompter.recording_clock.rt) + (if Result.is_empty then {STRING_32} "" else {STRING_32} "  " + Result end)
+				if video_stalled then
+					Result.append ({STRING_32} "  NO VIDEO")
+				elseif camera_verdict = {PT_CAMERA_CHECK}.Still or camera_verdict = {PT_CAMERA_CHECK}.Black then
+					Result.append ({STRING_32} "  NO PICTURE")
+				end
 			end
 			if off_road then
 				Result := (if Result.is_empty then {STRING_32} "" else Result + {STRING_32} "  " end) + {STRING_32} "OFF SCRIPT"
@@ -338,11 +345,24 @@ feature {NONE} -- Control window
 			l_status: STRING_32
 		do
 			l_status := state_name + settings.speed_wpm.out + pill.is_shown.out + pill.is_click_through.out + pill.capture_note
-				+ prompter.mode.out + speech_status + mode_note + take_note
+				+ prompter.mode.out + speech_status + camera_status + video_status + mode_note + take_note
 				+ edit_floor.renderer.status + edit_floor.status_note + edit_floor.has_take.out
 			if not l_status.same_string (last_status) then
 				last_status := l_status
 				window.request_render
+			end
+		end
+
+	camera_color: NATURAL_32
+			-- The Camera line's color: green when live, amber when live but dark or not yet
+			-- checked, red when the camera is not giving a usable picture.
+		do
+			if camera_verdict = {PT_CAMERA_CHECK}.Live then
+				Result := (if camera_dark then theme.warning else theme.success end)
+			elseif camera_verdict = {PT_CAMERA_CHECK}.Unchecked then
+				Result := theme.ink_muted
+			else
+				Result := theme.danger
 			end
 		end
 
@@ -379,6 +399,12 @@ feature {NONE} -- Control window
 				p.set_color (theme.danger)
 			end
 			l_y := wrapped (p, a_x + 18 * k, l_y, {STRING_32} "Speech: " + speech_status, 22 * k)
+			p.set_color (camera_color)
+			l_y := wrapped (p, a_x + 18 * k, l_y, {STRING_32} "Camera: " + camera_status, 22 * k)
+			if prompter.controller.is_recording and not video_status.is_empty then
+				p.set_color (if video_stalled then theme.danger else theme.success end)
+				l_y := wrapped (p, a_x + 18 * k, l_y, {STRING_32} "Video: " + video_status, 22 * k)
+			end
 			p.set_color (theme.ink_muted)
 			if not mode_note.is_empty then
 				p.set_color (theme.danger)
@@ -490,6 +516,21 @@ feature {NONE} -- Speech
 	speech_status: STRING_32
 			-- What the worker says it is doing.
 
+	camera_verdict: INTEGER
+			-- The worker's last camera check (a PT_CAMERA_CHECK verdict).
+
+	camera_dark: BOOLEAN
+			-- Was it live but dim?
+
+	camera_status: STRING_32
+			-- The last camera check, for the Camera line.
+
+	video_stalled: BOOLEAN
+			-- Has the running recording's video stopped?
+
+	video_status: STRING_32
+			-- The running recording's video, for the Video line.
+
 	speech_samples: INTEGER_64
 			-- Microphone samples the worker has consumed: the recording clock.
 
@@ -521,6 +562,9 @@ feature {NONE} -- Speech
 				speech_state := {PT_SPEECH_SLOT}.Failed
 				speech_status := {STRING_32} "the speech models were not found (" + Model_name + {STRING_32} ", " + Vad_name + {STRING_32} ")"
 			else
+				if settings.camera_name.is_empty then
+					camera_status := {STRING_32} "none set (settings.toml: camera = %"OBS Virtual Camera%" or your webcam)"
+				end
 				create l_worker.make (ffmpeg_path, settings.camera_name, settings.microphone_name, tee_path, l_model, l_vad)
 				launch (l_worker, speech_slot)
 				speech_started := True
@@ -881,6 +925,13 @@ feature {NONE} -- Speech: separate calls (each locks the slot for one short call
 			end
 			speech_state := a_slot.state
 			create speech_status.make_from_separate (a_slot.status_text)
+			camera_verdict := a_slot.camera_verdict
+			camera_dark := a_slot.camera_dark
+			if not a_slot.camera_text.is_empty then
+				create camera_status.make_from_separate (a_slot.camera_text)
+			end
+			video_stalled := a_slot.video_stalled
+			create video_status.make_from_separate (a_slot.video_text)
 			speech_samples := a_slot.samples_heard
 			speech_stopped := a_slot.has_stopped
 		end

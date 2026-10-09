@@ -8,7 +8,10 @@ note
 		(plan Step 4a), the same one ffmpeg is restarted on camera + microphone with
 		PT_CAPTURE_PLAN.make_recording (raw MKV + the session's tee), following goes
 		on from that tee, and on finish it records `Tail_ms' more, stops, keeps the
-		session tee for analysis, and goes back to listening. Every capture is a new
+		session tee for analysis, and goes back to listening. Beside the capture it checks
+		the camera with a short ffmpeg probe of its own (PT_CAMERA_CHECK, polled each turn
+		so following never waits) and, while recording, reads ffmpeg's -progress output
+		(PT_CAPTURE_PROGRESS) into the slot's Camera and Video reports. Every capture is a new
 		stream: a fresh pipeline, so its sample clock is the recording's own. ffmpeg's merged stdout/stderr pipe is
 		drained every turn (a full pipe would stall ffmpeg and the tee file with it).
 
@@ -40,6 +43,8 @@ feature {NONE} -- Initialization
 			create buffer.make_filled (0.0, Chunk_samples)
 			create tail.make (tee_path)
 			create process.make
+			create camera_probe.make
+			create progress.make
 			create recording_devices.make (camera, microphone, 1920, 1080, 30)
 		ensure
 			idle: not is_running and not is_listening
@@ -114,6 +119,7 @@ feature -- Execution
 					else
 						l_decoder.warm_up
 						probe_devices
+						webcam_probe_wanted := True
 						load_seconds := ((now_ms - l_start) / 1000).rounded
 						report (al_slot, {PT_SPEECH_SLOT}.Ready, {STRING_32} "speech ready (" + load_seconds.out + " s to load)")
 						vad := l_vad
@@ -136,9 +142,13 @@ feature -- Execution
 							elseif not is_listening and then listen_wanted (al_slot) then
 								start_listening (al_slot)
 							end
+							follow_camera (al_slot)
 							l_got := 0
 							if is_listening and then attached pipeline as al_pipeline then
 								l_got := pump (al_slot, al_pipeline)
+							end
+							if is_recording then
+								report_video (al_slot)
 							end
 							if l_got < Chunk_samples then
 								(create {EXECUTION_ENVIRONMENT}).sleep (Idle_sleep_ms.to_integer_64 * 1_000_000)
@@ -147,6 +157,7 @@ feature -- Execution
 					end
 				end
 				stop_listening
+				end_probe
 				if attached l_decoder as al_d then
 					al_d.recognizer.close
 				end
@@ -232,6 +243,14 @@ feature {NONE} -- Listening
 			l_raw, l_tee: STRING_32
 		do
 			stop_listening
+				-- The probe lets go first: a webcam has one owner, and even OBS Virtual Camera, which
+				-- two programs can read at once, failed to open ("Could not find output pin") when the
+				-- probe and the recording opened it in the same instant (live test, 2026-10-08).
+			end_probe
+			if not recording_devices.uses_mjpeg then
+					-- Check the virtual camera again `Probe_after_start_ms' into the take.
+				last_probe_ms := now_ms - Probe_every_ms + Probe_after_start_ms
+			end
 			l_raw := requested_raw (a_slot)
 			l_tee := requested_tee (a_slot)
 			start_capture (a_slot, create {PT_CAPTURE_PLAN}.make_recording (ffmpeg, recording_devices, l_raw, l_tee),
@@ -276,10 +295,12 @@ feature {NONE} -- Listening
 		do
 			end_ffmpeg
 			tail.close
+			progress.stop
 			l_seconds := tail.samples_read / 16_000
 			is_listening := False
 			is_recording := False
 			finish_at := 0.0
+			webcam_probe_wanted := True
 			report_finished (a_slot, l_seconds)
 			if listen_wanted (a_slot) then
 				start_listening (a_slot)
@@ -315,11 +336,7 @@ feature {NONE} -- Listening
 				-- Never follow a tee left by an earlier run: tailing would start on stale audio
 				-- before ffmpeg's -y truncates the file (found by the Step 4a live test).
 			l_ok := (create {SIMPLE_FILE}.make (a_tee)).delete
-			l_line := quoted (ffmpeg)
-			across a_plan.arguments as ic loop
-				l_line.append_character (' ')
-				l_line.append (quoted (ic))
-			end
+			l_line := command_line (a_plan.arguments)
 			create process.make
 			process.start (l_line)
 			if attached process.last_error as al_e then
@@ -330,6 +347,12 @@ feature {NONE} -- Listening
 				create tail.make (current_tee)
 				listen_started_ms := now_ms
 				is_listening := True
+				if a_state = {PT_SPEECH_SLOT}.Recording then
+					progress.restart (listen_started_ms)
+					video_reported_ms := 0.0
+				else
+					progress.stop
+				end
 				if attached vad as al_vad and attached decoder as al_decoder then
 					create pipeline.make (al_vad, al_decoder)
 				end
@@ -351,6 +374,9 @@ feature {NONE} -- Listening
 			if process.is_running then
 				l_text := process.read_available_output
 				process.accumulated_output.wipe_out
+				if is_recording and progress.has_started and attached l_text as al_text then
+					progress.feed (al_text, now_ms)
+				end
 			else
 				l_text := process.read_available_output
 				failed := True
@@ -396,6 +422,7 @@ feature {NONE} -- Listening
 			if is_listening then
 				end_ffmpeg
 				tail.close
+				progress.stop
 				if not is_recording then
 					l_ok := (create {SIMPLE_FILE}.make (current_tee)).delete
 				end
@@ -406,7 +433,144 @@ feature {NONE} -- Listening
 			stopped: not is_listening and not is_recording
 		end
 
+feature {NONE} -- Camera health (2026-10-08)
+
+	camera_probe: SIMPLE_ASYNC_PROCESS
+			-- The running camera check (PT_CAMERA_CHECK), its own ffmpeg beside the capture's.
+
+	is_probing: BOOLEAN
+			-- Is a camera check running?
+
+	probe_started_ms, last_probe_ms: REAL_64
+			-- When the running check started; when the last one ended (0: check at once).
+
+	webcam_probe_wanted: BOOLEAN
+			-- Should a webcam be checked when no recording holds it (at start, after each take)?
+
+	progress: PT_CAPTURE_PROGRESS
+			-- The running recording's video, from ffmpeg's -progress output.
+
+	video_reported_frames: INTEGER
+	video_reported_stalled: BOOLEAN
+	video_reported_ms: REAL_64
+			-- What `report_video' last told the slot, and when.
+
+	Probe_timeout_ms: REAL_64 = 8000.0
+			-- Longest a camera check may run (it reads 30 frames; 0.6 s on OBS, measured 2026-10-08).
+
+	Probe_every_ms: REAL_64 = 10000.0
+			-- How often a virtual camera is checked again.
+
+	Probe_after_start_ms: REAL_64 = 3000.0
+			-- When a virtual camera is first checked again after a recording opened it.
+
+	Video_report_ms: REAL_64 = 500.0
+			-- Shortest gap between video reports while nothing changes but the frame count.
+
+	probe_due: BOOLEAN
+			-- Should the camera be checked now? A virtual camera (OBS) every `Probe_every_ms', even
+			-- while recording: two programs can read it at once (measured 2026-10-08), and when OBS
+			-- closes mid-take it sends its placeholder card, so frames keep coming. A webcam only
+			-- when no recording holds it and once per take, so its light does not keep blinking.
+		do
+			if not camera.is_empty and not is_probing then
+				if recording_devices.uses_mjpeg then
+					Result := webcam_probe_wanted and not is_recording
+				else
+					Result := last_probe_ms = 0.0 or else now_ms - last_probe_ms >= Probe_every_ms
+				end
+			end
+		end
+
+	follow_camera (a_slot: separate PT_SPEECH_SLOT)
+			-- One turn: start a check when one is due; when the running one ends (or times out),
+			-- judge it and tell the slot.
+		local
+			l_text: detachable STRING_32
+			l_check: PT_CAMERA_CHECK
+		do
+			if is_probing then
+				l_text := camera_probe.read_available_output
+				if not camera_probe.is_running or else now_ms - probe_started_ms > Probe_timeout_ms then
+					end_probe
+					create l_check.make (recording_devices)
+					l_check.read (camera_probe.accumulated_output)
+					report_camera (a_slot, l_check.verdict, l_check.is_dark, l_check.summary)
+				end
+			elseif probe_due then
+				webcam_probe_wanted := False
+				last_probe_ms := now_ms
+				create camera_probe.make
+				camera_probe.start (command_line ((create {PT_CAMERA_CHECK}.make (recording_devices)).arguments))
+				if attached camera_probe.last_error as al_e then
+					report_camera (a_slot, {PT_CAMERA_CHECK}.No_picture, False, camera + {STRING_32} ": could not start ffmpeg to check it (" + al_e + {STRING_32} ")")
+				else
+					is_probing := True
+					probe_started_ms := now_ms
+				end
+			end
+		ensure
+			probe_clock_kept: is_probing implies probe_started_ms > 0.0
+		end
+
+	end_probe
+			-- Stop the running check, if any, and keep what it printed.
+		local
+			l_ok: BOOLEAN
+			l_exit: INTEGER
+			l_text: detachable STRING_32
+		do
+			if is_probing then
+				if camera_probe.is_running then
+					l_ok := camera_probe.kill
+					l_exit := camera_probe.wait (Exit_wait_ms)
+				end
+				l_text := camera_probe.read_available_output
+				is_probing := False
+				last_probe_ms := now_ms
+			end
+		ensure
+			not_probing: not is_probing
+		end
+
+	report_video (a_slot: separate PT_SPEECH_SLOT)
+			-- Tell the slot how the recording's video is doing: at once when it stalls or recovers,
+			-- else at most every `Video_report_ms' while frames grow.
+		require
+			recording: is_recording
+		local
+			l_now: REAL_64
+			l_stalled: BOOLEAN
+		do
+			if progress.has_started then
+				l_now := now_ms
+				l_stalled := progress.is_stalled (l_now)
+				if l_stalled /= video_reported_stalled or else (progress.frames /= video_reported_frames
+					and l_now - video_reported_ms >= Video_report_ms) or else video_reported_ms = 0.0 then
+					video_reported_stalled := l_stalled
+					video_reported_frames := progress.frames
+					video_reported_ms := l_now
+					put_video (a_slot, progress.frames, l_stalled, progress.summary (l_now))
+				end
+			end
+		end
+
 feature {NONE} -- Slot calls: each locks the slot for one short call
+
+	report_camera (a_slot: separate PT_SPEECH_SLOT; a_verdict: INTEGER; a_dark: BOOLEAN; a_text: STRING_32)
+		require
+			known: a_verdict >= {PT_CAMERA_CHECK}.Unchecked and a_verdict <= {PT_CAMERA_CHECK}.No_picture
+			dark_only_when_live: a_dark implies a_verdict = {PT_CAMERA_CHECK}.Live
+		do
+			a_slot.put_camera (a_verdict, a_dark, a_text)
+		end
+
+	put_video (a_slot: separate PT_SPEECH_SLOT; a_frames: INTEGER; a_stalled: BOOLEAN; a_text: STRING_32)
+		require
+			frames_non_negative: a_frames >= 0
+		do
+			a_slot.put_video (a_frames, a_stalled, a_text)
+		end
 
 	report (a_slot: separate PT_SPEECH_SLOT; a_state: INTEGER; a_text: STRING_32)
 		do
@@ -513,6 +677,16 @@ feature {NONE} -- Implementation
 				Result := {STRING_32} "the recording stopped (ffmpeg ended)"
 			else
 				Result := {STRING_32} "the microphone stopped (ffmpeg ended)"
+			end
+		end
+
+	command_line (a_arguments: LIST [STRING_32]): STRING_32
+			-- ffmpeg with `a_arguments', each quoted as needed.
+		do
+			Result := quoted (ffmpeg)
+			across a_arguments as ic loop
+				Result.append_character (' ')
+				Result.append (quoted (ic))
 			end
 		end
 

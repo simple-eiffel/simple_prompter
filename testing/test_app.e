@@ -31,6 +31,7 @@ feature {NONE} -- Initialization
 			run_take_tests
 			run_assembly_tests
 			run_outputs_tests
+			run_capture_health_tests
 			run_config_tests
 			run_acceptance_tests
 			run_real_voice_tests
@@ -190,6 +191,25 @@ feature {NONE} -- Test sets
 			run_test (agent t.test_obs_virtual_camera_uses_its_own_mode, "obs_virtual_camera_uses_its_own_mode")
 			run_test (agent t.test_empty_listing_uses_device_mode, "empty_listing_uses_device_mode")
 			run_test (agent t.test_preflight_disk_check, "preflight_disk_check")
+		end
+
+	run_capture_health_tests
+		local
+			t: TEST_CAPTURE_HEALTH
+		do
+			section ("camera check and recording progress")
+			create t
+			run_test (agent t.test_obs_placeholder_is_still, "obs_placeholder_is_still")
+			run_test (agent t.test_live_webcam_in_a_dark_room, "live_webcam_in_a_dark_room")
+			run_test (agent t.test_busy_camera_is_not_called_missing, "busy_camera_is_not_called_missing")
+			run_test (agent t.test_missing_camera, "missing_camera")
+			run_test (agent t.test_no_frames_is_no_picture, "no_frames_is_no_picture")
+			run_test (agent t.test_black_picture, "black_picture")
+			run_test (agent t.test_probe_opens_the_camera_as_the_recording_will, "probe_opens_the_camera_as_the_recording_will")
+			run_test (agent t.test_progress_counts_frames_across_chunks, "progress_counts_frames_across_chunks")
+			run_test (agent t.test_progress_stalls_when_frames_stop, "progress_stalls_when_frames_stop")
+			run_test (agent t.test_progress_waits_for_the_first_frame, "progress_waits_for_the_first_frame")
+			run_test (agent t.test_progress_reports_drops, "progress_reports_drops")
 		end
 
 	run_config_tests

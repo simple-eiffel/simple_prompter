@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.1] - 2026-10-09
+
+### Added
+- Camera line in the control window (PT_CAMERA_CHECK): the camera is opened as
+  the recording will open it and 30 frames are measured. Live (green), live but
+  dark (amber), or what is wrong (red): picture not moving (OBS closed or its
+  Virtual Camera stopped: it still sends OBS's placeholder card), black, in use
+  by another program, not found, no picture. A virtual camera is re-checked
+  every 10 s, even during a take; a webcam once at start and after each take.
+- Video line while recording (PT_CAPTURE_PROGRESS reads ffmpeg's -progress
+  output): frames, fps, drops and duplicates. If no frame arrives for 1.5 s
+  (or none in the first 5 s) it turns red and the pill badge shows NO VIDEO;
+  NO PICTURE when the camera check finds a still or black picture mid-take.
+
 ## [0.3.0] - 2026-10-07
 
 ### Added

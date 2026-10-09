@@ -517,6 +517,14 @@ feature -- Worker
 				l_waited := l_waited + 100
 			end
 			assert_true ({STRING_32} "listening first: " + slot_status (l_slot), slot_state (l_slot) = {PT_SPEECH_SLOT}.Listening)
+				-- Indicator 1 (2026-10-08): the camera is checked once the models are loaded.
+			l_waited := 0
+			from until slot_camera_verdict (l_slot) /= {PT_CAMERA_CHECK}.Unchecked or l_waited > 10_000 loop
+				sleep_ms (100)
+				l_waited := l_waited + 100
+			end
+			print ("    [camera] verdict " + slot_camera_verdict (l_slot).out + " after " + l_waited.out + " ms: " + slot_camera_text (l_slot).to_string_8 + "%N")
+			assert_true ("camera checked", slot_camera_verdict (l_slot) /= {PT_CAMERA_CHECK}.Unchecked)
 			l_listen_stream := slot_stream (l_slot)
 			request_record (l_slot, l_raw, l_tee)
 			l_waited := 0
@@ -528,6 +536,10 @@ feature -- Worker
 			print ("    [record] " + slot_status (l_slot).to_string_8 + "; stream " + l_listen_stream.out + " -> " + l_record_stream.out + "; " + slot_samples (l_slot).out + " samples after " + l_waited.out + " ms%N")
 			assert_true ({STRING_32} "recording: " + slot_status (l_slot), slot_state (l_slot) = {PT_SPEECH_SLOT}.Recording)
 			assert_true ("a new stream for the recording", l_record_stream > l_listen_stream)
+				-- Indicator 2 (2026-10-08): two seconds into the recording, video frames are flowing.
+			print ("    [video] " + slot_video_frames (l_slot).out + " frames: " + slot_video_text (l_slot).to_string_8 + "%N")
+			assert_true ("video frames flowing", slot_video_frames (l_slot) > 0)
+			assert_false ({STRING_32} "video not stalled: " + slot_video_text (l_slot), slot_video_stalled (l_slot))
 			request_finish (l_slot)
 			l_finish_ms := now_ms
 			l_waited := 0
@@ -624,6 +636,31 @@ feature {NONE} -- Separate calls
 	slot_stream (a_slot: separate PT_SPEECH_SLOT): INTEGER
 		do
 			Result := a_slot.stream
+		end
+
+	slot_camera_verdict (a_slot: separate PT_SPEECH_SLOT): INTEGER
+		do
+			Result := a_slot.camera_verdict
+		end
+
+	slot_camera_text (a_slot: separate PT_SPEECH_SLOT): STRING_32
+		do
+			create Result.make_from_separate (a_slot.camera_text)
+		end
+
+	slot_video_frames (a_slot: separate PT_SPEECH_SLOT): INTEGER
+		do
+			Result := a_slot.video_frames
+		end
+
+	slot_video_stalled (a_slot: separate PT_SPEECH_SLOT): BOOLEAN
+		do
+			Result := a_slot.video_stalled
+		end
+
+	slot_video_text (a_slot: separate PT_SPEECH_SLOT): STRING_32
+		do
+			create Result.make_from_separate (a_slot.video_text)
 		end
 
 	request_listen (a_slot: separate PT_SPEECH_SLOT)
