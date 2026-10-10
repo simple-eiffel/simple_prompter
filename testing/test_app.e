@@ -44,6 +44,7 @@ feature {NONE} -- Initialization
 			run_heard_stabilizer_tests
 			run_live_alignment_tests
 			run_sessions_tests
+			run_publish_tests
 			say ("%N========================%N")
 			say ("Results: " + passed.out + " passed, " + failed.out + " failed%N")
 			if failed > 0 then
@@ -450,6 +451,25 @@ feature {NONE} -- Test sets
 			run_test (agent t.test_recording_clock_restarts, "recording_clock_restarts")
 			run_test (agent t.test_raw_recording_has_small_clusters, "raw_recording_has_small_clusters")
 			run_test (agent t.test_loader_reads_a_session_back, "loader_reads_a_session_back")
+		end
+
+	run_publish_tests
+		local
+			t: TEST_PUBLISH
+		do
+			section ("Publish (0.5.0)")
+			create t
+			run_test (agent t.test_script_text_keeps_prose_only, "script_text_keeps_prose_only")
+			run_test (agent t.test_spoken_captions_follow_what_was_said, "spoken_captions_follow_what_was_said")
+			run_test (agent t.test_spoken_captions_split_long_sentences, "spoken_captions_split_long_sentences")
+			run_test (agent t.test_number_words, "number_words")
+			run_test (agent t.test_chapters_are_spaced_and_start_at_zero, "chapters_are_spaced_and_start_at_zero")
+			run_test (agent t.test_finish_plan_with_and_without_thumbnail, "finish_plan_with_and_without_thumbnail")
+			run_test (agent t.test_suggestions_from_json, "suggestions_from_json")
+			run_test (agent t.test_copy_without_the_ai, "copy_without_the_ai")
+			run_test (agent t.test_snapper_keeps_an_unmatched_opening_line, "snapper_keeps_an_unmatched_opening_line")
+			run_test (agent t.test_snapper_leaves_far_speech_out, "snapper_leaves_far_speech_out")
+			run_test (agent t.test_publish_settings_round_trip, "publish_settings_round_trip")
 		end
 
 feature {NONE} -- Implementation

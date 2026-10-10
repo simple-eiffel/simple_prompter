@@ -45,6 +45,7 @@
 		<library name="simple_process" location="$SIMPLE_EIFFEL/simple_process/simple_process.ecf"/>
 		<library name="simple_speech_gpu" location="$SIMPLE_EIFFEL/simple_speech/gpu/simple_speech_gpu.ecf"/>
 		<library name="simple_datetime" location="$SIMPLE_EIFFEL/simple_datetime/simple_datetime.ecf"/>
+		<library name="simple_http" location="$SIMPLE_EIFFEL/simple_http/simple_http.ecf"/>
 		<cluster name="speech" location=".\speech\" recursive="true"/>
 		<cluster name="app" location=".\app\" recursive="true"/>
 		<cluster name="runtime" location=".\runtime\" recursive="true"/>
@@ -83,6 +84,7 @@
 		<library name="simple_process" location="$SIMPLE_EIFFEL/simple_process/simple_process.ecf"/>
 		<library name="simple_speech_gpu" location="$SIMPLE_EIFFEL/simple_speech/gpu/simple_speech_gpu.ecf"/>
 		<library name="simple_shell" location="$SIMPLE_EIFFEL/simple_shell/simple_shell.ecf"/>
+		<library name="simple_http" location="$SIMPLE_EIFFEL/simple_http/simple_http.ecf"/>
 		<cluster name="speech" location=".\speech\" recursive="true"/>
 		<cluster name="runtime" location=".\runtime\" recursive="true"/>
 		<cluster name="live_tests" location=".\testing_live\" recursive="true"/>

@@ -77,6 +77,12 @@ feature -- Basic operations
 				if l_t0 < 0 then
 					l_t0 := (l_start - head_pad).max (0)
 				end
+				if l_i = 1 then
+						-- The video's opening: speech just before the first matched word that the
+						-- aligner did not match is the opening line (0.5.0: Reel 4 lost "Worthless
+						-- servant!" this way), not noise.
+					l_t0 := opening_start (a_map, l_t0, l_start)
+				end
 					-- End edge: middle of the nearest silence after the last word, at most Max_tail later
 					-- (VAD speech often runs past whisper's last word end; Phase 5, review of T16).
 				l_t1 := -1.0
@@ -141,6 +147,42 @@ feature -- Constants
 	Max_lead: REAL_64 = 0.6
 	Max_tail: REAL_64 = 0.8
 			-- Longest silence kept before the first word / after the last word.
+	Max_reach: REAL_64 = 3.0
+			-- How far before the first matched word the video's opening may reach.
+	Max_gap: REAL_64 = 1.0
+			-- Speech followed by a longer silence than this is not part of the opening.
+
+feature -- Opening
+
+	opening_start (a_map: PT_SPEECH_MAP; a_t0, a_first: REAL_64): REAL_64
+			-- The first cut's start edge: `a_t0', or earlier when speech runs on, with gaps shorter
+			-- than `Max_gap', from more than `Max_lead' and at most `Max_reach' before the first
+			-- matched word at `a_first' (then `head_pad' before that speech).
+		local
+			l_from: REAL_64
+			j: INTEGER
+			l_moved: BOOLEAN
+		do
+			Result := a_t0
+			l_from := a_first
+			from l_moved := True until not l_moved loop
+				l_moved := False
+				from j := 1 until j > a_map.span_count loop
+					if a_map.span (j).t0 < l_from - Probe and then a_map.span (j).t1 >= l_from - Max_gap
+						and then a_map.span (j).t0 >= a_first - Max_reach then
+						l_from := a_map.span (j).t0
+						l_moved := True
+					end
+					j := j + 1
+				end
+			end
+			if l_from < a_first - Max_lead then
+				Result := (l_from - head_pad).max (0).min (a_t0)
+			end
+		ensure
+			never_later: Result <= a_t0
+			within_reach: Result >= (a_first - Max_reach - head_pad).max (0).min (a_t0)
+		end
 
 feature -- Silence search
 

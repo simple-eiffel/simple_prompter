@@ -15,7 +15,7 @@ Part of the [Simple Eiffel](https://github.com/simple-eiffel) ecosystem.
 
 ## Status
 
-**0.4.0, in use on Windows 11** (per-user installer: `installer/simple_prompter.iss`)
+**0.5.0, in use on Windows 11** (per-user installer: `installer/simple_prompter.iss`)
 - The pill is the whole program: a text pill under the webcam, hidden from screen captures,
   with Status lights, Script, Settings and Last take callouts beside it, a slide handle under
   it, tooltips on everything (and a switch to turn them off), and an icon in the notification
@@ -24,7 +24,7 @@ Part of the [Simple Eiffel](https://github.com/simple-eiffel) ecosystem.
 - Recording from a camera and microphone (OBS Virtual Camera works) with ffmpeg on one
   clock; the take studio analyzes the take, renders final.mp4, and keeps a per-take
   picture-to-sound sync that Measure can set from a clap.
-- 237 tests pass in the contract-checked build. The follower is verified against real
+- 248 tests pass in the contract-checked build. The follower is verified against real
   recordings: it stays within a line of the reader, holds still during an ad-lib, catches up
   after a skipped paragraph, and never scrolls backward.
 
@@ -91,6 +91,10 @@ end
   from any edge.
 - **Tray icon:** click it to show or hide the pill; right-click it for a menu.
 - **Keys:** Ctrl+Alt+H hides or shows the pill, Ctrl+Alt+O opens a script, Ctrl+Alt+R records.
+- **Publish (Last take panel):** after Render, finishes the take for posting: final.mp4
+  opening on the thumbnail in `out\` and fading to black at YouTube's loudness,
+  `captions.en_US.SRT` (what was said), chapters, and `youtube.txt`, `facebook.txt`,
+  `x.txt`. The local AI (Ollama) writes titles and chapter names when it is running.
 
 ## Building
 
@@ -102,7 +106,7 @@ run_prompter.cmd [script.md] [--capturable] [--window]
 ```
 
 Dependencies (simple_* first): simple_shell, simple_widgets, simple_cairo, simple_process,
-simple_speech_gpu, simple_mml, simple_json, simple_file, simple_encoding, simple_toml,
+simple_speech_gpu, simple_http, simple_mml, simple_json, simple_file, simple_encoding, simple_toml,
 simple_datetime, simple_testing; EiffelBase.
 
 The full development record (research, specification, approved intent, contracts, review,

@@ -72,6 +72,7 @@ feature {NONE} -- Initialization
 			status_canvas.set_on_paint (agent paint_status)
 			status_canvas.set_on_press (agent on_status_press)
 			status_canvas.set_on_files (agent on_files)
+			edit_floor.set_on_publish (agent publish_take)
 			router.set_on_open (agent choose_script)
 			router.set_on_mode (agent switch_mode)
 			router.set_on_record (agent start_take)
@@ -97,7 +98,7 @@ feature {NONE} -- Initialization
 
 feature -- Constants
 
-	Version: STRING_32 = "0.4.0"
+	Version: STRING_32 = "0.5.0"
 			-- Shown in the control window; keep in step with installer/simple_prompter.iss.
 
 	Tick_ms: INTEGER = 16
@@ -1561,6 +1562,13 @@ feature {NONE} -- Take Studio (plan Step 4a)
 	finish_asked: BOOLEAN
 	recording_finished: BOOLEAN
 	recorded_seconds: REAL_64
+	publish_pending: BOOLEAN
+			-- Has a publish been asked for and not yet finished?
+	publish_finished: BOOLEAN
+	publish_summary: STRING_32
+		attribute
+			create Result.make_empty
+		end
 	analysis_pending: BOOLEAN
 	analysis_finished: BOOLEAN
 	analysis_summary: STRING_32
@@ -1633,6 +1641,28 @@ feature {NONE} -- Take Studio (plan Step 4a)
 				complete_take (analysis_summary)
 				last_signature := -1
 				window.request_render
+			end
+			if publish_pending then
+				if publish_finished then
+					publish_finished := False
+					publish_pending := False
+					edit_floor.set_publish_status (publish_summary, False)
+				elseif speech_state = {PT_SPEECH_SLOT}.Publishing then
+					edit_floor.set_publish_status (speech_status, True)
+				end
+			end
+		end
+
+	publish_take
+			-- Publish clicked in the Last take panel: the speech worker publishes the take shown
+			-- (0.5.0, PT_PUBLISH_JOB), with the publish settings.
+		do
+			if not publish_pending and then attached edit_floor.take_root as al_root then
+				ask_publish (speech_slot, al_root, settings.publish_link, settings.publish_hashtags,
+					settings.ollama_url, settings.ollama_model, settings.uses_ollama)
+				publish_pending := True
+				edit_floor.set_publish_status ((if speech_state = {PT_SPEECH_SLOT}.Ready or speech_state = {PT_SPEECH_SLOT}.Listening
+					then {STRING_32} "publishing: starting" else {STRING_32} "publishing: waiting for the speech models" end), True)
 			end
 		end
 
@@ -1775,6 +1805,11 @@ feature {NONE} -- Speech: separate calls (each locks the slot for one short call
 				create analysis_summary.make_from_separate (a_slot.analysis_summary)
 				a_slot.acknowledge_analysis
 			end
+			if a_slot.publish_finished then
+				publish_finished := True
+				create publish_summary.make_from_separate (a_slot.publish_summary)
+				a_slot.acknowledge_publish
+			end
 			if not a_slot.records.is_empty then
 				incoming.append (create {STRING_8}.make_from_separate (a_slot.records))
 				a_slot.clear_records
@@ -1827,6 +1862,13 @@ feature {NONE} -- Speech: separate calls (each locks the slot for one short call
 			duration_positive: a_duration > 0
 		do
 			a_slot.request_analysis (a_root, a_duration)
+		end
+
+	ask_publish (a_slot: separate PT_SPEECH_SLOT; a_root, a_link, a_hashtags, a_ai_url, a_ai_model: STRING_32; a_uses_ai: BOOLEAN)
+		require
+			idle: not a_slot.publish_requested
+		do
+			a_slot.request_publish (a_root, a_link, a_hashtags, a_ai_url, a_ai_model, a_uses_ai)
 		end
 
 	ask_finish (a_slot: separate PT_SPEECH_SLOT)

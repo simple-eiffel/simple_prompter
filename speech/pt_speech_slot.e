@@ -42,6 +42,8 @@ feature -- Constants
 	Failed: INTEGER = 4
 	Recording: INTEGER = 5
 	Analyzing: INTEGER = 6
+	Publishing: INTEGER = 7
+			-- Publishing a rendered take (0.5.0, PT_PUBLISH_JOB).
 
 	Max_record_bytes: INTEGER = 1_000_000
 			-- Records beyond this (the window stalled) replace what is waiting.
@@ -121,6 +123,49 @@ feature -- Access
 			create Result.make_empty
 		end
 
+	publish_requested: BOOLEAN
+			-- Should the worker publish the take in `publish_root' (0.5.0)?
+
+	publish_finished: BOOLEAN
+			-- Has the worker finished the last publish (successfully or not)?
+
+	publish_succeeded: BOOLEAN
+
+	publish_uses_ai: BOOLEAN
+			-- May the publish ask the local AI (Ollama) for its words?
+
+	publish_root: STRING_32
+			-- Session folder of the requested publish.
+		attribute
+			create Result.make_empty
+		end
+
+	publish_link: STRING_32
+		attribute
+			create Result.make_empty
+		end
+
+	publish_hashtags: STRING_32
+		attribute
+			create Result.make_empty
+		end
+
+	publish_ai_url: STRING_32
+		attribute
+			create Result.make_empty
+		end
+
+	publish_ai_model: STRING_32
+		attribute
+			create Result.make_empty
+		end
+
+	publish_summary: STRING_32
+			-- The worker's one-line outcome.
+		attribute
+			create Result.make_empty
+		end
+
 	camera_verdict: INTEGER
 			-- The last camera check's verdict (a PT_CAMERA_CHECK constant; Unchecked until the first).
 
@@ -149,7 +194,7 @@ feature -- Worker side
 
 	put_state (a_state: INTEGER; a_text: separate READABLE_STRING_32)
 		require
-			known: a_state >= Loading and a_state <= Analyzing
+			known: a_state >= Loading and a_state <= Publishing
 		do
 			state := a_state
 			create status_text.make_from_separate (a_text)
@@ -230,6 +275,17 @@ feature -- Worker side
 			create analysis_summary.make_from_separate (a_summary)
 		ensure
 			finished: analysis_finished and not analysis_requested
+		end
+
+	put_publish_finished (a_succeeded: BOOLEAN; a_summary: separate READABLE_STRING_32)
+			-- The publish is over.
+		do
+			publish_requested := False
+			publish_finished := True
+			publish_succeeded := a_succeeded
+			create publish_summary.make_from_separate (a_summary)
+		ensure
+			finished: publish_finished and not publish_requested
 		end
 
 	put_recording_finished (a_seconds: REAL_64)
@@ -345,6 +401,31 @@ feature -- Window side
 			requested: analysis_requested and not analysis_finished
 		end
 
+	request_publish (a_root, a_link, a_hashtags, a_ai_url, a_ai_model: separate READABLE_STRING_32; a_uses_ai: BOOLEAN)
+			-- Publish the take in session folder `a_root' (0.5.0).
+		require
+			not_publishing: not publish_requested
+		do
+			create publish_root.make_from_separate (a_root)
+			create publish_link.make_from_separate (a_link)
+			create publish_hashtags.make_from_separate (a_hashtags)
+			create publish_ai_url.make_from_separate (a_ai_url)
+			create publish_ai_model.make_from_separate (a_ai_model)
+			publish_uses_ai := a_uses_ai
+			publish_finished := False
+			publish_requested := True
+		ensure
+			requested: publish_requested and not publish_finished
+		end
+
+	acknowledge_publish
+			-- The window has seen `publish_finished'.
+		do
+			publish_finished := False
+		ensure
+			seen: not publish_finished
+		end
+
 	acknowledge_analysis
 			-- The window has seen `analysis_finished'.
 		do
@@ -354,7 +435,7 @@ feature -- Window side
 		end
 
 invariant
-	known_state: state >= Loading and state <= Analyzing
+	known_state: state >= Loading and state <= Publishing
 	known_camera_verdict: camera_verdict >= {PT_CAMERA_CHECK}.Unchecked and camera_verdict <= {PT_CAMERA_CHECK}.No_picture
 	video_frames_non_negative: video_frames >= 0
 	finish_only_while_recording: finish_requested implies record_requested

@@ -313,6 +313,45 @@ feature -- Load time
 
 feature -- Analysis (Step 4b)
 
+	test_publish_job_on_a_copy
+			-- 0.5.0: Publish on a copy of Reel 3 (its render, script, scoreboard thumbnail and the
+			-- analyzer's captions): real Silero and whisper, real ffmpeg, the local AI when running.
+		local
+			l_root, l_out: STRING_32
+			l_job: PT_PUBLISH_JOB
+			l_t0: REAL_64
+			l_ok: BOOLEAN
+			l_youtube: STRING_32
+		do
+			l_root := tee_path + {STRING_32} ".publish"
+			l_out := l_root + {STRING_32} "\out"
+			l_ok := (create {SIMPLE_FILE}.make (l_root)).delete_directory_recursive
+			l_ok := (create {SIMPLE_FILE}.make (l_out)).create_directory_recursive
+			l_ok := (create {SIMPLE_FILE}.make (l_root + {STRING_32} "\script")).create_directory_recursive
+			l_ok := (create {SIMPLE_FILE}.make (Reel_3 + {STRING_32} "\script\r1.md")).copy_to (l_root + {STRING_32} "\script\r1.md")
+			l_ok := (create {SIMPLE_FILE}.make (Reel_3 + {STRING_32} "\out\final (before cleanup).mp4")).copy_to (l_out + {STRING_32} "\final.mp4")
+			l_ok := (create {SIMPLE_FILE}.make (Reel_3 + {STRING_32} "\out\thumbnail_A - Scoreboard.jpg")).copy_to (l_out + {STRING_32} "\thumbnail_A - Scoreboard.jpg")
+			l_ok := (create {SIMPLE_FILE}.make (Reel_3 + {STRING_32} "\out\final (analyzer original).srt")).copy_to (l_out + {STRING_32} "\final.srt")
+			create l_job.make (create {PT_WHISPER_TRANSCRIBER}.make (vad.detector, decoder.recognizer), Ffmpeg_path)
+			l_job.set_on_stage (agent (a_text: STRING_32) do print ("    [stage] " + a_text.to_string_8 + "%N") end)
+			l_t0 := now_ms
+			l_job.run (l_root, {STRING_32} "larryrix.substack.com", {STRING_32} "#Jesus #Faith #BibleStudy", {STRING_32} "http://localhost:11435", {STRING_32} "", True)
+			print ("    [publish] " + (create {UTF_CONVERTER}).string_32_to_utf_8_string_8 (l_job.summary) + " in " + ((now_ms - l_t0) / 1000).truncated_to_integer.out + " s%N")
+			print ("    [folder] " + l_root.to_string_8 + "%N")
+			assert_true ({STRING_32} "succeeded: " + l_job.summary, l_job.succeeded)
+			assert_true ("the render kept", (create {SIMPLE_FILE}.make (l_out + {STRING_32} "\final (before cleanup).mp4")).exists)
+			assert_true ("finished video", (create {SIMPLE_FILE}.make (l_out + {STRING_32} "\final.mp4")).exists)
+			assert_true ("captions for Facebook", (create {SIMPLE_FILE}.make (l_out + {STRING_32} "\captions.en_US.SRT")).exists)
+			assert_true ("analyzer captions kept", (create {SIMPLE_FILE}.make (l_out + {STRING_32} "\final (analyzer original).srt")).exists)
+			assert_true ("facebook.txt", (create {SIMPLE_FILE}.make (l_out + {STRING_32} "\facebook.txt")).exists)
+			assert_true ("x.txt", (create {SIMPLE_FILE}.make (l_out + {STRING_32} "\x.txt")).exists)
+			l_youtube := (create {SIMPLE_FILE}.make (l_out + {STRING_32} "\youtube.txt")).read_text_utf_8
+			assert_true ("youtube chapters", l_youtube.has_substring ({STRING_32} "CHAPTERS"))
+			assert_true ("the samples cleaned up", not (create {SIMPLE_FILE}.make (l_out + {STRING_32} "\publish.f32")).exists)
+		end
+
+	Reel_3: STRING_32 = "C:\Users\LJR19\Videos\simple_prompter\2026-10-10 141925 - Reel 3 - Woman 1, Disciples 0"
+
 	test_analysis_job_on_a_real_take
 			-- The read-test recording as a session (script, tee, journal) analyzed by the job the worker
 			-- runs after Wrap: real Silero and whisper, analysis.json and review.srt written, within the
