@@ -27,6 +27,7 @@ feature {NONE} -- Initialization
 			create panel.make
 			create renderer.make (a_theme, a_measure.font_size)
 			create bar.make (scale)
+			create rails.make (scale)
 		ensure
 			settings_set: settings = a_settings
 			closed: not panel.is_open
@@ -68,16 +69,25 @@ feature -- Access
 	bar: PT_TRANSPORT_BAR
 			-- The video-player buttons and progress line under the script text.
 
-	width: INTEGER
-			-- Column plus padding.
+	rails: PT_PILL_RAILS
+			-- The Status lights left of the text; Quit, Script, Settings and Last take right of it.
+
+	text_left: REAL_64
+			-- Where the text area starts (after the left rail).
 		do
-			Result := (column_width + 2 * padding).ceiling
+			Result := rails.rail_width
+		end
+
+	width: INTEGER
+			-- Column plus padding, plus the two rails.
+		do
+			Result := (column_width + 2 * padding + 2 * rails.rail_width).ceiling
 		end
 
 	height: INTEGER
-			-- Visible lines plus padding, plus the transport bar under them.
+			-- Visible lines plus padding (at least what the rails need), plus the transport bar under them.
 		do
-			Result := (settings.lines_visible * measure.line_height + 2 * padding + bar.height).ceiling
+			Result := ((settings.lines_visible * measure.line_height + 2 * padding).max (rails.min_text_height) + bar.height).ceiling
 		end
 
 	reading_line: REAL_64
@@ -156,8 +166,9 @@ feature -- Lifecycle
 				panel.set_opacity (settings.opacity.max (40))
 				panel.set_draggable (True)
 				panel.set_resizable ((Design_grip * scale).rounded.max (1).min (64),
-					(settings.Min_width * scale + 2 * padding).ceiling,
-					(measure.line_height + 2 * padding + bar.height).ceiling)
+					(settings.Min_width * scale + 2 * padding + 2 * rails.rail_width).ceiling,
+					((measure.line_height + 2 * padding).max (rails.min_text_height) + bar.height).ceiling)
+				panel.set_sides_size_on_press (True)
 				panel.show (l_x, l_y, width, height)
 			end
 		end
@@ -211,7 +222,7 @@ feature -- Commands
 		do
 			l_lines := ((a_height - 2 * padding - bar.height) / measure.line_height).rounded
 				.max (settings.Min_lines).min (settings.Max_lines)
-			l_column := ((a_width - 2 * padding) / scale).rounded
+			l_column := ((a_width - 2 * padding - 2 * rails.rail_width) / scale).rounded
 				.max (settings.Min_width).min (settings.Max_width)
 			if l_lines /= settings.lines_visible then
 				settings.set_lines_visible (l_lines)
@@ -256,7 +267,11 @@ feature -- Commands
 			if is_pointer_over /= bar.is_pointer_in then
 				bar.set_pointer_in (not bar.is_pointer_in)
 			end
+			if not is_pointer_over and rails.hover.is_pointer_in then
+				rails.hover.set_pointer_in (False)
+			end
 			bar.update_tooltip (a_now_ms)
+			rails.hover.update (a_now_ms)
 		ensure
 			left_forgets_hover: not bar.is_pointer_in implies bar.hovered = 0
 		end
@@ -268,6 +283,16 @@ feature -- Commands
 				bar.set_pointer_in (True)
 				bar.set_hovered (bar.hit (a_x, a_y), a_now_ms)
 			end
+			if rails.is_laid_out then
+				rails.track (a_x, a_y, a_now_ms)
+			end
+		end
+
+	set_tooltips_enabled (a_on: BOOLEAN)
+			-- Show tooltips on the pill, or never.
+		do
+			bar.set_tooltips_enabled (a_on)
+			rails.hover.set_enabled (a_on)
 		end
 
 	paint (a_prompter: SIMPLE_PROMPTER; a_geometry: PT_PILL_GEOMETRY; a_caret: INTEGER; a_badge: READABLE_STRING_32)
@@ -283,7 +308,10 @@ feature -- Commands
 					if panel.width > 2 * bar.Design_inset * scale and panel.height > bar.height then
 						bar.lay_out (0.0, panel.height - bar.height, panel.width)
 					end
-					renderer.render (l_dc, panel.width, panel.height, a_prompter, a_geometry, a_caret, a_badge, bar)
+					if panel.width > 2 * rails.rail_width then
+						rails.lay_out (panel.width, panel.height - bar.height)
+					end
+					renderer.render (l_dc, panel.width, panel.height, a_prompter, a_geometry, a_caret, a_badge, bar, rails)
 					panel.release_dc (l_dc)
 				end
 			end

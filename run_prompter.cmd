@@ -1,7 +1,7 @@
 @echo off
 rem Start simple_prompter. Copies cairo.dll and the CUDA whisper DLLs beside the exe
 rem when a rebuild removed them. Needs the CUDA 13 runtime on PATH for voice following.
-rem Usage: run_prompter.cmd [script.md] [--capturable]
+rem Usage: run_prompter.cmd [script.md] [--capturable] [--window]
 set "F=%~dp0EIFGENs\simple_prompter_app\F_code"
 set "W=%SIMPLE_EIFFEL%\whisper_cpp_build\build_cuda\bin"
 if not exist "%F%\simple_prompter.exe" (

@@ -28,6 +28,7 @@ feature {NONE} -- Initialization
 			scale := a_scale
 			create lefts.make_filled (0.0, 1, Button_count)
 			create enabled_flags.make_filled (False, 1, Button_count)
+			create hover.make
 		ensure
 			scale_set: scale = a_scale
 			not_laid_out: not is_laid_out
@@ -129,24 +130,47 @@ feature -- Access
 
 feature -- Display state
 
+	hover: PT_HOVER
+			-- What the pointer rests on (shared tooltip model, 0.4.0).
+
 	is_pointer_in: BOOLEAN
 			-- Is the pointer over the pill (no "mouse left" event arrives, so the app polls)?
+		do
+			Result := hover.is_pointer_in
+		end
 
 	hovered: INTEGER
 			-- Button under the pointer, `Progress_hit' on the progress line, or 0.
+		do
+			Result := hover.hovered
+		end
 
 	hover_started_ms: REAL_64
 			-- When the pointer arrived on `hovered'.
+		do
+			Result := hover.hover_started_ms
+		end
 
 	is_tooltip_shown: BOOLEAN
 			-- Is the tooltip for `hovered' showing?
+		do
+			Result := hover.is_tooltip_shown
+		end
 
 	tooltip: STRING_32
 			-- What `hovered' does, and its key.
 		require
 			hovering: hovered /= 0
 		do
-			inspect hovered
+			Result := tooltip_text (hovered)
+		end
+
+	tooltip_text (a_target: INTEGER): STRING_32
+			-- What `a_target' does, and its key.
+		require
+			target: a_target /= 0
+		do
+			inspect a_target
 			when Back_button then
 				Result := {STRING_32} "Back a sentence  (Ctrl+Alt+Left)"
 			when Again_button then
@@ -345,11 +369,7 @@ feature -- Display state setting
 	set_pointer_in (a_on: BOOLEAN)
 			-- The pointer is over the pill, or has left it (then nothing is hovered).
 		do
-			is_pointer_in := a_on
-			if not a_on then
-				hovered := 0
-				is_tooltip_shown := False
-			end
+			hover.set_pointer_in (a_on)
 		ensure
 			set: is_pointer_in = a_on
 			left_forgets_hover: not a_on implies (hovered = 0 and not is_tooltip_shown)
@@ -361,11 +381,7 @@ feature -- Display state setting
 		require
 			valid: a_target = 0 or a_target = Progress_hit or valid_button (a_target)
 		do
-			if a_target /= hovered then
-				hovered := a_target
-				hover_started_ms := a_now_ms
-				is_tooltip_shown := False
-			end
+			hover.set_hovered (a_target, (if a_target = 0 then {STRING_32} "" else tooltip_text (a_target) end), a_now_ms)
 		ensure
 			set: hovered = a_target
 			new_target_waits: a_target /= old hovered implies (not is_tooltip_shown and hover_started_ms = a_now_ms)
@@ -374,9 +390,17 @@ feature -- Display state setting
 	update_tooltip (a_now_ms: REAL_64)
 			-- Show the tooltip once the pointer has rested on its target long enough.
 		do
-			is_tooltip_shown := hovered /= 0 and is_pointer_in and a_now_ms - hover_started_ms >= Tooltip_delay_ms
+			hover.update (a_now_ms)
 		ensure
 			needs_a_target: is_tooltip_shown implies hovered /= 0
+		end
+
+	set_tooltips_enabled (a_on: BOOLEAN)
+			-- Show tooltips, or never (Settings: Show tooltips).
+		do
+			hover.set_enabled (a_on)
+		ensure
+			set: hover.is_enabled = a_on
 		end
 
 	set_enabled (a_button: INTEGER; a_on: BOOLEAN)

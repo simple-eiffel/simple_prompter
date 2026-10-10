@@ -15,14 +15,18 @@ Part of the [Simple Eiffel](https://github.com/simple-eiffel) ecosystem.
 
 ## Status
 
-🚧 **Library complete, application in progress**
-- The library (this repository) is built and verified: 88 classes, 183 tests passing in both
-  the contract-checked and the lean release build, every exported feature exercised by a test.
-- Verified against a real recording: the follower stays within a line of the reader, holds
-  still during an ad-lib, catches up after a skipped paragraph, and never scrolls backward.
-- Not yet built: the prompter window, live microphone capture, and the GPU speech pieces
-  (whisper and Silero VAD through simple_speech). The library talks to them only through
-  deferred classes, so its tests run without any of them.
+**0.4.0, in use on Windows 11** (per-user installer: `installer/simple_prompter.iss`)
+- The pill is the whole program: a text pill under the webcam, hidden from screen captures,
+  with Status lights, Script, Settings and Last take callouts beside it, a slide handle under
+  it, tooltips on everything (and a switch to turn them off), and an icon in the notification
+  area. Drop a script on the pill to open it.
+- Voice following on the local GPU (Silero VAD and whisper through simple_speech_gpu).
+- Recording from a camera and microphone (OBS Virtual Camera works) with ffmpeg on one
+  clock; the take studio analyzes the take, renders final.mp4, and keeps a per-take
+  picture-to-sound sync that Measure can set from a clap.
+- 237 tests pass in the contract-checked build. The follower is verified against real
+  recordings: it stays within a line of the reader, holds still during an ad-lib, catches up
+  after a skipped paragraph, and never scrolls backward.
 
 ## What it does
 
@@ -76,15 +80,30 @@ end
 - **The journal is the truth**: one JSONL line per event, flushed immediately, so a crash loses
   at most a torn last line, which replay skips.
 
+## Using the pill
+
+- **Left rail:** the Status button and its three lights (microphone, camera, voice
+  following). Click it for details.
+- **Right rail:** Quit, Script (open one, or a recent one), Settings (camera, microphone,
+  sync start, tooltips), Last take (render, sync, previews, things to check).
+- **Under the pill:** the slide handle. Drag it to slide the pill left and right.
+- **Edges:** drag the left or right edge to resize. Shift+drag moves the pill or sizes it
+  from any edge.
+- **Tray icon:** click it to show or hide the pill; right-click it for a menu.
+- **Keys:** Ctrl+Alt+H hides or shows the pill, Ctrl+Alt+O opens a script, Ctrl+Alt+R records.
+
 ## Building
 
 ```bash
 ec.sh test -config simple_prompter.ecf -target simple_prompter_tests
 ./EIFGENs/simple_prompter_tests/F_code/simple_prompter.exe
+ec.sh test -config simple_prompter.ecf -target simple_prompter_app
+run_prompter.cmd [script.md] [--capturable] [--window]
 ```
 
-Dependencies (simple_* first): simple_mml, simple_json, simple_file, simple_encoding,
-simple_toml, simple_testing; EiffelBase.
+Dependencies (simple_* first): simple_shell, simple_widgets, simple_cairo, simple_process,
+simple_speech_gpu, simple_mml, simple_json, simple_file, simple_encoding, simple_toml,
+simple_datetime, simple_testing; EiffelBase.
 
 The full development record (research, specification, approved intent, contracts, review,
 tasks, and the evidence of every phase) is in `.eiffel-workflow/`.

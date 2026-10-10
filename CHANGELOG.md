@@ -7,6 +7,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-10-10
+
+### Changed
+- The pill is the whole program. The control window is gone from the screen (it still
+  runs the event pump, hidden; `--window` shows it for development). Everything it held
+  is now beside the pill, and an icon in the notification area stands for the program.
+
+### Added
+- Rails on the pill. Left: one Status button with three lights (microphone, camera,
+  voice following: off, OK, needs a look, problem). Right: Quit, Script, Settings,
+  Last take. A button whose callout is open is lit.
+- Callouts, each its own panel beside the pill and hidden from screen captures like it:
+  Status (left), Script and Settings (right), Last take (below). Each has a close button
+  and sizes itself to its content; they follow the pill when it moves.
+- Tooltips on everything (the rails, the transport bar, every callout control, the
+  handle, the side grips), shown after the pointer rests for 450 ms, with a Show
+  tooltips switch in Settings to turn them off.
+- Recent scripts: the last five, one click to open again, in the Script callout.
+- The slide handle: a tab under the pill. Drag it to slide the pill left and right
+  only; open callouts come along live.
+- Side grips: drag the pill's left or right edge to make it wider or narrower, no
+  Shift needed. Shift+drag still moves the pill or sizes it from any edge.
+- Drop a script (.md or .txt) on the pill or on the Script callout to open it.
+- Tray icon: click it to show or hide the pill (as Ctrl+Alt+H does); right-click for
+  Hide/Show the pill, Open a script..., and Quit.
+- Needs simple_shell 1.14.0 (panel handles, side grips, drops on panels, tray clicks
+  and menu, a window that starts hidden).
+
 ## [0.3.6] - 2026-10-10
 
 ### Changed

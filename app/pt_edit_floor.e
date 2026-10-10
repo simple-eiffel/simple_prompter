@@ -71,6 +71,42 @@ feature -- Access
 			set: on_sync_changed = a_action
 		end
 
+	bottom: REAL_64
+			-- Where the last `paint' ended (its height, from its top).
+
+	clickables: ARRAYED_LIST [TUPLE [x, y, w, h: REAL_64; action, index: INTEGER]]
+			-- What the last `paint' made clickable (for tooltips; `press' acts on them).
+		do
+			Result := rows
+		end
+
+	row_tip (a_action, a_index: INTEGER): STRING_32
+			-- What clicking a row or button does.
+		do
+			inspect a_action
+			when Action_render then
+				Result := {STRING_32} "Render final.mp4 with captions and chapters, using this take's sync"
+			when Action_play_final then
+				Result := {STRING_32} "Play final.mp4"
+			when Action_open_folder then
+				Result := {STRING_32} "Open this take's folder"
+			when Action_preview_cut then
+				Result := {STRING_32} "Preview cut " + a_index.out + {STRING_32} " (with the sync)"
+			when Action_preview_flag then
+				Result := {STRING_32} "Preview around this, two seconds either side"
+			when Action_sync_down then
+				Result := {STRING_32} "Picture 10 ms later against the sound"
+			when Action_sync_up then
+				Result := {STRING_32} "Picture 10 ms earlier against the sound"
+			when Action_sync_preview then
+				Result := {STRING_32} "Watch a few seconds with this sync (at your clap, once measured)"
+			when Action_measure then
+				Result := {STRING_32} "Find the sync from claps: clap 2 or 3 times, hands in the picture"
+			else
+				Result := {STRING_32} ""
+			end
+		end
+
 	has_take: BOOLEAN
 		do
 			Result := attached take as al_take and then al_take.is_loaded and then attached al_take.analysis
@@ -216,6 +252,7 @@ feature -- Display
 					l_y := wrapped (p, a_x, l_y, a_w, status_note, 20 * k)
 				end
 			end
+			bottom := l_y + 12 * k
 		end
 
 	press (a_x, a_y: REAL_64)

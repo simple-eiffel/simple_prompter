@@ -326,7 +326,7 @@ feature -- Tests: Settings page (0.3.5)
 			assert_true ("locked", pg.is_locked)
 			pg.lay_out (0, 0, 400, 1.0)
 			assert_integers_equal ("no camera rows without a camera", 0, pg.cameras.count)
-			assert_integers_equal ("mic, delay buttons, done", 4, pg.zones.count)
+			assert_integers_equal ("mic, delay buttons, tooltips, done", 5, pg.zones.count)
 		end
 
 	Device_listing: STRING_32 = "[
@@ -338,6 +338,110 @@ feature -- Tests: Settings page (0.3.5)
 [dshow @ 000001]   Alternative name "@device_cm_33D9A762_wave"
 [dshow @ 000001] "Microphone (FHD Camera Microphone)" (audio)
 ]"
+
+feature -- Tests: pill-only UI (0.4.0)
+
+	test_hover_waits_and_can_be_turned_off
+		local
+			h: PT_HOVER
+		do
+			create h.make
+			h.set_pointer_in (True)
+			h.set_hovered (3, {STRING_32} "Settings", 1000)
+			h.update (1200)
+			assert_false ("not yet", h.is_tooltip_shown)
+			h.update (1000 + h.Tooltip_delay_ms)
+			assert_true ("after the delay", h.is_tooltip_shown)
+			assert_true ("its text", h.tooltip.same_string ({STRING_32} "Settings"))
+			h.set_hovered (4, {STRING_32} "Last take", 1500)
+			assert_false ("a new target waits again", h.is_tooltip_shown)
+			h.set_enabled (False)
+			h.update (9000)
+			assert_false ("tooltips off", h.is_tooltip_shown)
+			h.set_enabled (True)
+			h.update (9000)
+			assert_true ("back on", h.is_tooltip_shown)
+			h.set_pointer_in (False)
+			assert_integers_equal ("left: nothing hovered", 0, h.hovered)
+			assert_false ("left: no tooltip", h.is_tooltip_shown)
+		end
+
+	test_pill_rails_hit_every_button_with_a_tooltip
+		local
+			r: PT_PILL_RAILS
+			l_codes: ARRAY [INTEGER]
+		do
+			create r.make (1.5)
+			r.lay_out (900, r.min_text_height)
+			assert_integers_equal ("five buttons, two side grips", 7, r.zones.count)
+			l_codes := <<r.Status_hit, r.Quit_hit, r.Script_hit, r.Settings_hit, r.Take_hit, r.Left_grip_hit, r.Right_grip_hit>>
+			across l_codes as ic loop
+				if attached r.zone (ic) as al_z then
+					assert_integers_equal ("hit " + ic.out, ic, r.hit (al_z.x + al_z.w / 2, al_z.y + al_z.h / 2))
+					assert_false ("tooltip " + ic.out, r.tooltip_text (ic).is_empty)
+					assert_true ("on a rail " + ic.out, r.is_in_rail (al_z.x + al_z.w / 2, 900))
+				else
+					assert_true ("placed " + ic.out, False)
+				end
+			end
+			assert_integers_equal ("text between the rails", 0, r.hit (450, 40))
+			assert_false ("text is not a rail", r.is_in_rail (450, 900))
+			r.set_lights (r.Light_good, r.Light_problem, r.Light_check)
+			assert_true ("status names the problem", r.tooltip_text (r.Status_hit).has_substring ({STRING_32} "camera has a problem"))
+			r.set_open (False, False, True, False)
+			assert_true ("settings lit", r.is_settings_open)
+		end
+
+	test_rails_change_the_pill_signature_when_lit
+		local
+			r: PT_PILL_RAILS
+			l_before: INTEGER
+		do
+			create r.make (1.0)
+			l_before := r.signature
+			r.set_open (True, False, False, False)
+			assert_false ("status lit shows", r.signature = l_before)
+			l_before := r.signature
+			r.set_lights (r.Light_good, r.Light_good, r.Light_good)
+			assert_false ("lights show", r.signature = l_before)
+		end
+
+	test_recent_scripts_newest_first
+		local
+			s, t: PT_SETTINGS
+			l_path: STRING_32
+			i: INTEGER
+		do
+			l_path := temp_path ({STRING_32} "settings_recent.toml")
+			create s.make_with_file (l_path)
+			s.set_last_script ({STRING_32} "C:\a.md")
+			s.set_last_script ({STRING_32} "C:\b.md")
+			s.set_last_script ({STRING_32} "C:\a.md")
+			assert_integers_equal ("no duplicates", 2, s.recent_scripts.count)
+			assert_true ("newest first", s.recent_scripts.first.same_string ({STRING_32} "C:\a.md"))
+			from i := 1 until i > 7 loop
+				s.set_last_script ({STRING_32} "C:\s" + i.out + {STRING_32} ".md")
+				i := i + 1
+			end
+			assert_integers_equal ("at most five", s.Max_recent, s.recent_scripts.count)
+			s.set_shows_tooltips (False)
+			create t.make_with_file (l_path)
+			assert_integers_equal ("kept", 5, t.recent_scripts.count)
+			assert_true ("order kept", t.recent_scripts.first.same_string ({STRING_32} "C:\s7.md"))
+			assert_false ("tooltips off kept", t.shows_tooltips)
+		end
+
+	temp_path (a_name: READABLE_STRING_32): STRING_32
+		local
+			l_ok: BOOLEAN
+		do
+			if attached (create {EXECUTION_ENVIRONMENT}).item ("TEMP") as al_temp then
+				Result := al_temp + {STRING_32} "\" + a_name
+			else
+				Result := a_name.to_string_32
+			end
+			l_ok := (create {SIMPLE_FILE}.make (Result)).delete
+		end
 
 feature {NONE} -- Fixtures
 

@@ -30,6 +30,8 @@ feature {NONE} -- Initialization
 			create camera_name.make_from_string ({STRING_32} "FHD Camera")
 			create microphone_name.make_from_string ({STRING_32} "Microphone (FHD Camera Microphone)")
 			follow_mode := {PT_FOLLOW_MODE}.Tracking
+			create recent_scripts.make (Max_recent)
+			shows_tooltips := True
 		ensure
 			memory_only: path = Void
 			nothing_saved: save_count = 0
@@ -58,6 +60,9 @@ feature -- Constants
 	Min_width: INTEGER = 200
 	Max_width: INTEGER = 2400
 	Default_width: INTEGER = 560
+	Max_recent: INTEGER = 5
+			-- Scripts remembered for the Script callout.
+
 	Min_wpm: INTEGER = 40
 	Max_wpm: INTEGER = 400
 	Default_wpm: INTEGER = 130
@@ -82,6 +87,12 @@ feature -- Access
 	video_delay_ms: INTEGER
 			-- How far the camera's picture runs behind the microphone (milliseconds); the recording
 			-- moves the picture this much earlier (PT_CAPTURE_PLAN.video_delay_ms). 0 by default.
+	shows_tooltips: BOOLEAN
+			-- Show tooltips on the pill and its callouts? (Settings; on until the reader turns them off.)
+
+	recent_scripts: ARRAYED_LIST [STRING_32]
+			-- The scripts opened last, newest first (at most `Max_recent').
+
 	is_tracking_proven: BOOLEAN
 			-- Set once Tracking passes its acceptance test (approved Q5).
 
@@ -186,6 +197,10 @@ feature {NONE} -- Implementation
 					.with_boolean ("tracking_proven", is_tracking_proven)
 					.with_boolean ("pill_placed", has_pill_position).with_integer ("pill_x", pill_x).with_integer ("pill_y", pill_y)
 					.with_string ("last_script", last_script).with_integer ("follow_mode", follow_mode)
+					.with_boolean ("show_tooltips", shows_tooltips)
+				across 1 |..| recent_scripts.count as ic loop
+					l_table := l_table.with_string ("recent_" + ic.out, recent_scripts [ic])
+				end
 				create l_root.make
 				l_root := l_root.with_table ("prompter", l_table)
 					-- simple_toml.save_file narrows to STRING_8 (lossy); write UTF-8 through simple_file instead.
@@ -207,9 +222,32 @@ feature -- Script
 			-- Remember `a_path' as the script to reopen at the next start.
 		do
 			last_script := a_path.to_string_32
+			from recent_scripts.start until recent_scripts.after loop
+				if recent_scripts.item.same_string (a_path) then
+					recent_scripts.remove
+				else
+					recent_scripts.forth
+				end
+			end
+			recent_scripts.put_front (last_script.twin)
+			from until recent_scripts.count <= Max_recent loop
+				recent_scripts.finish
+				recent_scripts.remove
+			end
 			save
 		ensure
 			set: last_script.same_string (a_path)
+			newest_first: recent_scripts.first.same_string (a_path)
+			few: recent_scripts.count <= Max_recent
+			saved: save_count = old save_count + 1
+		end
+
+	set_shows_tooltips (a_on: BOOLEAN)
+		do
+			shows_tooltips := a_on
+			save
+		ensure
+			set: shows_tooltips = a_on
 			saved: save_count = old save_count + 1
 		end
 
@@ -375,6 +413,15 @@ feature {NONE} -- Loading
 			if t.has ("video_delay_ms") and then in_range (t.integer_item ("video_delay_ms"), {PT_TAKE_SYNC}.Min_ms, {PT_TAKE_SYNC}.Max_ms) then
 				video_delay_ms := t.integer_item ("video_delay_ms").to_integer_32
 			end
+			if t.has ("show_tooltips") then
+				shows_tooltips := t.boolean_item ("show_tooltips")
+			end
+			recent_scripts.wipe_out
+			across 1 |..| Max_recent as ic loop
+				if attached t.string_item ("recent_" + ic.out) as al_s and then not al_s.is_empty then
+					recent_scripts.extend (al_s)
+				end
+			end
 			if t.has ("tracking_proven") then
 				is_tracking_proven := t.boolean_item ("tracking_proven")
 			end
@@ -405,6 +452,7 @@ invariant
 	wpm_range: speed_wpm >= Min_wpm and speed_wpm <= Max_wpm
 	count_in_range: count_in_seconds >= 0 and count_in_seconds <= 5
 	pads_non_negative: head_pad >= 0 and tail_pad >= 0
+	few_recent: recent_scripts.count <= Max_recent
 	video_delay_range: video_delay_ms >= {PT_TAKE_SYNC}.Min_ms and video_delay_ms <= {PT_TAKE_SYNC}.Max_ms
 
 end

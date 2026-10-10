@@ -37,6 +37,7 @@ feature -- Constants: hit targets
 	Done_hit: INTEGER = 1
 	Delay_down_hit: INTEGER = 2
 	Delay_up_hit: INTEGER = 3
+	Tooltips_hit: INTEGER = 4
 	Camera_base: INTEGER = 100
 			-- Camera row `i' is Camera_base + i.
 	Microphone_base: INTEGER = 200
@@ -83,6 +84,12 @@ feature -- Access
 
 	is_locked: BOOLEAN
 			-- Is a take recording (nothing but Done may change)?
+
+	is_tooltips_on: BOOLEAN
+			-- The Show tooltips switch.
+
+	tooltips_y: REAL_64
+			-- Top of the Show tooltips row.
 
 	camera_heading_y, microphone_heading_y, delay_heading_y, hint_y, bottom: REAL_64
 			-- Baselines of the section headings and the delay hint; the page's lowest pixel.
@@ -139,6 +146,13 @@ feature -- Element change
 			delay_set: video_delay_ms = a_delay_ms
 			chosen_listed: across microphones as ic some ic.same_string (a_microphone) end
 			camera_listed: not a_camera.is_empty implies across cameras as ic some ic.same_string (a_camera) end
+		end
+
+	set_tooltips_on (a_on: BOOLEAN)
+		do
+			is_tooltips_on := a_on
+		ensure
+			set: is_tooltips_on = a_on
 		end
 
 	set_locked (a_locked: BOOLEAN)
@@ -219,11 +233,15 @@ feature -- Layout
 				Design_step_button * a_scale, Design_row * a_scale])
 			l_y := l_y + (Design_row + 22) * a_scale
 			hint_y := l_y
-			l_y := l_y + 34 * a_scale
+				-- Room for the hint's three lines in a narrow callout.
+			l_y := l_y + 62 * a_scale
+			tooltips_y := l_y
+			zones.extend ([Tooltips_hit, a_left, l_y, a_width, Design_row * a_scale])
+			l_y := l_y + (Design_row + Design_section_gap) * a_scale
 			zones.extend ([Done_hit, a_left, l_y, Design_done_width * a_scale, Design_done_height * a_scale])
 			bottom := l_y + Design_done_height * a_scale
 		ensure
-			every_row_placed: zones.count = cameras.count + microphones.count + 3
+			every_row_placed: zones.count = cameras.count + microphones.count + 4
 			done_last: zones.last.code = Done_hit
 			below_top: bottom > a_top
 		end

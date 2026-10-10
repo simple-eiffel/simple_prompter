@@ -406,6 +406,10 @@ feature {NONE} -- Test sets
 			run_test (agent t.test_settings_page_lists_and_chooses, "settings_page_lists_and_chooses")
 			run_test (agent t.test_settings_page_keeps_a_missing_device_visible, "settings_page_keeps_a_missing_device_visible")
 			run_test (agent t.test_settings_page_delay_steps_and_locks, "settings_page_delay_steps_and_locks")
+			run_test (agent t.test_hover_waits_and_can_be_turned_off, "hover_waits_and_can_be_turned_off")
+			run_test (agent t.test_pill_rails_hit_every_button_with_a_tooltip, "pill_rails_hit_every_button_with_a_tooltip")
+			run_test (agent t.test_rails_change_the_pill_signature_when_lit, "rails_change_the_pill_signature_when_lit")
+			run_test (agent t.test_recent_scripts_newest_first, "recent_scripts_newest_first")
 		end
 
 	run_heard_stabilizer_tests
