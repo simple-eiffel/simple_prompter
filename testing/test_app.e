@@ -189,6 +189,7 @@ feature {NONE} -- Test sets
 			run_test (agent t.test_capture_plan_practice_is_audio_only, "capture_plan_practice_is_audio_only")
 			run_test (agent t.test_webcam_is_recorded_as_mjpeg, "webcam_is_recorded_as_mjpeg")
 			run_test (agent t.test_obs_virtual_camera_uses_its_own_mode, "obs_virtual_camera_uses_its_own_mode")
+			run_test (agent t.test_video_delay_moves_the_picture_earlier, "video_delay_moves_the_picture_earlier")
 			run_test (agent t.test_empty_listing_uses_device_mode, "empty_listing_uses_device_mode")
 			run_test (agent t.test_preflight_disk_check, "preflight_disk_check")
 		end
@@ -398,6 +399,10 @@ feature {NONE} -- Test sets
 			run_test (agent t.test_transport_bar_progress_and_jump, "transport_bar_progress_and_jump")
 			run_test (agent t.test_transport_bar_signature_tracks_what_is_drawn, "transport_bar_signature_tracks_what_is_drawn")
 			run_test (agent t.test_transport_bar_tooltips, "transport_bar_tooltips")
+			run_test (agent t.test_device_list_reads_ffmpeg_listing, "device_list_reads_ffmpeg_listing")
+			run_test (agent t.test_settings_page_lists_and_chooses, "settings_page_lists_and_chooses")
+			run_test (agent t.test_settings_page_keeps_a_missing_device_visible, "settings_page_keeps_a_missing_device_visible")
+			run_test (agent t.test_settings_page_delay_steps_and_locks, "settings_page_delay_steps_and_locks")
 		end
 
 	run_heard_stabilizer_tests

@@ -24,6 +24,8 @@ feature {NONE} -- Initialization
 		do
 			create records.make (4096)
 			create prompt.make_empty
+			create device_camera.make_empty
+			create device_microphone.make_empty
 			create status_text.make_from_string ({STRING_32} "loading the speech models")
 			state := Loading
 		ensure
@@ -86,6 +88,15 @@ feature -- Access
 		attribute
 			create Result.make_empty
 		end
+
+	record_video_delay_ms: INTEGER
+			-- How much earlier the requested recording moves the picture (PT_CAPTURE_PLAN.video_delay_ms).
+
+	devices_requested: BOOLEAN
+			-- Should the worker switch to `device_camera' and `device_microphone' (Settings page)?
+
+	device_camera, device_microphone: STRING_32
+			-- The devices of the last `request_devices'.
 
 	recorded_seconds: REAL_64
 			-- Length of the last finished recording, from its tee.
@@ -237,6 +248,14 @@ feature -- Worker side
 			finished: recording_finished and not record_requested and not finish_requested
 		end
 
+	acknowledge_devices
+			-- The worker has switched devices.
+		do
+			devices_requested := False
+		ensure
+			taken: not devices_requested
+		end
+
 feature -- Window side
 
 	clear_records
@@ -270,18 +289,34 @@ feature -- Window side
 			requested: stop_requested
 		end
 
-	request_record (a_raw, a_tee: separate READABLE_STRING_32)
-			-- Record camera + microphone into `a_raw' (and the 16 kHz tee `a_tee').
+	request_record (a_raw, a_tee: separate READABLE_STRING_32; a_video_delay_ms: INTEGER)
+			-- Record camera + microphone into `a_raw' (and the 16 kHz tee `a_tee'), the picture moved
+			-- `a_video_delay_ms' earlier.
 		require
 			not_recording: not record_requested
+			delay_in_range: a_video_delay_ms >= 0 and a_video_delay_ms <= {PT_CAPTURE_PLAN}.Max_video_delay_ms
 		do
 			create record_raw.make_from_separate (a_raw)
 			create record_tee.make_from_separate (a_tee)
+			record_video_delay_ms := a_video_delay_ms
 			record_requested := True
 			finish_requested := False
 			recording_finished := False
 		ensure
 			requested: record_requested and not recording_finished
+		end
+
+	request_devices (a_camera, a_microphone: separate READABLE_STRING_32)
+			-- Switch to `a_camera' and `a_microphone' when no take is recording (the worker stops
+			-- listening, checks the camera again and listens on the new microphone).
+		require
+			microphone_present: not a_microphone.is_empty
+		do
+			create device_camera.make_from_separate (a_camera)
+			create device_microphone.make_from_separate (a_microphone)
+			devices_requested := True
+		ensure
+			requested: devices_requested
 		end
 
 	request_finish

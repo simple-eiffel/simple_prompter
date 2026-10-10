@@ -613,7 +613,7 @@ feature {NONE} -- Separate calls
 		require
 			idle: not a_slot.record_requested
 		do
-			a_slot.request_record (a_raw, a_tee)
+			a_slot.request_record (a_raw, a_tee, 0)
 		end
 
 	request_finish (a_slot: separate PT_SPEECH_SLOT)

@@ -139,6 +139,8 @@ feature -- Execution
 								start_recording (al_slot)
 							elseif not is_recording and then analysis_wanted (al_slot) then
 								run_analysis (al_slot)
+							elseif not is_recording and then devices_wanted (al_slot) then
+								change_devices (al_slot)
 							elseif not is_listening and then listen_wanted (al_slot) then
 								start_listening (al_slot)
 							end
@@ -235,12 +237,34 @@ feature {NONE} -- Listening
 			not_recording: not is_recording
 		end
 
+	change_devices (a_slot: separate PT_SPEECH_SLOT)
+			-- Switch to the devices the Settings page chose: stop listening (the loop listens again
+			-- on the new microphone), find how the new camera is recorded, and check it at once.
+		require
+			not_recording: not is_recording
+		do
+			camera := requested_camera (a_slot)
+			microphone := requested_microphone (a_slot)
+			take_devices (a_slot)
+			stop_listening
+			end_probe
+			create recording_devices.make (camera, microphone, 1920, 1080, 30)
+			probe_devices
+			last_probe_ms := 0.0
+			webcam_probe_wanted := True
+			report_camera (a_slot, {PT_CAMERA_CHECK}.Unchecked, False,
+				(if camera.is_empty then {STRING_32} "none set" else camera + {STRING_32} ": checking" end))
+		ensure
+			not_listening: not is_listening
+		end
+
 	start_recording (a_slot: separate PT_SPEECH_SLOT)
 			-- Stop listening; record camera + microphone into the requested raw file and tee.
 		require
 			not_recording: not is_recording
 		local
 			l_raw, l_tee: STRING_32
+			l_plan: PT_CAPTURE_PLAN
 		do
 			stop_listening
 				-- The probe lets go first: a webcam has one owner, and even OBS Virtual Camera, which
@@ -253,7 +277,9 @@ feature {NONE} -- Listening
 			end
 			l_raw := requested_raw (a_slot)
 			l_tee := requested_tee (a_slot)
-			start_capture (a_slot, create {PT_CAPTURE_PLAN}.make_recording (ffmpeg, recording_devices, l_raw, l_tee),
+			create l_plan.make_recording (ffmpeg, recording_devices, l_raw, l_tee)
+			l_plan.set_video_delay (requested_video_delay (a_slot))
+			start_capture (a_slot, l_plan,
 				l_tee, {PT_SPEECH_SLOT}.Recording, {STRING_32} "RECORDING: " + camera + (if recording_devices.uses_mjpeg then {STRING_32} "" else {STRING_32} " (its own format)" end)
 				+ {STRING_32} " + " + microphone)
 			if is_listening then
@@ -641,6 +667,31 @@ feature {NONE} -- Slot calls: each locks the slot for one short call
 	requested_tee (a_slot: separate PT_SPEECH_SLOT): STRING_32
 		do
 			create Result.make_from_separate (a_slot.record_tee)
+		end
+
+	devices_wanted (a_slot: separate PT_SPEECH_SLOT): BOOLEAN
+		do
+			Result := a_slot.devices_requested
+		end
+
+	requested_camera (a_slot: separate PT_SPEECH_SLOT): STRING_32
+		do
+			create Result.make_from_separate (a_slot.device_camera)
+		end
+
+	requested_microphone (a_slot: separate PT_SPEECH_SLOT): STRING_32
+		do
+			create Result.make_from_separate (a_slot.device_microphone)
+		end
+
+	take_devices (a_slot: separate PT_SPEECH_SLOT)
+		do
+			a_slot.acknowledge_devices
+		end
+
+	requested_video_delay (a_slot: separate PT_SPEECH_SLOT): INTEGER
+		do
+			Result := a_slot.record_video_delay_ms.max (0).min ({PT_CAPTURE_PLAN}.Max_video_delay_ms)
 		end
 
 	announce_stream (a_slot: separate PT_SPEECH_SLOT; a_stream: INTEGER)

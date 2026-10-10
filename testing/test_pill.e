@@ -241,6 +241,102 @@ feature -- Tests: transport bar (0.3.2)
 			assert_false ("leaving hides it", b.is_tooltip_shown)
 		end
 
+feature -- Tests: Settings page (0.3.5)
+
+	test_device_list_reads_ffmpeg_listing
+			-- JACKJACK's listing, 2026-10-10 (ffmpeg 8.0 -list_devices true -f dshow -i dummy).
+		local
+			d: PT_DEVICE_LIST
+		do
+			create d.make_from_listing (Device_listing)
+			assert_integers_equal ("three cameras", 3, d.cameras.count)
+			assert_true ("first camera", d.cameras [1].same_string ({STRING_32} "FHD Camera"))
+			assert_true ("obs", d.has_camera ({STRING_32} "OBS Virtual Camera"))
+			assert_integers_equal ("two microphones", 2, d.microphones.count)
+			assert_true ("broadcast microphone", d.has_microphone ({STRING_32} "Microphone (NVIDIA Broadcast)"))
+			assert_false ("alternative names skipped", d.has_camera ({STRING_32} "@device_pnp_usb#vid_1234"))
+			create d.make_from_listing ({STRING_32} "")
+			assert_true ("nothing listed", d.cameras.is_empty and d.microphones.is_empty)
+		end
+
+	test_settings_page_lists_and_chooses
+		local
+			pg: PT_SETTINGS_PAGE
+			d: PT_DEVICE_LIST
+			l_zone: detachable TUPLE [code: INTEGER; x, y, w, h: REAL_64]
+		do
+			create d.make_from_listing (Device_listing)
+			create pg.make
+			pg.offer (d, {STRING_32} "OBS Virtual Camera", {STRING_32} "Microphone (FHD Camera Microphone)", 110)
+			assert_true ("camera found", pg.is_camera_found)
+			assert_integers_equal ("only Windows' cameras", 3, pg.cameras.count)
+			pg.lay_out (10, 100, 480, 1.5)
+			l_zone := pg.zone (pg.Camera_base + 1)
+			assert_true ("first camera row placed", attached l_zone)
+			if attached l_zone as al_z then
+				assert_integers_equal ("hit the first camera", pg.Camera_base + 1, pg.hit (al_z.x + 5, al_z.y + 5))
+				pg.choose_camera (pg.hit (al_z.x + 5, al_z.y + 5) - pg.Camera_base)
+			end
+			assert_true ("webcam chosen", pg.camera.same_string ({STRING_32} "FHD Camera"))
+			if attached pg.zone (pg.Microphone_base + 1) as al_z then
+				assert_true ("mic row is a mic row", pg.is_microphone_row (pg.hit (al_z.x + 5, al_z.y + 5)))
+				pg.choose_microphone (1)
+			end
+			assert_true ("broadcast chosen", pg.microphone.same_string ({STRING_32} "Microphone (NVIDIA Broadcast)"))
+			assert_integers_equal ("outside", pg.Nothing_hit, pg.hit (5000, 5000))
+			if attached pg.zone (pg.Done_hit) as al_z then
+				assert_integers_equal ("done", pg.Done_hit, pg.hit (al_z.x + 1, al_z.y + 1))
+				assert_true ("done below the rest", across pg.zones as ic all ic.y <= al_z.y end)
+			end
+		end
+
+	test_settings_page_keeps_a_missing_device_visible
+			-- A chosen device Windows no longer offers is listed, marked, never swapped silently.
+		local
+			pg: PT_SETTINGS_PAGE
+		do
+			create pg.make
+			pg.offer (create {PT_DEVICE_LIST}.make_from_listing (Device_listing), {STRING_32} "Old Camera",
+				{STRING_32} "Microphone (High Definition Audio Device)", 0)
+			assert_false ("camera missing", pg.is_camera_found)
+			assert_false ("microphone missing", pg.is_microphone_found)
+			assert_integers_equal ("missing camera listed last", 4, pg.cameras.count)
+			assert_true ("still chosen", pg.camera.same_string ({STRING_32} "Old Camera"))
+			assert_true ("marked", pg.device_text (pg.camera, False).has_substring ({STRING_32} "not found"))
+			pg.choose_camera (2)
+			assert_true ("a found one chosen", pg.is_camera_found)
+		end
+
+	test_settings_page_delay_steps_and_locks
+		local
+			pg: PT_SETTINGS_PAGE
+		do
+			create pg.make
+			pg.offer (create {PT_DEVICE_LIST}.make_empty, {STRING_32} "", {STRING_32} "Mic", 110)
+			pg.step_delay (1)
+			assert_integers_equal ("up 10", 120, pg.video_delay_ms)
+			pg.step_delay (-20)
+			assert_integers_equal ("never below 0", 0, pg.video_delay_ms)
+			pg.step_delay (500)
+			assert_integers_equal ("never above the maximum", {PT_CAPTURE_PLAN}.Max_video_delay_ms, pg.video_delay_ms)
+			assert_true ("text", pg.delay_text.same_string ({STRING_32} "1000 ms"))
+			pg.set_locked (True)
+			assert_true ("locked", pg.is_locked)
+			pg.lay_out (0, 0, 400, 1.0)
+			assert_integers_equal ("no camera rows without a camera", 0, pg.cameras.count)
+			assert_integers_equal ("mic, delay buttons, done", 4, pg.zones.count)
+		end
+
+	Device_listing: STRING_32 = "[
+[dshow @ 000001] "FHD Camera" (video)
+[dshow @ 000001]   Alternative name "@device_pnp_usb#vid_1234"
+[dshow @ 000001] "Camera (NVIDIA Broadcast)" (video)
+[dshow @ 000001] "OBS Virtual Camera" (video)
+[dshow @ 000001] "Microphone (NVIDIA Broadcast)" (audio)
+[dshow @ 000001]   Alternative name "@device_cm_33D9A762_wave"
+[dshow @ 000001] "Microphone (FHD Camera Microphone)" (audio)
+]"
+
 feature {NONE} -- Fixtures
 
 	geometry (a_unused: REAL_64): PT_PILL_GEOMETRY

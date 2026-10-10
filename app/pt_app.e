@@ -86,7 +86,7 @@ feature {NONE} -- Initialization
 
 feature -- Constants
 
-	Version: STRING_32 = "0.3.4"
+	Version: STRING_32 = "0.3.5"
 			-- Shown in the control window; keep in step with installer/simple_prompter.iss.
 
 	Tick_ms: INTEGER = 16
@@ -113,6 +113,15 @@ feature -- Access
 		attribute
 			create Result.make_empty
 		end
+
+	settings_page: PT_SETTINGS_PAGE
+			-- The Settings page (camera, microphone, picture delay), shown in the left column.
+		attribute
+			create Result.make
+		end
+
+	is_settings_shown: BOOLEAN
+			-- Does the left column show the Settings page?
 
 feature {NONE} -- The clock
 
@@ -260,11 +269,17 @@ feature {NONE} -- Opening scripts
 		end
 
 	on_status_press (a_x, a_y: REAL_64)
-			-- A click on the control window: the Open button opens a script.
+			-- A click on the control window: the Open button opens a script, the Settings button
+			-- shows or hides the Settings page, a click on the page changes a setting.
 		do
 			if a_x >= open_button_x and a_x <= open_button_x + open_button_width
 				and a_y >= open_button_y and a_y <= open_button_y + open_button_height then
 				choose_script
+			elseif a_x >= settings_button_x and a_x <= settings_button_x + settings_button_width
+				and a_y >= open_button_y and a_y <= open_button_y + open_button_height then
+				toggle_settings
+			elseif is_settings_shown and then settings_page.hit (a_x, a_y) /= settings_page.Nothing_hit then
+				on_settings_press (settings_page.hit (a_x, a_y))
 			else
 				edit_floor.press (a_x, a_y)
 				last_status := {STRING_32} ""
@@ -313,6 +328,63 @@ feature {NONE} -- Opening scripts
 		end
 
 	open_button_x, open_button_y, open_button_width, open_button_height: REAL_64
+
+	settings_button_x, settings_button_width: REAL_64
+			-- The Settings button, on the Open button's row.
+
+	toggle_settings
+			-- Show the Settings page (listing Windows' devices afresh), or go back.
+		local
+			l_listing: STRING_32
+		do
+			if is_settings_shown then
+				is_settings_shown := False
+			else
+				l_listing := (create {SIMPLE_PROCESS}.make).command_output ({STRING_32} "%"" + ffmpeg_path
+					+ {STRING_32} "%" -hide_banner -list_devices true -f dshow -i dummy")
+				settings_page.offer (create {PT_DEVICE_LIST}.make_from_listing (l_listing), settings.camera_name,
+					settings.microphone_name, settings.video_delay_ms)
+				is_settings_shown := True
+			end
+			window.request_render
+		end
+
+	on_settings_press (a_code: INTEGER)
+			-- A click on the Settings page's `a_code' target: each change is saved and used at once.
+		do
+			if a_code = settings_page.Done_hit then
+				is_settings_shown := False
+			elseif not prompter.controller.is_recording then
+				settings_page.set_locked (False)
+				if settings_page.is_camera_row (a_code) then
+					settings_page.choose_camera (a_code - settings_page.Camera_base)
+					apply_devices
+				elseif settings_page.is_microphone_row (a_code) then
+					settings_page.choose_microphone (a_code - settings_page.Microphone_base)
+					apply_devices
+				elseif a_code = settings_page.Delay_down_hit then
+					settings_page.step_delay (-1)
+					settings.set_video_delay (settings_page.video_delay_ms)
+				elseif a_code = settings_page.Delay_up_hit then
+					settings_page.step_delay (1)
+					settings.set_video_delay (settings_page.video_delay_ms)
+				end
+			end
+			window.request_render
+		end
+
+	apply_devices
+			-- Save the page's devices and hand them to the speech worker, when they changed.
+		do
+			if not settings_page.camera.same_string (settings.camera_name)
+				or not settings_page.microphone.same_string (settings.microphone_name) then
+				settings.set_devices (settings_page.camera, settings_page.microphone)
+				camera_status := (if settings.camera_name.is_empty then {STRING_32} "none set" else settings.camera_name + {STRING_32} ": checking" end)
+				if speech_started then
+					ask_devices (speech_slot, settings.camera_name, settings.microphone_name)
+				end
+			end
+		end
 			-- Where the Open button was last drawn (canvas coordinates).
 
 feature {NONE} -- Pill content
@@ -422,10 +494,32 @@ feature {NONE} -- Control window
 			p.font (p.Role_ui, 13, True)
 			p.set_color (theme.background)
 			p.text (a_x + open_button_x + 14 * k, a_y + open_button_y + 19 * k, {STRING_32} "Open script...")
+			settings_button_x := open_button_x + open_button_width + 10 * k
+			settings_button_width := 110 * k
+			p.set_color (if is_settings_shown then theme.accent else theme.outline end)
+			p.rrect_fill (a_x + settings_button_x, a_y + open_button_y, settings_button_width, open_button_height, 6 * k)
+			p.set_color (if is_settings_shown then theme.background else theme.ink end)
+			p.text (a_x + settings_button_x + 14 * k, a_y + open_button_y + 19 * k, {STRING_32} "Settings...")
 			p.font (p.Role_ui, 13, False)
 			p.set_color (theme.ink_muted)
-			p.text (a_x + open_button_x + open_button_width + 14 * k, a_y + open_button_y + 19 * k, {STRING_32} "or drop a .md / .txt file here")
-			l_y := l_y + open_button_height + 26 * k
+			p.text (a_x + settings_button_x + settings_button_width + 14 * k, a_y + open_button_y + 19 * k, {STRING_32} "or drop a script here")
+			if is_settings_shown then
+				paint_settings_page (p, a_x + 18 * k, l_y + open_button_height, k)
+			else
+				paint_overview (p, a_x, a_y, l_y + open_button_height + 26 * k, k)
+			end
+				-- The Edit Floor, in the right-hand column (rows are hit-tested in canvas coordinates).
+			p.set_color (theme.outline)
+			p.fill_rect (a_x + 520 * k, a_y + 16 * k, 1, Window_height * k - 32 * k)
+			edit_floor.paint (p, 540 * k, 0, 480 * k, k)
+		end
+
+	paint_overview (p: SW_PAINTER; a_x, a_y, a_from_y, k: REAL_64)
+			-- The left column below the buttons: state, speech, camera, keys and mouse help.
+		local
+			l_y: REAL_64
+		do
+			l_y := a_from_y
 			l_y := wrapped (p, a_x + 18 * k, l_y, {STRING_32} "State: " + state_name + {STRING_32} "    Follows: " + mode_name, 22 * k)
 			if speech_state = {PT_SPEECH_SLOT}.Failed then
 				p.set_color (theme.danger)
@@ -477,10 +571,90 @@ feature {NONE} -- Control window
 			l_y := l_y + 30 * k
 			p.set_color (theme.ink_muted)
 			p.text (a_x + 18 * k, l_y, {STRING_32} "Close this window to quit.")
-				-- The Edit Floor, in the right-hand column (rows are hit-tested in canvas coordinates).
-			p.set_color (theme.outline)
-			p.fill_rect (a_x + 520 * k, a_y + 16 * k, 1, Window_height * k - 32 * k)
-			edit_floor.paint (p, 540 * k, 0, 480 * k, k)
+		end
+
+	paint_settings_page (p: SW_PAINTER; a_left, a_top, k: REAL_64)
+			-- The Settings page: camera and microphone lists, the picture delay, Done.
+		local
+			l_i: INTEGER
+			l_name: STRING_32
+		do
+			settings_page.set_locked (prompter.controller.is_recording)
+			settings_page.lay_out (a_left, a_top, Left_column_width * k, k)
+			p.font (p.Role_ui, 16, True)
+			p.set_color (theme.ink)
+			p.text (a_left, settings_page.title_y, {STRING_32} "Settings")
+			p.font (p.Role_ui, 13, False)
+			if settings_page.is_locked then
+				p.set_color (theme.warning)
+				p.text (a_left + 90 * k, settings_page.title_y, {STRING_32} "locked while a take records")
+			else
+				p.set_color (theme.ink_muted)
+				p.text (a_left + 90 * k, settings_page.title_y, {STRING_32} "click to choose; saved at once")
+			end
+			settings_heading (p, a_left, settings_page.camera_heading_y, {STRING_32} "Camera (the picture)", k)
+			settings_heading (p, a_left, settings_page.microphone_heading_y, {STRING_32} "Microphone (the sound)", k)
+			settings_heading (p, a_left, settings_page.delay_heading_y, {STRING_32} "Picture delay", k)
+			across settings_page.zones as ic loop
+				if settings_page.is_camera_row (ic.code) then
+					l_i := ic.code - settings_page.Camera_base
+					l_name := settings_page.cameras [l_i]
+					settings_row (p, ic.x, ic.y, ic.w, ic.h, settings_page.device_text (l_name, l_i <= settings_page.found_cameras),
+						l_name.same_string (settings_page.camera), l_i <= settings_page.found_cameras, k)
+				elseif settings_page.is_microphone_row (ic.code) then
+					l_i := ic.code - settings_page.Microphone_base
+					l_name := settings_page.microphones [l_i]
+					settings_row (p, ic.x, ic.y, ic.w, ic.h, settings_page.device_text (l_name, l_i <= settings_page.found_microphones),
+						l_name.same_string (settings_page.microphone), l_i <= settings_page.found_microphones, k)
+				elseif ic.code = settings_page.Delay_down_hit or ic.code = settings_page.Delay_up_hit then
+					p.set_color (theme.outline)
+					p.rrect_fill (ic.x, ic.y, ic.w, ic.h, 6 * k)
+					p.set_color (if settings_page.is_locked then theme.ink_muted else theme.ink end)
+					p.font (p.Role_ui, 15, True)
+					p.text (ic.x + ic.w / 2 - 4 * k, ic.y + 19 * k, (if ic.code = settings_page.Delay_down_hit then {STRING_32} "-" else {STRING_32} "+" end))
+					if ic.code = settings_page.Delay_down_hit then
+						p.font (p.Role_ui, 14, True)
+						p.set_color (theme.ink)
+						p.text (ic.x + ic.w + 18 * k, ic.y + 19 * k, settings_page.delay_text)
+					end
+				elseif ic.code = settings_page.Done_hit then
+					p.set_color (theme.accent)
+					p.rrect_fill (ic.x, ic.y, ic.w, ic.h, 6 * k)
+					p.font (p.Role_ui, 13, True)
+					p.set_color (theme.background)
+					p.text (ic.x + 36 * k, ic.y + 19 * k, {STRING_32} "Done")
+				end
+			end
+			p.font (p.Role_ui, 13, False)
+			p.set_color (theme.ink_muted)
+			l_name := {STRING_32} "How far the picture runs behind the sound; each take moves it this much earlier. Broadcast + OBS: about 110 ms."
+			if wrapped (p, a_left, settings_page.hint_y, l_name, 18 * k) > 0 then
+			end
+		end
+
+	settings_heading (p: SW_PAINTER; a_x, a_y: REAL_64; a_text: STRING_32; k: REAL_64)
+		do
+			p.font (p.Role_ui, 13, True)
+			p.set_color (theme.ink)
+			p.text (a_x, a_y, a_text)
+		end
+
+	settings_row (p: SW_PAINTER; a_x, a_y, a_w, a_h: REAL_64; a_text: STRING_32; a_chosen, a_found: BOOLEAN; k: REAL_64)
+			-- One device row: a radio dot and the name; the chosen row on a light slab.
+		do
+			if a_chosen then
+				p.set_color (theme.outline)
+				p.rrect_fill (a_x - 6 * k, a_y + 1 * k, a_w, a_h - 2 * k, 5 * k)
+			end
+			p.set_color (if a_chosen then theme.accent else theme.ink_muted end)
+			p.set_line_width (1.5 * k)
+			p.rrect_stroke (a_x + 2 * k, a_y + 7 * k, 12 * k, 12 * k, 6 * k)
+			if a_chosen then
+				p.rrect_fill (a_x + 5 * k, a_y + 10 * k, 6 * k, 6 * k, 3 * k)
+			end
+			p.font (p.Role_ui, 13, a_chosen)
+			p.set_color (if not a_found then theme.danger elseif a_chosen then theme.ink else theme.ink_muted end)
+			p.text (a_x + 24 * k, a_y + 18 * k, a_text)
 		end
 
 	Left_column_width: REAL_64 = 486.0
@@ -987,7 +1161,14 @@ feature {NONE} -- Speech: separate calls (each locks the slot for one short call
 		require
 			not_recording: not a_slot.record_requested
 		do
-			a_slot.request_record (a_raw, a_tee)
+			a_slot.request_record (a_raw, a_tee, settings.video_delay_ms)
+		end
+
+	ask_devices (a_slot: separate PT_SPEECH_SLOT; a_camera, a_microphone: STRING_32)
+		require
+			microphone_present: not a_microphone.is_empty
+		do
+			a_slot.request_devices (a_camera, a_microphone)
 		end
 
 	ask_analysis (a_slot: separate PT_SPEECH_SLOT; a_root: STRING_32; a_duration: REAL_64)

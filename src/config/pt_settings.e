@@ -79,6 +79,9 @@ feature -- Access
 	sessions_root: STRING_32
 			-- Empty = %USERPROFILE%\Videos\simple_prompter (resolved by the app; approved Q8).
 	camera_name, microphone_name: STRING_32
+	video_delay_ms: INTEGER
+			-- How far the camera's picture runs behind the microphone (milliseconds); the recording
+			-- moves the picture this much earlier (PT_CAPTURE_PLAN.video_delay_ms). 0 by default.
 	is_tracking_proven: BOOLEAN
 			-- Set once Tracking passes its acceptance test (approved Q5).
 
@@ -179,7 +182,8 @@ feature {NONE} -- Implementation
 					.with_integer ("speed_wpm", speed_wpm).with_float ("count_in_seconds", count_in_seconds)
 					.with_float ("head_pad", head_pad).with_float ("tail_pad", tail_pad)
 					.with_string ("sessions_root", sessions_root).with_string ("camera", camera_name)
-					.with_string ("microphone", microphone_name).with_boolean ("tracking_proven", is_tracking_proven)
+					.with_string ("microphone", microphone_name).with_integer ("video_delay_ms", video_delay_ms)
+					.with_boolean ("tracking_proven", is_tracking_proven)
 					.with_boolean ("pill_placed", has_pill_position).with_integer ("pill_x", pill_x).with_integer ("pill_y", pill_y)
 					.with_string ("last_script", last_script).with_integer ("follow_mode", follow_mode)
 				create l_root.make
@@ -248,6 +252,17 @@ feature -- Pill placement
 		end
 
 feature -- Element change (review L20)
+
+	set_video_delay (a_ms: INTEGER)
+		require
+			in_range: a_ms >= 0 and a_ms <= {PT_CAPTURE_PLAN}.Max_video_delay_ms
+		do
+			video_delay_ms := a_ms
+			save
+		ensure
+			set: video_delay_ms = a_ms
+			saved: save_count = old save_count + 1
+		end
 
 	set_count_in_seconds (a_seconds: REAL_64)
 		require
@@ -357,6 +372,9 @@ feature {NONE} -- Loading
 			if attached t.string_item ("microphone") as al_s and then not al_s.is_empty then
 				microphone_name := al_s
 			end
+			if t.has ("video_delay_ms") and then in_range (t.integer_item ("video_delay_ms"), 0, {PT_CAPTURE_PLAN}.Max_video_delay_ms) then
+				video_delay_ms := t.integer_item ("video_delay_ms").to_integer_32
+			end
 			if t.has ("tracking_proven") then
 				is_tracking_proven := t.boolean_item ("tracking_proven")
 			end
@@ -387,5 +405,6 @@ invariant
 	wpm_range: speed_wpm >= Min_wpm and speed_wpm <= Max_wpm
 	count_in_range: count_in_seconds >= 0 and count_in_seconds <= 5
 	pads_non_negative: head_pad >= 0 and tail_pad >= 0
+	video_delay_range: video_delay_ms >= 0 and video_delay_ms <= {PT_CAPTURE_PLAN}.Max_video_delay_ms
 
 end

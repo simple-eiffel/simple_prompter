@@ -7,6 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.5] - 2026-10-10
+
+### Fixed
+- Picture and sound out of sync on a virtual camera (OBS Virtual Camera, NVIDIA
+  Broadcast): the picture ran about 0.35 s behind the sound (clap test). The camera
+  and the microphone were two ffmpeg inputs, each starting its clock at 0, which
+  threw away the ~0.5 s between the camera's first frame and the microphone's
+  first sound. They are now one input on one clock (-use_video_device_timestamps 0):
+  0.11 s behind, which is the time NVIDIA Broadcast and OBS spend on the picture.
+
+### Added
+- Picture delay (Settings, `video_delay_ms`): each take moves the picture that much
+  earlier, the sound and the voice-following copy untouched. Checked on a clap
+  recording: 110 ms put the hands meeting within a frame of the clap.
+- Settings page in the control window (the Settings... button beside Open
+  script...): choose the camera and the microphone from what Windows offers, and
+  set the picture delay. Each change is saved at once and used without a restart
+  (the speech worker switches devices and checks the camera again); locked while a
+  take records. A chosen device Windows no longer offers stays listed as "(not
+  found)" instead of being swapped silently.
+
 ## [0.3.4] - 2026-10-10
 
 ### Added

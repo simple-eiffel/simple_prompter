@@ -5,6 +5,9 @@ note
 		audio) AND 16 kHz mono f32 -> tee.f32 with per-packet flush (spike
 		evidence: MJPEG needed for 1080p; PCM avoids encoder delay; the growing
 		tee file tracks real time). Practice (approved Q4): microphone only -> tee.f32.
+		Camera and microphone are always ONE input, so they share one clock (0.3.5).
+		`video_delay_ms' moves the picture earlier by what a camera's processing
+		holds it back; the sound and the tee keep their own times.
 	]"
 	author: "Larry Rix"
 
@@ -53,6 +56,7 @@ feature -- Constants
 	Gop_frames: INTEGER = 30
 	Audio_buffer_ms: INTEGER = 50
 	Cluster_ms: INTEGER = 500
+	Max_video_delay_ms: INTEGER = 1000
 			-- Longest Matroska cluster in the raw recording; bounds what a hard kill can lose.
 			-- dshow audio device buffer; the device default can be large and adds directly
 			-- to tee latency (review H6; measure in spike T-0).
@@ -65,15 +69,43 @@ feature -- Access
 	tee_path: STRING_32
 
 	audio_stream: STRING_32
-			-- The microphone's stream: in the one dshow input, or the second input for a camera
-			-- recorded in its own mode.
+			-- The microphone's stream: always in the one dshow input.
 		do
-			if not is_audio_only and not devices.uses_mjpeg then
-				Result := {STRING_32} "1:a"
-			else
-				Result := {STRING_32} "0:a"
-			end
+			Result := {STRING_32} "0:a"
 		end
+
+	video_delay_ms: INTEGER
+			-- How far the picture reaches ffmpeg behind the sound: a virtual camera's processing
+			-- (NVIDIA Broadcast + OBS: ~110 ms by clap, 2026-10-10). The recording moves the
+			-- picture this much earlier; 0 leaves it alone.
+
+	video_shift_filter: STRING_32
+			-- The video filter for `video_delay_ms': "setpts=PTS-0.110/TB,trim=start=0". Frames
+			-- that would land before the start are dropped.
+		local
+			l_frac: STRING_32
+		do
+			l_frac := (video_delay_ms \\ 1000).out.to_string_32
+			from until l_frac.count >= 3 loop
+				l_frac.prepend_character ('0')
+			end
+			Result := {STRING_32} "setpts=PTS-" + (video_delay_ms // 1000).out.to_string_32 + {STRING_32} "." + l_frac
+				+ {STRING_32} "/TB,trim=start=0"
+		end
+
+feature -- Settings
+
+	set_video_delay (a_ms: INTEGER)
+			-- Move the recorded picture `a_ms' earlier.
+		require
+			in_range: a_ms >= 0 and a_ms <= Max_video_delay_ms
+		do
+			video_delay_ms := a_ms
+		ensure
+			set: video_delay_ms = a_ms
+		end
+
+feature -- Access
 
 	arguments: ARRAYED_LIST [STRING_32]
 			-- Arguments after the ffmpeg executable.
@@ -94,20 +126,22 @@ feature -- Access
 					Result.extend ({STRING_32} "-i")
 					Result.extend ({STRING_32} "video=" + devices.camera + {STRING_32} ":audio=" + devices.microphone)
 				else
-						-- The device's own mode (OBS Virtual Camera, NVIDIA Broadcast), as its own input:
-						-- a virtual camera stamps frames on its own clock (OBS: ~231,000 s against the
-						-- microphone's 0), and in one input ffmpeg held every frame back waiting for the
-						-- audio, so a hard stop wrote none (OBS test, 2026-10-07). Separate inputs each
-						-- start at 0; the microphone keeps its own clock, which the tee's samples follow.
-					Result.extend ({STRING_32} "-i")
-					Result.extend ({STRING_32} "video=" + devices.camera)
-					add (Result, <<"-f", "dshow", "-audio_buffer_size">>)
-					Result.extend (Audio_buffer_ms.out.to_string_32)
-					Result.extend ({STRING_32} "-i")
-					Result.extend ({STRING_32} "audio=" + devices.microphone)
+						-- The device's own mode (OBS Virtual Camera, NVIDIA Broadcast), camera and microphone in
+						-- ONE input, its frames stamped on DirectShow's clock as they arrive. A virtual camera
+						-- stamps frames on its own clock (OBS: ~231,000 s against the microphone's 0), which
+						-- held every frame back in one input (2026-10-07); two inputs fixed that but each
+						-- started at 0, throwing away the ~0.5 s between the camera's first frame and the
+						-- microphone's first sound: the picture ran 0.35 s behind (clap test, 2026-10-10).
+						-- One input on one clock: 0.11 s behind, the camera's own processing (`video_delay_ms').
+					add (Result, <<"-use_video_device_timestamps", "0", "-i">>)
+					Result.extend ({STRING_32} "video=" + devices.camera + {STRING_32} ":audio=" + devices.microphone)
 				end
 				add (Result, <<"-map", "0:v", "-map">>)
 				Result.extend (audio_stream)
+				if video_delay_ms > 0 then
+					Result.extend ({STRING_32} "-vf")
+					Result.extend (video_shift_filter)
+				end
 				add (Result, <<"-c:v", "h264_nvenc", "-preset", "p5", "-cq", "18", "-g">>)
 				Result.extend (Gop_frames.out.to_string_32)
 				add (Result, <<"-c:a", "pcm_s16le">>)
@@ -129,8 +163,10 @@ feature -- Access
 			small_audio_buffer: has_pair (Result, "-audio_buffer_size", Audio_buffer_ms.out)
 			mjpeg_when_offered: (not is_audio_only and devices.uses_mjpeg) implies has_pair (Result, "-vcodec", "mjpeg")
 			device_mode_otherwise: (not is_audio_only and not devices.uses_mjpeg) implies not has_pair (Result, "-vcodec", "mjpeg")
-			own_inputs_otherwise: (not is_audio_only and not devices.uses_mjpeg) implies (has_pair (Result, "-i", {STRING_32} "video=" + devices.camera)
-				and has_pair (Result, "-i", {STRING_32} "audio=" + devices.microphone))
+			one_clock_otherwise: (not is_audio_only and not devices.uses_mjpeg) implies (has_pair (Result, "-use_video_device_timestamps", "0")
+				and has_pair (Result, "-i", {STRING_32} "video=" + devices.camera + {STRING_32} ":audio=" + devices.microphone))
+			picture_moved_when_delayed: (not is_audio_only and video_delay_ms > 0) implies has_pair (Result, "-vf", video_shift_filter)
+			picture_left_otherwise: (is_audio_only or video_delay_ms = 0) implies not across Result as ic some ic.same_string ({STRING_32} "-vf") end
 			pcm_when_recording: not is_audio_only implies has_pair (Result, "-c:a", "pcm_s16le")
 			raw_when_recording: not is_audio_only implies across Result as ic some ic.same_string (raw_path) end
 			small_clusters_when_recording: not is_audio_only implies has_pair (Result, "-cluster_time_limit", Cluster_ms.out)
@@ -167,6 +203,7 @@ feature {NONE} -- Implementation
 		end
 
 invariant
+	video_delay_range: video_delay_ms >= 0 and video_delay_ms <= Max_video_delay_ms
 	raw_iff_recording: is_audio_only = raw_path.is_empty
 	tee_present: not tee_path.is_empty
 

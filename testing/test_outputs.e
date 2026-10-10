@@ -149,9 +149,33 @@ feature -- Tests: capture plan and preflight
 			assert_false ("no mjpeg asked", p.has_pair (p.arguments, "-vcodec", "mjpeg"))
 			assert_false ("no size forced", p.has_pair (p.arguments, "-video_size", "1920x1080"))
 			assert_true ("still nvenc", p.has_pair (p.arguments, "-c:v", "h264_nvenc"))
-			assert_true ("video input alone", p.has_pair (p.arguments, "-i", "video=OBS Virtual Camera"))
-			assert_true ("microphone input alone", p.has_pair (p.arguments, "-i", "audio=Mic"))
-			assert_true ("audio from the second input", p.has_pair (p.arguments, "-map", "1:a"))
+				-- One input on one clock (0.3.5): two inputs each started at 0 and the picture ran
+				-- 0.35 s behind the sound (clap test, 2026-10-10).
+			assert_true ("one input", p.has_pair (p.arguments, "-i", "video=OBS Virtual Camera:audio=Mic"))
+			assert_true ("frames on the capture clock", p.has_pair (p.arguments, "-use_video_device_timestamps", "0"))
+			assert_true ("audio from the one input", p.has_pair (p.arguments, "-map", "0:a"))
+			assert_false ("no second input", p.has_pair (p.arguments, "-map", "1:a"))
+			assert_false ("picture not moved by default", across p.arguments as ic some ic.same_string ({STRING_32} "-vf") end)
+		end
+
+	test_video_delay_moves_the_picture_earlier
+			-- NVIDIA Broadcast + OBS hold the picture ~110 ms (clap test, 2026-10-10): the recording
+			-- moves it that much earlier; the sound and the tee are left alone.
+		local
+			d: PT_DEVICE_CHOICE
+			p: PT_CAPTURE_PLAN
+		do
+			d := (create {PT_DEVICE_PROBE}).choice (Obs_listing, {STRING_32} "OBS Virtual Camera", {STRING_32} "Mic")
+			create p.make_recording ({STRING_32} "ffmpeg", d, {STRING_32} "raw.mkv", {STRING_32} "tee.f32")
+			p.set_video_delay (110)
+			assert_true ("picture moved", p.has_pair (p.arguments, "-vf", "setpts=PTS-0.110/TB,trim=start=0"))
+			p.set_video_delay (1000)
+			assert_true ("a whole second", p.has_pair (p.arguments, "-vf", "setpts=PTS-1.000/TB,trim=start=0"))
+			p.set_video_delay (5)
+			assert_true ("five milliseconds", p.has_pair (p.arguments, "-vf", "setpts=PTS-0.005/TB,trim=start=0"))
+			create p.make_audio_only ({STRING_32} "ffmpeg", d, {STRING_32} "tee.f32")
+			p.set_video_delay (110)
+			assert_false ("practice has no picture", across p.arguments as ic some ic.same_string ({STRING_32} "-vf") end)
 		end
 
 	test_empty_listing_uses_device_mode
