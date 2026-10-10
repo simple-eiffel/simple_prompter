@@ -255,7 +255,7 @@ feature -- Element change (review L20)
 
 	set_video_delay (a_ms: INTEGER)
 		require
-			in_range: a_ms >= 0 and a_ms <= {PT_CAPTURE_PLAN}.Max_video_delay_ms
+			in_range: a_ms >= {PT_TAKE_SYNC}.Min_ms and a_ms <= {PT_TAKE_SYNC}.Max_ms
 		do
 			video_delay_ms := a_ms
 			save
@@ -372,7 +372,7 @@ feature {NONE} -- Loading
 			if attached t.string_item ("microphone") as al_s and then not al_s.is_empty then
 				microphone_name := al_s
 			end
-			if t.has ("video_delay_ms") and then in_range (t.integer_item ("video_delay_ms"), 0, {PT_CAPTURE_PLAN}.Max_video_delay_ms) then
+			if t.has ("video_delay_ms") and then in_range (t.integer_item ("video_delay_ms"), {PT_TAKE_SYNC}.Min_ms, {PT_TAKE_SYNC}.Max_ms) then
 				video_delay_ms := t.integer_item ("video_delay_ms").to_integer_32
 			end
 			if t.has ("tracking_proven") then
@@ -405,6 +405,6 @@ invariant
 	wpm_range: speed_wpm >= Min_wpm and speed_wpm <= Max_wpm
 	count_in_range: count_in_seconds >= 0 and count_in_seconds <= 5
 	pads_non_negative: head_pad >= 0 and tail_pad >= 0
-	video_delay_range: video_delay_ms >= 0 and video_delay_ms <= {PT_CAPTURE_PLAN}.Max_video_delay_ms
+	video_delay_range: video_delay_ms >= {PT_TAKE_SYNC}.Min_ms and video_delay_ms <= {PT_TAKE_SYNC}.Max_ms
 
 end

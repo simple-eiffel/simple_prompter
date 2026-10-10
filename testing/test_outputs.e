@@ -74,6 +74,43 @@ feature -- Tests: writers (Phase 4 behavior)
 			g := p.filter_script (l)
 			assert_integers_equal ("three trims", 3, p.occurrences (g, "]trim="))
 			assert_integers_equal ("one concat", 1, p.occurrences (g, "concat=n=3"))
+			assert_integers_equal ("sound from the one input", 3, p.occurrences (g, "[0:a]atrim="))
+			assert_false ("one input", across p.arguments ({STRING_32} "raw.mkv", {STRING_32} "f", {STRING_32} "o.mp4") as ic some ic.same_string ({STRING_32} "-itsoffset") end)
+		end
+
+	test_render_plan_moves_the_picture_by_the_sync
+			-- 0.3.6: the picture input's times moved back by the sync; the sound from a second, untouched input.
+		local
+			p: PT_RENDER_PLAN
+			l: PT_CUT_LIST
+			a: ARRAYED_LIST [STRING_32]
+		do
+			create l.make
+			l.extend (create {PT_CUT}.make (0, span (2.0, 4.2), <<id (1)>>, 1, 1, 1, False))
+			l.extend (create {PT_CUT}.make (0, span (9.5, 17.0), <<id (2)>>, 2, 2, 2, False))
+			create p.make ({STRING_32} "ffmpeg", 20, False)
+			p.set_video_delay (110)
+			a := p.arguments ({STRING_32} "raw.mkv", {STRING_32} "f", {STRING_32} "o.mp4")
+			assert_true ("picture moved back", p.has_pair (a, "-itsoffset", "-0.110"))
+			assert_true ("then the picture input", p.has_pair (a, "-0.110", "-i"))
+			assert_true ("exact order", a [1].same_string ({STRING_32} "-hide_banner") and a [2].same_string ({STRING_32} "-y")
+				and a [3].same_string ({STRING_32} "-itsoffset") and a [5].same_string ({STRING_32} "-i") and a [6].same_string ({STRING_32} "raw.mkv")
+				and a [7].same_string ({STRING_32} "-i") and a [8].same_string ({STRING_32} "raw.mkv"))
+			assert_integers_equal ("raw opened twice", 2, count_of (a, {STRING_32} "raw.mkv"))
+			assert_integers_equal ("sound from the second input", 2, p.occurrences (p.filter_script (l), "[1:a]atrim="))
+			assert_integers_equal ("picture from the first", 2, p.occurrences (p.filter_script (l), "[0:v]trim="))
+			p.set_video_delay (-40)
+			assert_true ("picture ahead: moved later", p.has_pair (p.arguments ({STRING_32} "raw.mkv", {STRING_32} "f", {STRING_32} "o.mp4"), "-itsoffset", "0.040"))
+			assert_true ("signed seconds", p.signed_seconds (-1250).same_string ("-1.250"))
+		end
+
+	count_of (a_list: ARRAYED_LIST [STRING_32]; a_item: STRING_32): INTEGER
+		do
+			across a_list as ic loop
+				if ic.same_string (a_item) then
+					Result := Result + 1
+				end
+			end
 		end
 
 	test_cut_codec_round_trip
@@ -155,27 +192,7 @@ feature -- Tests: capture plan and preflight
 			assert_true ("frames on the capture clock", p.has_pair (p.arguments, "-use_video_device_timestamps", "0"))
 			assert_true ("audio from the one input", p.has_pair (p.arguments, "-map", "0:a"))
 			assert_false ("no second input", p.has_pair (p.arguments, "-map", "1:a"))
-			assert_false ("picture not moved by default", across p.arguments as ic some ic.same_string ({STRING_32} "-vf") end)
-		end
-
-	test_video_delay_moves_the_picture_earlier
-			-- NVIDIA Broadcast + OBS hold the picture ~110 ms (clap test, 2026-10-10): the recording
-			-- moves it that much earlier; the sound and the tee are left alone.
-		local
-			d: PT_DEVICE_CHOICE
-			p: PT_CAPTURE_PLAN
-		do
-			d := (create {PT_DEVICE_PROBE}).choice (Obs_listing, {STRING_32} "OBS Virtual Camera", {STRING_32} "Mic")
-			create p.make_recording ({STRING_32} "ffmpeg", d, {STRING_32} "raw.mkv", {STRING_32} "tee.f32")
-			p.set_video_delay (110)
-			assert_true ("picture moved", p.has_pair (p.arguments, "-vf", "setpts=PTS-0.110/TB,trim=start=0"))
-			p.set_video_delay (1000)
-			assert_true ("a whole second", p.has_pair (p.arguments, "-vf", "setpts=PTS-1.000/TB,trim=start=0"))
-			p.set_video_delay (5)
-			assert_true ("five milliseconds", p.has_pair (p.arguments, "-vf", "setpts=PTS-0.005/TB,trim=start=0"))
-			create p.make_audio_only ({STRING_32} "ffmpeg", d, {STRING_32} "tee.f32")
-			p.set_video_delay (110)
-			assert_false ("practice has no picture", across p.arguments as ic some ic.same_string ({STRING_32} "-vf") end)
+			assert_false ("picture as it arrived", across p.arguments as ic some ic.same_string ({STRING_32} "-vf") end)
 		end
 
 	test_empty_listing_uses_device_mode

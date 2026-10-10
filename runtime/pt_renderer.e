@@ -48,11 +48,13 @@ feature -- Access
 
 feature -- Commands
 
-	start (a_folder: PT_SESSION_FOLDER; a_revision: PT_SCRIPT_REVISION; a_analysis: PT_ANALYSIS; a_journal: PT_JOURNAL)
-			-- Write the captions and chapters and start ffmpeg on the take's cut list.
+	start (a_folder: PT_SESSION_FOLDER; a_revision: PT_SCRIPT_REVISION; a_analysis: PT_ANALYSIS; a_journal: PT_JOURNAL; a_video_delay_ms: INTEGER)
+			-- Write the captions and chapters and start ffmpeg on the take's cut list, the picture moved
+			-- `a_video_delay_ms' (PT_TAKE_SYNC).
 		require
 			not_rendering: not is_rendering
 			analyzed: a_analysis.is_success
+			delay_in_range: a_video_delay_ms >= {PT_TAKE_SYNC}.Min_ms and a_video_delay_ms <= {PT_TAKE_SYNC}.Max_ms
 		local
 			l_plan: PT_RENDER_PLAN
 			l_captions: PT_CAPTION_BUILDER
@@ -66,6 +68,7 @@ feature -- Commands
 				output_path := a_folder.out_dir + {STRING_32} "\final.mp4"
 				l_filter := a_folder.out_dir + {STRING_32} "\final.filter"
 				create l_plan.make (ffmpeg, Fade_ms, False)
+				l_plan.set_video_delay (a_video_delay_ms)
 				l_ok := (create {SIMPLE_FILE}.make (l_filter)).set_content (l_plan.filter_script (a_analysis.cuts))
 				create l_captions.make
 				l_captions.build (a_revision, a_analysis.cuts, a_analysis.timeline)

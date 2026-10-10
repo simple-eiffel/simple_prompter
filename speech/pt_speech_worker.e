@@ -278,7 +278,6 @@ feature {NONE} -- Listening
 			l_raw := requested_raw (a_slot)
 			l_tee := requested_tee (a_slot)
 			create l_plan.make_recording (ffmpeg, recording_devices, l_raw, l_tee)
-			l_plan.set_video_delay (requested_video_delay (a_slot))
 			start_capture (a_slot, l_plan,
 				l_tee, {PT_SPEECH_SLOT}.Recording, {STRING_32} "RECORDING: " + camera + (if recording_devices.uses_mjpeg then {STRING_32} "" else {STRING_32} " (its own format)" end)
 				+ {STRING_32} " + " + microphone)
@@ -687,11 +686,6 @@ feature {NONE} -- Slot calls: each locks the slot for one short call
 	take_devices (a_slot: separate PT_SPEECH_SLOT)
 		do
 			a_slot.acknowledge_devices
-		end
-
-	requested_video_delay (a_slot: separate PT_SPEECH_SLOT): INTEGER
-		do
-			Result := a_slot.record_video_delay_ms.max (0).min ({PT_CAPTURE_PLAN}.Max_video_delay_ms)
 		end
 
 	announce_stream (a_slot: separate PT_SPEECH_SLOT; a_stream: INTEGER)

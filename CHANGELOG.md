@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.6] - 2026-10-10
+
+### Changed
+- Sync moves from recording to previews and the render: the raw recording keeps the
+  picture as it arrived, so a wrong sync is fixed by changing it and rendering again.
+  The render opens the raw file twice (the picture moved by -itsoffset, the sound
+  untouched) so every cut trims both at the same instants; previews shift the picture
+  in ffplay. The Settings page's value is now where each new take starts.
+
+### Added
+- Sync row in the Last take panel: - / + in 10 ms steps (-500 to +1000 ms), Preview
+  sync, and Measure. Each take keeps its own value (sync.toml in its folder); every
+  change becomes the starting value for the next take.
+- Measure (PT_SYNC_MEASURE, PT_SYNC_MEASURER): finds claps in the take's sound and the
+  frame where the hands meet in the picture, and sets the sync from them. On today's
+  two clap recordings it found 320 ms and 80 ms, within a camera frame of the values
+  measured by hand.
+- The Last take panel shows the newest take at start, so it can be rendered, previewed
+  or measured again after a restart.
+
 ## [0.3.5] - 2026-10-10
 
 ### Fixed

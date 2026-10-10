@@ -321,6 +321,91 @@ feature -- T23 settings
 			assert_true ("microphone back", t.microphone_name.same_string ({STRING_32} "Microphone (High Definition Audio Device)"))
 		end
 
+feature -- Sync (0.3.6)
+
+	test_take_sync_is_kept_beside_the_take
+		local
+			s, t: PT_TAKE_SYNC
+			l_path: STRING_32
+			l_ok: BOOLEAN
+		do
+			l_path := temp_path ({STRING_32} "sync.toml")
+			l_ok := (create {SIMPLE_FILE}.make (l_path)).delete
+			create s.make (l_path, 110)
+			assert_integers_equal ("starts from the last choice", 110, s.delay_ms)
+			assert_false ("not the take's own yet", s.is_stored)
+			s.step (1)
+			assert_integers_equal ("nudged", 120, s.delay_ms)
+			create t.make (l_path, 0)
+			assert_integers_equal ("the take's own value wins", 120, t.delay_ms)
+			assert_true ("stored", t.is_stored)
+			t.set_measured (80)
+			create s.make (l_path, 0)
+			assert_true ("measured kept", s.is_measured and s.delay_ms = 80)
+			s.step (-100)
+			assert_integers_equal ("kept in range", {PT_TAKE_SYNC}.Min_ms, s.delay_ms)
+			assert_false ("by hand now", s.is_measured)
+			assert_true ("text", s.text.same_string ({STRING_32} "-500 ms"))
+		end
+
+	test_sync_measure_finds_a_clap_and_the_hands
+			-- A clap sounds at 1.000 s; the hands close from 0.95 s and meet on the last moving frame
+			-- (1.100 s); new frames every 1/30 s in a 60 a second stream: 1.100 - 1/60 - 1.000 = 83 ms.
+		local
+			m: PT_SYNC_MEASURE
+			l_sound: SPECIAL [REAL_32]
+			l_frames: SPECIAL [NATURAL_8]
+			i, j, v: INTEGER
+			t: REAL_64
+		do
+			create l_sound.make_filled (0.001, 3 * 16_000)
+			from i := 16_000 until i >= 16_000 + 80 loop
+				l_sound [i] := (0.8 * (1 - (i - 16_000) / 80)).truncated_to_real
+				i := i + 1
+			end
+			create m.make
+			m.find_claps (l_sound, l_sound.count)
+			assert_integers_equal ("one clap", 1, m.claps.count)
+			assert_true ("at 1.000 s", (m.claps.first - 1.0).abs < 0.002)
+			create l_frames.make_filled (0, 72 * 4)
+			v := 100
+			from i := 0 until i >= 72 loop
+				t := 0.7 + i / 60
+				if i \\ 2 = 0 then
+					v := v + (if t >= 0.95 and t <= 1.1 then 20 else 1 end)
+				end
+				from j := 0 until j >= 4 loop
+					l_frames [i * 4 + j] := v.to_natural_8
+					j := j + 1
+				end
+				i := i + 1
+			end
+			m.add_clap_frames (1.0, 0.7, l_frames, 4, 72)
+			assert_integers_equal ("one delay", 1, m.delays.count)
+			assert_integers_equal ("83 ms", 83, m.delays.first)
+			assert_integers_equal ("to the nearest 10", 80, m.delay_ms)
+			create l_frames.make_filled (90, 72 * 4)
+			m.add_clap_frames (1.0, 0.7, l_frames, 4, 72)
+			assert_integers_equal ("a still picture adds nothing", 1, m.delays.count)
+		end
+
+	test_sync_measure_ignores_soft_sounds
+		local
+			m: PT_SYNC_MEASURE
+			l_sound: SPECIAL [REAL_32]
+			i: INTEGER
+		do
+			create l_sound.make_filled (0.0, 16_000)
+			from i := 0 until i >= l_sound.count loop
+				l_sound [i] := (0.05 * ((i \\ 40) / 40 - 0.5)).truncated_to_real
+				i := i + 1
+			end
+			create m.make
+			m.find_claps (l_sound, l_sound.count)
+			assert_true ("nothing loud enough", m.claps.is_empty)
+			assert_false ("nothing found", m.is_found)
+		end
+
 feature -- T12 facade from disk
 
 	test_open_read_test_from_disk

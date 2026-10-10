@@ -112,7 +112,7 @@ feature -- Element change
 			-- List `a_devices' with `a_camera' and `a_microphone' chosen and `a_delay_ms' set.
 		require
 			microphone_present: not a_microphone.is_empty
-			delay_in_range: a_delay_ms >= 0 and a_delay_ms <= {PT_CAPTURE_PLAN}.Max_video_delay_ms
+			delay_in_range: a_delay_ms >= {PT_TAKE_SYNC}.Min_ms and a_delay_ms <= {PT_TAKE_SYNC}.Max_ms
 		do
 			camera := a_camera.to_string_32
 			microphone := a_microphone.to_string_32
@@ -175,9 +175,9 @@ feature -- Element change
 		require
 			unlocked: not is_locked
 		do
-			video_delay_ms := (video_delay_ms + a_steps * Delay_step_ms).max (0).min ({PT_CAPTURE_PLAN}.Max_video_delay_ms)
+			video_delay_ms := (video_delay_ms + a_steps * Delay_step_ms).max ({PT_TAKE_SYNC}.Min_ms).min ({PT_TAKE_SYNC}.Max_ms)
 		ensure
-			in_range: video_delay_ms >= 0 and video_delay_ms <= {PT_CAPTURE_PLAN}.Max_video_delay_ms
+			in_range: video_delay_ms >= {PT_TAKE_SYNC}.Min_ms and video_delay_ms <= {PT_TAKE_SYNC}.Max_ms
 		end
 
 feature -- Layout
@@ -270,6 +270,6 @@ feature -- Display
 invariant
 	microphone_present: not microphone.is_empty
 	found_first: found_cameras <= cameras.count and found_microphones <= microphones.count
-	delay_in_range: video_delay_ms >= 0 and video_delay_ms <= {PT_CAPTURE_PLAN}.Max_video_delay_ms
+	delay_in_range: video_delay_ms >= {PT_TAKE_SYNC}.Min_ms and video_delay_ms <= {PT_TAKE_SYNC}.Max_ms
 
 end

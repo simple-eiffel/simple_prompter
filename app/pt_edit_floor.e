@@ -6,6 +6,9 @@ note
 		click previews a cut or a flag in ffplay (F-01 8.3 v1: -ss / -t on the raw file),
 		and the buttons render final.mp4 with captions and chapters, play it, or open the
 		session folder. The take is read back from its folder (PT_SESSION_LOADER).
+		Sync (0.3.6): the take's picture-to-sound sync (PT_TAKE_SYNC), nudged in 10 ms
+		steps, previewed, or measured from claps (PT_SYNC_MEASURER); previews and the
+		render use it, and each change becomes the starting value for the next take.
 	]"
 	author: "Larry Rix"
 
@@ -26,6 +29,8 @@ feature {NONE} -- Initialization
 			create status_note.make_empty
 			create preview.make
 			create rows.make (16)
+			create measurer.make (a_ffmpeg)
+			create sync_note.make_empty
 		ensure
 			empty: not has_take
 		end
@@ -45,6 +50,27 @@ feature -- Access
 	status_note: STRING_32
 			-- The last thing a click did (or why it could not).
 
+	sync: detachable PT_TAKE_SYNC
+			-- The shown take's sync.
+
+	measurer: PT_SYNC_MEASURER
+
+	sync_note: STRING_32
+			-- What Measure found (empty until it runs on this take).
+
+	sync_preview_from: REAL_64
+			-- Where Preview sync starts: just before the first clap measured, else the first cut.
+
+	on_sync_changed: detachable PROCEDURE [INTEGER]
+			-- Told each new sync value (the app keeps it as the next take's starting value).
+
+	set_on_sync_changed (a_action: PROCEDURE [INTEGER])
+		do
+			on_sync_changed := a_action
+		ensure
+			set: on_sync_changed = a_action
+		end
+
 	has_take: BOOLEAN
 		do
 			Result := attached take as al_take and then al_take.is_loaded and then attached al_take.analysis
@@ -52,16 +78,24 @@ feature -- Access
 
 feature -- Commands
 
-	show (a_root: READABLE_STRING_32)
-			-- Read the take in session folder `a_root' (after its analysis) and show it.
+	show (a_root: READABLE_STRING_32; a_start_sync_ms: INTEGER)
+			-- Read the take in session folder `a_root' (after its analysis) and show it; its sync
+			-- starts at `a_start_sync_ms' unless the take already has its own.
 		require
 			root_present: not a_root.is_empty
+			sync_in_range: a_start_sync_ms >= {PT_TAKE_SYNC}.Min_ms and a_start_sync_ms <= {PT_TAKE_SYNC}.Max_ms
 		local
 			l_loader: PT_SESSION_LOADER
 		do
 			create l_loader.make
 			l_loader.load (a_root)
 			take := l_loader
+			sync := Void
+			sync_note := {STRING_32} ""
+			sync_preview_from := -1.0
+			if l_loader.is_loaded and then attached l_loader.folder as al_folder then
+				sync := create {PT_TAKE_SYNC}.make (al_folder.root + {STRING_32} "\sync.toml", a_start_sync_ms)
+			end
 			if not l_loader.is_loaded then
 				status_note := l_loader.last_error.twin
 			elseif l_loader.analysis = Void then
@@ -112,6 +146,22 @@ feature -- Display
 				button (p, a_x + 100 * k, l_y - 18 * k, 92 * k, 26 * k, {STRING_32} "Play final", Action_play_final, k)
 				button (p, a_x + 200 * k, l_y - 18 * k, 104 * k, 26 * k, {STRING_32} "Open folder", Action_open_folder, k)
 				l_y := l_y + 24 * k
+				if attached sync as al_sync then
+					p.font (p.Role_ui, 12, True)
+					p.set_color (Ink)
+					p.text (a_x, l_y + 8 * k, {STRING_32} "Sync")
+					button (p, a_x + 42 * k, l_y - 10 * k, 26 * k, 26 * k, {STRING_32} "-", Action_sync_down, k)
+					p.font (p.Role_ui, 12, True)
+					p.set_color (Ink)
+					p.text (a_x + 76 * k, l_y + 8 * k, al_sync.text)
+					button (p, a_x + 140 * k, l_y - 10 * k, 26 * k, 26 * k, {STRING_32} "+", Action_sync_up, k)
+					button (p, a_x + 176 * k, l_y - 10 * k, 108 * k, 26 * k, {STRING_32} "Preview sync", Action_sync_preview, k)
+					button (p, a_x + 292 * k, l_y - 10 * k, 80 * k, 26 * k, {STRING_32} "Measure", Action_measure, k)
+					l_y := l_y + 38 * k
+					p.font (p.Role_ui, 12, False)
+					p.set_color (Muted)
+					l_y := wrapped (p, a_x, l_y, a_w, sync_text (al_sync), 20 * k)
+				end
 				p.font (p.Role_ui, 12, False)
 				p.set_color (Muted)
 				if not renderer.status.is_empty then
@@ -188,6 +238,10 @@ feature {NONE} -- Actions
 	Action_open_folder: INTEGER = 3
 	Action_preview_cut: INTEGER = 4
 	Action_preview_flag: INTEGER = 5
+	Action_sync_down: INTEGER = 6
+	Action_sync_up: INTEGER = 7
+	Action_sync_preview: INTEGER = 8
+	Action_measure: INTEGER = 9
 
 	act (a_action, a_index: INTEGER)
 		do
@@ -196,12 +250,12 @@ feature {NONE} -- Actions
 				inspect a_action
 				when Action_render then
 					if not renderer.is_rendering then
-						renderer.start (al_folder, al_history.current_revision, al_analysis, al_journal)
+						renderer.start (al_folder, al_history.current_revision, al_analysis, al_journal, sync_ms)
 						status_note := {STRING_32} ""
 					end
 				when Action_play_final then
 					if (create {SIMPLE_FILE}.make (al_folder.out_dir + {STRING_32} "\final.mp4")).exists then
-						play (al_folder.out_dir + {STRING_32} "\final.mp4", 0.0, 0.0, {STRING_32} "final")
+						play (al_folder.out_dir + {STRING_32} "\final.mp4", 0.0, 0.0, {STRING_32} "final", 0)
 					else
 						status_note := {STRING_32} "render first: there is no final.mp4 yet"
 					end
@@ -210,20 +264,43 @@ feature {NONE} -- Actions
 				when Action_preview_cut then
 					if a_index >= 1 and a_index <= al_analysis.cuts.count then
 						play (al_folder.raw_path, al_analysis.cuts.cut (a_index).span.t0, al_analysis.cuts.cut (a_index).span.duration,
-							{STRING_32} "cut " + a_index.out)
+							{STRING_32} "cut " + a_index.out, sync_ms)
 					end
 				when Action_preview_flag then
 					if a_index >= 1 and a_index <= al_analysis.flags.count then
 						play (al_folder.raw_path, (al_analysis.flags [a_index].span.t0 - 2.0).max (0.0),
-							al_analysis.flags [a_index].span.duration + 4.0, {STRING_32} "check " + a_index.out)
+							al_analysis.flags [a_index].span.duration + 4.0, {STRING_32} "check " + a_index.out, sync_ms)
+					end
+				when Action_sync_down, Action_sync_up then
+					if attached sync as al_sync then
+						al_sync.step (if a_action = Action_sync_down then -1 else 1 end)
+						sync_note := {STRING_32} ""
+						tell_sync (al_sync.delay_ms)
+					end
+				when Action_sync_preview then
+					if sync_preview_from >= 0 then
+						play (al_folder.raw_path, sync_preview_from, 5.0, {STRING_32} "sync " + sync_ms.out + {STRING_32} " ms", sync_ms)
+					elseif al_analysis.cuts.count >= 1 then
+						play (al_folder.raw_path, al_analysis.cuts.cut (1).span.t0, 8.0, {STRING_32} "sync " + sync_ms.out + {STRING_32} " ms", sync_ms)
+					end
+				when Action_measure then
+					measurer.run (al_folder.raw_path, al_folder.tee_path, al_folder.out_dir)
+					sync_note := measurer.summary.twin
+					if measurer.measure.is_found and attached sync as al_sync then
+						al_sync.set_measured (measurer.measure.delay_ms.max ({PT_TAKE_SYNC}.Min_ms).min ({PT_TAKE_SYNC}.Max_ms))
+						if not measurer.measure.claps.is_empty then
+							sync_preview_from := (measurer.measure.claps.first - 1.0).max (0.0)
+						end
+						tell_sync (al_sync.delay_ms)
 					end
 				else
 				end
 			end
 		end
 
-	play (a_file: STRING_32; a_from, a_seconds: REAL_64; a_title: STRING_32)
-			-- Preview `a_seconds' of `a_file' from `a_from' in ffplay (0 seconds: to the end).
+	play (a_file: STRING_32; a_from, a_seconds: REAL_64; a_title: STRING_32; a_sync_ms: INTEGER)
+			-- Preview `a_seconds' of `a_file' from `a_from' in ffplay (0 seconds: to the end), the
+			-- picture moved `a_sync_ms' earlier (ffplay keeps the picture on the sound's clock).
 		local
 			l_line: STRING_32
 			l_ok: BOOLEAN
@@ -238,6 +315,10 @@ feature {NONE} -- Actions
 			end
 			if a_seconds > 0 then
 				l_line.append ({STRING_32} " -t " + seconds (a_seconds))
+			end
+			if a_sync_ms /= 0 then
+				l_line.append ({STRING_32} " -vf " + quoted ({STRING_32} "setpts=PTS-("
+					+ (create {PT_RENDER_PLAN}.make ({STRING_32} "ffmpeg", 0, False)).signed_seconds (a_sync_ms).to_string_32 + {STRING_32} ")/TB"))
 			end
 			l_line.append ({STRING_32} " " + quoted (a_file))
 			create preview.make
@@ -257,6 +338,41 @@ feature {NONE} -- Actions
 			create l_process.make
 			l_process.set_show_window (True)
 			l_process.start (a_line)
+		end
+
+feature {NONE} -- Sync
+
+	sync_ms: INTEGER
+			-- The shown take's sync (0 without a take).
+		do
+			if attached sync as al_sync then
+				Result := al_sync.delay_ms
+			end
+		end
+
+	sync_text (a_sync: PT_TAKE_SYNC): STRING_32
+			-- What the sync does, or what Measure found.
+		do
+			if not sync_note.is_empty then
+				Result := sync_note.twin
+			elseif a_sync.delay_ms > 0 then
+				Result := {STRING_32} "previews and the render move the picture " + a_sync.text + {STRING_32} " earlier"
+			elseif a_sync.delay_ms < 0 then
+				Result := {STRING_32} "previews and the render move the picture " + a_sync.delay_ms.abs.out + {STRING_32} " ms later"
+			else
+				Result := {STRING_32} "picture and sound as recorded"
+			end
+			if a_sync.is_measured and sync_note.is_empty then
+				Result.append ({STRING_32} " (measured)")
+			end
+		end
+
+	tell_sync (a_ms: INTEGER)
+			-- Hand `a_ms' to `on_sync_changed'.
+		do
+			if attached on_sync_changed as al_action then
+				al_action.call ([a_ms])
+			end
 		end
 
 feature {NONE} -- Implementation

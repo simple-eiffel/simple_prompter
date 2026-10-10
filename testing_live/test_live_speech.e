@@ -382,7 +382,7 @@ feature {NONE} -- Analysis support
 			assert_true ({STRING_32} "session reads back: " + l_loader.last_error, l_loader.is_loaded and attached l_loader.analysis)
 			if attached l_loader.history as al_history and attached l_loader.journal as al_journal and attached l_loader.analysis as al_analysis then
 				create l_renderer.make (Ffmpeg_path)
-				l_renderer.start (a_folder, al_history.current_revision, al_analysis, al_journal)
+				l_renderer.start (a_folder, al_history.current_revision, al_analysis, al_journal, 0)
 				from until not l_renderer.is_rendering or l_waited > 120_000 loop
 					sleep_ms (100)
 					l_waited := l_waited + 100
@@ -576,6 +576,45 @@ feature -- Worker
 			end
 		end
 
+feature -- Sync measured from claps (0.3.6)
+
+	test_sync_measure_on_real_claps
+			-- Two clap recordings measured by hand on 2026-10-10: the two-input take (picture
+			-- 0.31-0.35 s behind) and the one-clock test (0.09-0.13 s behind). Skipped when absent.
+		do
+			measure_claps ("C:\Users\LJR19\Videos\simple_prompter\2026-10-10 072135 - Reel 1 - You Ain't Got This!\raw.mkv",
+				"C:\Users\LJR19\Videos\simple_prompter\2026-10-10 072135 - Reel 1 - You Ain't Got This!\tee.f32", 290, 370)
+			measure_claps ("C:\Users\LJR19\AppData\Local\Temp\claude\D--prod\62c845fc-cdc6-4eeb-8e64-b4148a3b683a\scratchpad\spike.mkv",
+				"C:\Users\LJR19\AppData\Local\Temp\claude\D--prod\62c845fc-cdc6-4eeb-8e64-b4148a3b683a\scratchpad\spike_tee.f32", 70, 150)
+		end
+
+	measure_claps (a_raw, a_tee: STRING_32; a_low, a_high: INTEGER)
+		local
+			m: PT_SYNC_MEASURER
+			l_dir: STRING_32
+		do
+			if (create {SIMPLE_FILE}.make (a_raw)).exists and (create {SIMPLE_FILE}.make (a_tee)).exists then
+				create m.make ({STRING_32} "C:\ProgramData\chocolatey\lib\ffmpeg\tools\ffmpeg\bin\ffmpeg.exe")
+				l_dir := {STRING_32} "C:\Users\LJR19\AppData\Local\Temp\claude\D--prod\62c845fc-cdc6-4eeb-8e64-b4148a3b683a\scratchpad"
+				m.run (a_raw, a_tee, l_dir)
+				print ("    [live] " + m.summary.to_string_8 + "; claps heard at")
+				across m.measure.claps as ic loop
+					print (" " + ic.truncated_to_real.out)
+				end
+				print ("; delays")
+				across m.measure.delays as ic loop
+					print (" " + ic.out)
+				end
+				print ("%%N")
+				assert_true ("found", m.measure.is_found)
+				if m.measure.is_found then
+					assert_true ("in range " + a_low.out + ".." + a_high.out, m.measure.delay_ms >= a_low and m.measure.delay_ms <= a_high)
+				end
+			else
+				print ("    [live] skipped: " + a_raw.to_string_8 + " not here%%N")
+			end
+		end
+
 feature {NONE} -- Separate calls
 
 	launch (a_worker: separate PT_SPEECH_WORKER; a_slot: separate PT_SPEECH_SLOT)
@@ -613,7 +652,7 @@ feature {NONE} -- Separate calls
 		require
 			idle: not a_slot.record_requested
 		do
-			a_slot.request_record (a_raw, a_tee, 0)
+			a_slot.request_record (a_raw, a_tee)
 		end
 
 	request_finish (a_slot: separate PT_SPEECH_SLOT)

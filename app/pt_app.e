@@ -60,6 +60,7 @@ feature {NONE} -- Initialization
 			create speech_slot.make
 			ffmpeg_path := resolved_ffmpeg
 			create edit_floor.make (ffmpeg_path)
+			edit_floor.set_on_sync_changed (agent settings.set_video_delay)
 			geometry := new_geometry
 			create status_canvas.make (Window_height * theme.text_scale)
 			l_title := {STRING_32} "simple_prompter"
@@ -86,7 +87,7 @@ feature {NONE} -- Initialization
 
 feature -- Constants
 
-	Version: STRING_32 = "0.3.5"
+	Version: STRING_32 = "0.3.6"
 			-- Shown in the control window; keep in step with installer/simple_prompter.iss.
 
 	Tick_ms: INTEGER = 16
@@ -146,6 +147,7 @@ feature {NONE} -- The clock
 				pill.open
 				router.register_all
 				window.set_fast_timer (Tick_ms)
+				show_latest_take
 				window.request_render
 			end
 			refresh_status
@@ -594,7 +596,7 @@ feature {NONE} -- Control window
 			end
 			settings_heading (p, a_left, settings_page.camera_heading_y, {STRING_32} "Camera (the picture)", k)
 			settings_heading (p, a_left, settings_page.microphone_heading_y, {STRING_32} "Microphone (the sound)", k)
-			settings_heading (p, a_left, settings_page.delay_heading_y, {STRING_32} "Picture delay", k)
+			settings_heading (p, a_left, settings_page.delay_heading_y, {STRING_32} "Sync: where each new take starts", k)
 			across settings_page.zones as ic loop
 				if settings_page.is_camera_row (ic.code) then
 					l_i := ic.code - settings_page.Camera_base
@@ -627,7 +629,7 @@ feature {NONE} -- Control window
 			end
 			p.font (p.Role_ui, 13, False)
 			p.set_color (theme.ink_muted)
-			l_name := {STRING_32} "How far the picture runs behind the sound; each take moves it this much earlier. Broadcast + OBS: about 110 ms."
+			l_name := {STRING_32} "How far the picture runs behind the sound. Adjust or Measure any take in the Last take panel; your last choice starts the next take."
 			if wrapped (p, a_left, settings_page.hint_y, l_name, 18 * k) > 0 then
 			end
 		end
@@ -1024,7 +1026,7 @@ feature {NONE} -- Take Studio (plan Step 4a)
 			end
 			if prompter.has_session and then not prompter.controller.is_recording then
 				take_note := {STRING_32} "Take saved (" + clock_text (recorded_seconds) + {STRING_32} "), " + a_outcome
-				edit_floor.show (prompter.session.folder.root)
+				edit_floor.show (prompter.session.folder.root, settings.video_delay_ms)
 				prompter.end_session
 				previous_state := prompter.controller.state
 				geometry := new_geometry
@@ -1047,19 +1049,49 @@ feature {NONE} -- Take Studio (plan Step 4a)
 			end
 		end
 
+	sessions_base: STRING_32
+			-- Where session folders go: the setting, else %USERPROFILE%\Videos\simple_prompter.
+		do
+			if not settings.sessions_root.is_empty then
+				Result := settings.sessions_root.twin
+			elseif attached (create {EXECUTION_ENVIRONMENT}).item ("USERPROFILE") as al_home then
+				Result := al_home + {STRING_32} "\Videos\simple_prompter"
+			else
+				Result := program_folder + {STRING_32} "\sessions"
+			end
+		end
+
+	show_latest_take
+			-- At start, the Last take panel shows the newest analyzed take (folder names begin with the
+			-- date and time, so the greatest name is the newest), to render, preview or measure it again.
+		local
+			l_dir: DIRECTORY
+			l_best, l_root: STRING_32
+		do
+			create l_best.make_empty
+			create l_dir.make (sessions_base)
+			if l_dir.exists then
+				across l_dir.entries as ic loop
+					l_root := sessions_base + {STRING_32} "\" + ic.name
+					if not ic.is_current_symbol and not ic.is_parent_symbol and then ic.name > l_best
+						and then (create {SIMPLE_FILE}.make (l_root + {STRING_32} "\analysis\analysis.json")).exists
+						and then (create {SIMPLE_FILE}.make (l_root + {STRING_32} "\raw.mkv")).exists then
+						l_best := ic.name.twin
+					end
+				end
+				if not l_best.is_empty then
+					edit_floor.show (sessions_base + {STRING_32} "\" + l_best, settings.video_delay_ms)
+				end
+			end
+		end
+
 	new_session_root: STRING_32
 			-- A fresh folder: <sessions root>\<date time> - <script title>.
 		local
 			l_base, l_title: STRING_32
 			l_now: SIMPLE_DATE_TIME
 		do
-			if not settings.sessions_root.is_empty then
-				l_base := settings.sessions_root.twin
-			elseif attached (create {EXECUTION_ENVIRONMENT}).item ("USERPROFILE") as al_home then
-				l_base := al_home + {STRING_32} "\Videos\simple_prompter"
-			else
-				l_base := program_folder + {STRING_32} "\sessions"
-			end
+			l_base := sessions_base
 			create l_now.make_now
 			l_title := prompter.history.current_revision.title.twin
 			across <<'\', '/', ':', '*', '?', '"', '<', '>', '|'>> as ic loop
@@ -1161,7 +1193,7 @@ feature {NONE} -- Speech: separate calls (each locks the slot for one short call
 		require
 			not_recording: not a_slot.record_requested
 		do
-			a_slot.request_record (a_raw, a_tee, settings.video_delay_ms)
+			a_slot.request_record (a_raw, a_tee)
 		end
 
 	ask_devices (a_slot: separate PT_SPEECH_SLOT; a_camera, a_microphone: STRING_32)

@@ -183,13 +183,13 @@ feature {NONE} -- Test sets
 			run_test (agent t.test_review_srt_one_cue_per_mark, "review_srt_one_cue_per_mark")
 			run_test (agent t.test_edl_has_one_event_per_cut, "edl_has_one_event_per_cut")
 			run_test (agent t.test_render_plan_follows_the_spike_recipe, "render_plan_follows_the_spike_recipe")
+			run_test (agent t.test_render_plan_moves_the_picture_by_the_sync, "render_plan_moves_the_picture_by_the_sync")
 			run_test (agent t.test_cut_codec_round_trip, "cut_codec_round_trip")
 			run_test (agent t.test_capture_plan_recording_arguments, "capture_plan_recording_arguments")
 			run_test (agent t.test_capture_plan_sets_a_small_audio_buffer, "capture_plan_sets_a_small_audio_buffer")
 			run_test (agent t.test_capture_plan_practice_is_audio_only, "capture_plan_practice_is_audio_only")
 			run_test (agent t.test_webcam_is_recorded_as_mjpeg, "webcam_is_recorded_as_mjpeg")
 			run_test (agent t.test_obs_virtual_camera_uses_its_own_mode, "obs_virtual_camera_uses_its_own_mode")
-			run_test (agent t.test_video_delay_moves_the_picture_earlier, "video_delay_moves_the_picture_earlier")
 			run_test (agent t.test_empty_listing_uses_device_mode, "empty_listing_uses_device_mode")
 			run_test (agent t.test_preflight_disk_check, "preflight_disk_check")
 		end
@@ -253,6 +253,9 @@ feature {NONE} -- Test sets
 			run_test (agent t.test_chapters_start_at_zero, "chapters_start_at_zero")
 			run_test (agent t.test_analysis_codec_round_trip, "analysis_codec_round_trip")
 			run_test (agent t.test_settings_round_trip, "settings_round_trip")
+			run_test (agent t.test_take_sync_is_kept_beside_the_take, "take_sync_is_kept_beside_the_take")
+			run_test (agent t.test_sync_measure_finds_a_clap_and_the_hands, "sync_measure_finds_a_clap_and_the_hands")
+			run_test (agent t.test_sync_measure_ignores_soft_sounds, "sync_measure_ignores_soft_sounds")
 			run_test (agent t.test_open_read_test_from_disk, "open_read_test_from_disk")
 		end
 
