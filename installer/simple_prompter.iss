@@ -15,7 +15,7 @@
 ; ============================================================================
 
 #define AppName        "simple_prompter"
-#define AppVersion     "0.3.1"
+#define AppVersion     "0.3.2"
 #define AppPublisher   "Larry Rix"
 #define AppExeName     "simple_prompter.exe"
 #define BuildDir       "..\EIFGENs\simple_prompter_app\F_code"

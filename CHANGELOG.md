@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.2] - 2026-10-09
+
+### Added
+- Transport bar under the script text on the pill (PT_TRANSPORT_BAR, always
+  showing): a progress line (click it to hold with the caret on that word) and
+  video-player buttons - back a sentence, again, play / hold / go, forward a
+  sentence | record / wrap / stop, star, reject | slower, faster. Each does what
+  its Ctrl+Alt key does; back and forward also hold first when reading. A
+  button that would do nothing now is dimmed. Resting the pointer on a button
+  or the line for 450 ms shows a tooltip with its key. The pill is taller by
+  the bar; the number of script lines is unchanged. Needs simple_shell 1.13.0
+  (`SHELL_PANEL.is_cursor_over`).
+
 ## [0.3.1] - 2026-10-09
 
 ### Added

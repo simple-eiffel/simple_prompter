@@ -5,7 +5,9 @@ note
 		until the reader Shift+drags it; where it was dropped is remembered in
 		the settings. Shift+drag on an edge or corner sizes it: the height snaps
 		to whole lines and the width becomes the text column, both remembered.
-		Hide and click-through are toggles the hotkeys reach.
+		Hide and click-through are toggles the hotkeys reach. Under the script text
+		sits the transport bar (PT_TRANSPORT_BAR): a progress line and video-player
+		buttons, always showing, with tooltips.
 	]"
 	author: "Larry Rix"
 
@@ -24,6 +26,7 @@ feature {NONE} -- Initialization
 			measure := a_measure
 			create panel.make
 			create renderer.make (a_theme, a_measure.font_size)
+			create bar.make (scale)
 		ensure
 			settings_set: settings = a_settings
 			closed: not panel.is_open
@@ -62,6 +65,9 @@ feature -- Access
 	panel: SHELL_PANEL
 	renderer: PT_PILL_RENDERER
 
+	bar: PT_TRANSPORT_BAR
+			-- The video-player buttons and progress line under the script text.
+
 	width: INTEGER
 			-- Column plus padding.
 		do
@@ -69,9 +75,9 @@ feature -- Access
 		end
 
 	height: INTEGER
-			-- Visible lines plus padding.
+			-- Visible lines plus padding, plus the transport bar under them.
 		do
-			Result := (settings.lines_visible * measure.line_height + 2 * padding).ceiling
+			Result := (settings.lines_visible * measure.line_height + 2 * padding + bar.height).ceiling
 		end
 
 	reading_line: REAL_64
@@ -151,7 +157,7 @@ feature -- Lifecycle
 				panel.set_draggable (True)
 				panel.set_resizable ((Design_grip * scale).rounded.max (1).min (64),
 					(settings.Min_width * scale + 2 * padding).ceiling,
-					(measure.line_height + 2 * padding).ceiling)
+					(measure.line_height + 2 * padding + bar.height).ceiling)
 				panel.show (l_x, l_y, width, height)
 			end
 		end
@@ -203,7 +209,7 @@ feature -- Commands
 		local
 			l_lines, l_column: INTEGER
 		do
-			l_lines := ((a_height - 2 * padding) / measure.line_height).rounded
+			l_lines := ((a_height - 2 * padding - bar.height) / measure.line_height).rounded
 				.max (settings.Min_lines).min (settings.Max_lines)
 			l_column := ((a_width - 2 * padding) / scale).rounded
 				.max (settings.Min_width).min (settings.Max_width)
@@ -237,6 +243,33 @@ feature -- Commands
 			Result := panel.is_shift_held
 		end
 
+	is_pointer_over: BOOLEAN
+			-- Is the mouse pointer over the pill, and could it click there (not click-through)?
+		do
+			Result := is_shown and then not panel.is_click_through and then panel.is_cursor_over
+		end
+
+	refresh_hover (a_now_ms: REAL_64)
+			-- Forget the hover once the pointer leaves the pill (no event says so); show a
+			-- tooltip once the pointer has rested on a button.
+		do
+			if is_pointer_over /= bar.is_pointer_in then
+				bar.set_pointer_in (not bar.is_pointer_in)
+			end
+			bar.update_tooltip (a_now_ms)
+		ensure
+			left_forgets_hover: not bar.is_pointer_in implies bar.hovered = 0
+		end
+
+	track_pointer (a_x, a_y: INTEGER; a_now_ms: REAL_64)
+			-- The pointer moved to (`a_x', `a_y') on the pill at `a_now_ms': what is under it.
+		do
+			if bar.is_laid_out then
+				bar.set_pointer_in (True)
+				bar.set_hovered (bar.hit (a_x, a_y), a_now_ms)
+			end
+		end
+
 	paint (a_prompter: SIMPLE_PROMPTER; a_geometry: PT_PILL_GEOMETRY; a_caret: INTEGER; a_badge: READABLE_STRING_32)
 			-- Repaint the pill now.
 		require
@@ -247,7 +280,10 @@ feature -- Commands
 			if is_shown then
 				l_dc := panel.dc
 				if l_dc /= default_pointer then
-					renderer.render (l_dc, panel.width, panel.height, a_prompter, a_geometry, a_caret, a_badge)
+					if panel.width > 2 * bar.Design_inset * scale and panel.height > bar.height then
+						bar.lay_out (0.0, panel.height - bar.height, panel.width)
+					end
+					renderer.render (l_dc, panel.width, panel.height, a_prompter, a_geometry, a_caret, a_badge, bar)
 					panel.release_dc (l_dc)
 				end
 			end

@@ -7,6 +7,8 @@ note
 		performed only when the controller allows it. App-level controls (hide,
 		click-through) go to the pill. Plan Step 1 leaves out Edit (its inline
 		editor arrives with recording, Step 4) and the recording-only marks.
+		The pill's transport bar (0.3.2) reaches the same actions as the keys:
+		`on_bar' acts on a click, `refresh_bar' says which buttons would act now.
 	]"
 	author: "Larry Rix"
 
@@ -198,7 +200,97 @@ feature -- Commands
 			end
 		end
 
+feature -- Transport bar
+
+	on_bar (a_hit, a_word: INTEGER)
+			-- A click on the pill's transport bar: button `a_hit', or the progress line
+			-- (then `a_word' is the word it points at).
+		require
+			known: a_hit = {PT_TRANSPORT_BAR}.Progress_hit or (a_hit >= 1 and a_hit <= {PT_TRANSPORT_BAR}.Button_count)
+			word_for_jump: a_hit = {PT_TRANSPORT_BAR}.Progress_hit implies
+				(a_word >= 1 and a_word <= prompter.history.current_revision.word_count)
+		local
+			l_idle: BOOLEAN
+		do
+			l_idle := prompter.controller.state = {PT_TAKE_STATE}.Idle
+			inspect a_hit
+			when {PT_TRANSPORT_BAR}.Back_button then
+				hold_if_reading
+				try_action ({PT_ACTION}.Back)
+			when {PT_TRANSPORT_BAR}.Forward_button then
+				hold_if_reading
+				try_action ({PT_ACTION}.Forward)
+			when {PT_TRANSPORT_BAR}.Again_button then
+				on_control ({PT_CONTROL}.Again)
+			when {PT_TRANSPORT_BAR}.Play_button then
+				if l_idle then
+					on_control ({PT_CONTROL}.Play_stop)
+				else
+					on_control ({PT_CONTROL}.Hold_toggle)
+				end
+			when {PT_TRANSPORT_BAR}.Record_button then
+				if not l_idle then
+					on_control ({PT_CONTROL}.Wrap)
+				elseif attached on_record as al_record then
+					al_record.call (Void)
+				end
+			when {PT_TRANSPORT_BAR}.Star_button then
+				on_control ({PT_CONTROL}.Star)
+			when {PT_TRANSPORT_BAR}.Reject_button then
+				on_control ({PT_CONTROL}.Reject)
+			when {PT_TRANSPORT_BAR}.Slower_button then
+				if is_constant then
+					change_speed (-Speed_step)
+				end
+			when {PT_TRANSPORT_BAR}.Faster_button then
+				if is_constant then
+					change_speed (Speed_step)
+				end
+			when {PT_TRANSPORT_BAR}.Progress_hit then
+				hold_if_reading
+				if prompter.controller.state = {PT_TAKE_STATE}.Held then
+					prompter.controller.pick_word (a_word)
+				end
+			end
+		end
+
+	refresh_bar (a_bar: PT_TRANSPORT_BAR)
+			-- Which buttons would act now, what the play and record buttons show, how far through.
+		local
+			l_state: INTEGER
+			l_idle, l_reading, l_held, l_steps: BOOLEAN
+		do
+			l_state := prompter.controller.state
+			l_idle := l_state = {PT_TAKE_STATE}.Idle
+			l_held := l_state = {PT_TAKE_STATE}.Held
+			l_reading := l_state = {PT_TAKE_STATE}.Reading or l_state = {PT_TAKE_STATE}.Count_in
+			l_steps := l_held or (l_reading and prompter.controller.is_allowed ({PT_ACTION}.Hold))
+			a_bar.set_enabled ({PT_TRANSPORT_BAR}.Back_button, l_steps)
+			a_bar.set_enabled ({PT_TRANSPORT_BAR}.Forward_button, l_steps)
+			a_bar.set_enabled ({PT_TRANSPORT_BAR}.Again_button, resolves ({PT_CONTROL}.Again))
+			if l_idle then
+				a_bar.set_enabled ({PT_TRANSPORT_BAR}.Play_button, resolves ({PT_CONTROL}.Play_stop))
+				a_bar.set_enabled ({PT_TRANSPORT_BAR}.Record_button,
+					on_record /= Void and prompter.controller.is_allowed ({PT_ACTION}.Record))
+			else
+				a_bar.set_enabled ({PT_TRANSPORT_BAR}.Play_button, resolves ({PT_CONTROL}.Hold_toggle))
+				a_bar.set_enabled ({PT_TRANSPORT_BAR}.Record_button, resolves ({PT_CONTROL}.Wrap))
+			end
+			a_bar.set_enabled ({PT_TRANSPORT_BAR}.Star_button, resolves ({PT_CONTROL}.Star))
+			a_bar.set_enabled ({PT_TRANSPORT_BAR}.Reject_button, resolves ({PT_CONTROL}.Reject))
+			a_bar.set_enabled ({PT_TRANSPORT_BAR}.Slower_button, is_constant and settings.speed_wpm > settings.Min_wpm)
+			a_bar.set_enabled ({PT_TRANSPORT_BAR}.Faster_button, is_constant and settings.speed_wpm < settings.Max_wpm)
+			a_bar.set_transport (l_reading, not l_idle, prompter.controller.is_recording)
+			a_bar.set_progress (prompter.scroll.position, prompter.history.current_revision.word_count)
+		end
+
 feature -- Status
+
+	is_constant: BOOLEAN
+			-- Is the pill following at a constant speed (so the speed buttons apply)?
+		do
+			Result := prompter.mode = {PT_FOLLOW_MODE}.Constant
+		end
 
 	Step_one_controls: ARRAY [INTEGER]
 			-- Controls live in plan Step 1, in registration (hotkey id) order.
@@ -240,6 +332,20 @@ feature {NONE} -- Implementation
 			else
 				refused.extend (l_line + {STRING_32} " (" + a_what + {STRING_32} ") is held by another program")
 			end
+		end
+
+	hold_if_reading
+			-- Reading or counting in: hold first, so a step or a jump has a caret to move.
+		do
+			if prompter.controller.state = {PT_TAKE_STATE}.Reading or prompter.controller.state = {PT_TAKE_STATE}.Count_in then
+				try_action ({PT_ACTION}.Hold)
+			end
+		end
+
+	resolves (a_control: INTEGER): BOOLEAN
+			-- Would `a_control' perform an action now?
+		do
+			Result := resolver.action_for (a_control, prompter.controller.state, prompter.controller.is_recording) /= 0
 		end
 
 	try_action (a_action: INTEGER)

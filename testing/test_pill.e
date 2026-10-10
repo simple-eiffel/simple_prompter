@@ -131,6 +131,116 @@ feature -- Settings and keys
 			assert_true ("each has a modifier", across k.all_bindings as ic all not ic.is_bare end)
 		end
 
+feature -- Tests: transport bar (0.3.2)
+
+	test_transport_bar_hits_every_button
+			-- A 400 px pill at scale 1: each button answers at its own centre, the band above
+			-- the row is the progress line, the script text above the bar never hits.
+		local
+			b: PT_TRANSPORT_BAR
+			i: INTEGER
+		do
+			create b.make (1.0)
+			b.lay_out (0.0, 100.0, 400.0)
+			from i := 1 until i > b.Button_count loop
+				assert_integers_equal ("button " + i.out + " at its centre", i, b.hit (b.button_centre_x (i), b.button_centre_y))
+				i := i + 1
+			end
+			assert_integers_equal ("progress band", b.Progress_hit, b.hit (200.0, 102.0))
+			assert_integers_equal ("script text", 0, b.hit (200.0, 99.0))
+			assert_integers_equal ("gap between groups",
+				0, b.hit ((b.button_left (b.Forward_button) + b.button_size + b.button_left (b.Record_button)) / 2, b.button_centre_y))
+			assert_true ("in the bar", b.is_in_bar (100.0) and not b.is_in_bar (99.9))
+			assert_true ("full size when it fits", (b.button_size - b.Design_button).abs < 0.001)
+		end
+
+	test_transport_bar_narrows_to_fit
+			-- The narrowest pill (200 px column + padding) at 150 % scale still holds every button.
+		local
+			b: PT_TRANSPORT_BAR
+		do
+			create b.make (1.5)
+			b.lay_out (0.0, 0.0, 224.0 * 1.5)
+			assert_true ("narrowed", b.button_size < b.Design_button * 1.5)
+			assert_true ("first inside", b.button_left (1) >= 0.0)
+			assert_true ("last inside", b.button_left (b.Button_count) + b.button_size <= 224.0 * 1.5 + 0.001)
+			assert_integers_equal ("still hits", b.Faster_button, b.hit (b.button_centre_x (b.Faster_button), b.button_centre_y))
+		end
+
+	test_transport_bar_progress_and_jump
+			-- The progress line maps x to a fraction and a fraction to a word.
+		local
+			b: PT_TRANSPORT_BAR
+		do
+			create b.make (1.0)
+			b.lay_out (0.0, 0.0, 400.0)
+			assert_true ("left end", b.fraction_at (b.progress_left) = 0.0)
+			assert_true ("right end", b.fraction_at (b.progress_right) = 1.0)
+			assert_true ("past the ends clamps", b.fraction_at (-50.0) = 0.0 and b.fraction_at (900.0) = 1.0)
+			assert_integers_equal ("start is word 1", 1, b.word_at_fraction (0.0, 50))
+			assert_integers_equal ("end is the last word", 50, b.word_at_fraction (1.0, 50))
+			assert_integers_equal ("half way", 25, b.word_at_fraction (0.5, 50))
+			b.set_progress (25.0, 50)
+			assert_true ("half read", (b.progress - 0.5).abs < 0.001)
+			b.set_progress (80.0, 50)
+			assert_true ("never past the end", b.progress = 1.0)
+			b.set_progress (3.0, 0)
+			assert_true ("no script, no progress", b.progress = 0.0)
+		end
+
+	test_transport_bar_signature_tracks_what_is_drawn
+			-- Anything the buttons draw changes the signature; hiding forgets the hover.
+		local
+			b: PT_TRANSPORT_BAR
+			s: INTEGER
+		do
+			create b.make (1.0)
+			s := b.signature
+			b.set_enabled (b.Star_button, True)
+			assert_true ("enabled changes it", b.signature /= s)
+			s := b.signature
+			b.set_pointer_in (True)
+			b.set_hovered (b.Play_button, 0.0)
+			assert_true ("hovered changes it", b.signature /= s)
+			s := b.signature
+			b.update_tooltip (1000.0)
+			assert_true ("tooltip changes it", b.signature /= s)
+			b.set_pointer_in (False)
+			assert_integers_equal ("leaving forgets the hover", 0, b.hovered)
+			s := b.signature
+			b.set_transport (True, True, True)
+			assert_true ("transport changes it", b.signature /= s)
+		end
+
+	test_transport_bar_tooltips
+			-- A tooltip waits for the pointer to rest, names the key, follows the state,
+			-- and goes when the pointer moves on or leaves.
+		local
+			b: PT_TRANSPORT_BAR
+		do
+			create b.make (1.0)
+			b.set_pointer_in (True)
+			b.set_hovered (b.Play_button, 1000.0)
+			b.update_tooltip (1200.0)
+			assert_false ("not yet", b.is_tooltip_shown)
+			b.update_tooltip (1000.0 + b.Tooltip_delay_ms)
+			assert_true ("after resting", b.is_tooltip_shown)
+			assert_true ("idle: play and its key", b.tooltip.has_substring ({STRING_32} "Play") and b.tooltip.has_substring ({STRING_32} "Ctrl+Alt+P"))
+			b.set_transport (True, True, False)
+			assert_true ("reading: hold", b.tooltip.starts_with ({STRING_32} "Hold"))
+			b.set_transport (False, True, False)
+			assert_true ("held: go", b.tooltip.starts_with ({STRING_32} "Go"))
+			b.set_hovered (b.Record_button, 2000.0)
+			assert_false ("a new target waits again", b.is_tooltip_shown)
+			b.set_transport (True, True, True)
+			assert_true ("recording: wrap", b.tooltip.starts_with ({STRING_32} "Wrap"))
+			b.set_hovered (b.Progress_hit, 3000.0)
+			assert_true ("the progress line has one too", b.tooltip.starts_with ({STRING_32} "Jump"))
+			b.update_tooltip (5000.0)
+			b.set_pointer_in (False)
+			assert_false ("leaving hides it", b.is_tooltip_shown)
+		end
+
 feature {NONE} -- Fixtures
 
 	geometry (a_unused: REAL_64): PT_PILL_GEOMETRY

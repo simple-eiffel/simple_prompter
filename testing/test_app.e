@@ -393,6 +393,11 @@ feature {NONE} -- Test sets
 			run_test (agent t.test_hold_never_offers_a_cue, "hold_never_offers_a_cue")
 			run_test (agent t.test_pill_position_survives_a_restart, "pill_position_survives_a_restart")
 			run_test (agent t.test_all_bindings_lists_every_binding, "all_bindings_lists_every_binding")
+			run_test (agent t.test_transport_bar_hits_every_button, "transport_bar_hits_every_button")
+			run_test (agent t.test_transport_bar_narrows_to_fit, "transport_bar_narrows_to_fit")
+			run_test (agent t.test_transport_bar_progress_and_jump, "transport_bar_progress_and_jump")
+			run_test (agent t.test_transport_bar_signature_tracks_what_is_drawn, "transport_bar_signature_tracks_what_is_drawn")
+			run_test (agent t.test_transport_bar_tooltips, "transport_bar_tooltips")
 		end
 
 	run_heard_stabilizer_tests

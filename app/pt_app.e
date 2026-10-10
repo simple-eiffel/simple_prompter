@@ -86,7 +86,7 @@ feature {NONE} -- Initialization
 
 feature -- Constants
 
-	Version: STRING_32 = "0.3.1"
+	Version: STRING_32 = "0.3.2"
 			-- Shown in the control window; keep in step with installer/simple_prompter.iss.
 
 	Tick_ms: INTEGER = 16
@@ -122,6 +122,8 @@ feature {NONE} -- The clock
 	count_in_started_ms: REAL_64
 	previous_state: INTEGER
 	last_signature: INTEGER_64
+	last_bar_signature: INTEGER
+			-- `pill.bar.signature' at the last repaint.
 	last_status: STRING_32
 		attribute
 			create Result.make_empty
@@ -149,7 +151,14 @@ feature {NONE} -- The clock
 				router.on_hotkey (a_a)
 				on_tick
 			when {SHELL_PANEL}.Event_press then
-				router.on_press (geometry.word_at (a_a, a_b, prompter.scroll.y_offset))
+				if pill.bar.is_laid_out and then pill.bar.is_in_bar (a_b) then
+					on_bar_press (a_a, a_b)
+				else
+					router.on_press (geometry.word_at (a_a, a_b, prompter.scroll.y_offset))
+				end
+				on_tick
+			when {SHELL_PANEL}.Event_move then
+				pill.track_pointer (a_a, a_b, clock.now_ms)
 				on_tick
 			when {SHELL_PANEL}.Event_right_press then
 				router.on_right_press
@@ -195,6 +204,12 @@ feature {NONE} -- The clock
 				end
 				prompter.tick (l_now)
 				follow_road
+				pill.refresh_hover (l_now)
+				router.refresh_bar (pill.bar)
+				if pill.bar.signature /= last_bar_signature then
+					last_bar_signature := pill.bar.signature
+					last_signature := -1
+				end
 				if pill.is_shift_held /= grips_shown then
 					grips_shown := not grips_shown
 					pill.set_shows_grips (grips_shown)
@@ -278,6 +293,23 @@ feature {NONE} -- Opening scripts
 			last_status := {STRING_32} ""
 			window.request_render
 			on_tick
+		end
+
+	on_bar_press (a_x, a_y: INTEGER)
+			-- A click on the pill's transport bar: a button, or a jump along the progress line.
+		require
+			laid_out: pill.bar.is_laid_out
+		local
+			l_hit, l_word, l_count: INTEGER
+		do
+			l_hit := pill.bar.hit (a_x, a_y)
+			l_count := prompter.history.current_revision.word_count
+			if pill.bar.valid_button (l_hit) then
+				router.on_bar (l_hit, 0)
+			elseif l_hit = pill.bar.Progress_hit and l_count >= 1 then
+				l_word := pill.bar.word_at_fraction (pill.bar.fraction_at (a_x), l_count)
+				router.on_bar (l_hit, l_word)
+			end
 		end
 
 	open_button_x, open_button_y, open_button_width, open_button_height: REAL_64
