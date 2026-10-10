@@ -70,6 +70,9 @@ feature -- Access
 	has_alignment: BOOLEAN
 			-- Has an anchored alignment arrived since the last caret change?
 
+	last_snapped: BOOLEAN
+			-- Did the last `advance' jump to the aligned word (more than `Snap_lag' behind)?
+
 feature -- Input
 
 	on_voice (a_frame: PT_VOICE_FRAME)
@@ -97,6 +100,7 @@ feature -- Motion
 			-- Steer toward the aligned word at the measured rate; coast, then hold.
 		do
 			caret_changed := False
+			last_snapped := False
 			seconds_since_anchor := seconds_since_anchor + a_dt_s
 			if is_held then
 				velocity := 0
@@ -118,6 +122,7 @@ feature -- Motion
 					-- More than a line behind a fresh anchor (a skipped paragraph, a late start):
 					-- jump to the reader; the scroll's spring turns the jump into a quick glide.
 				target := aligned_word.to_double.min (word_count)
+				last_snapped := True
 			end
 			if not is_held then
 				if is_speaking then

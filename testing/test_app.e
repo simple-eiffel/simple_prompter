@@ -243,6 +243,8 @@ feature {NONE} -- Test sets
 			run_test (agent t.test_step_back_and_forward_edges, "step_back_and_forward_edges")
 			run_test (agent t.test_cough_session_journal, "cough_session_journal")
 			run_test (agent t.test_journal_writes_and_replays, "journal_writes_and_replays")
+			run_test (agent t.test_follow_trace_rides_in_the_journal, "follow_trace_rides_in_the_journal")
+			run_test (agent t.test_follow_trace_records_the_decision, "follow_trace_records_the_decision")
 			run_test (agent t.test_silence_around_the_instructed_pause, "silence_around_the_instructed_pause")
 			run_test (agent t.test_star_marks_exactly_one_attempt, "star_marks_exactly_one_attempt")
 			run_test (agent t.test_starred_older_take_wins, "starred_older_take_wins")

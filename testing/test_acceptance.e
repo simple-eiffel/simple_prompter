@@ -113,6 +113,86 @@ feature -- T11 journal persistence
 			assert_reals_equal ("flub time", 2.5, k.event (2).rt, 0.0005)
 		end
 
+feature -- Follow trace (0.5.1)
+
+	test_follow_trace_rides_in_the_journal
+			-- Trace lines wait for the next event (or a flush), land before it in time order,
+			-- and replay skips them; a practice journal drops them.
+		local
+			j, k, m: PT_JOURNAL
+			l_path: STRING_32
+			l_lines: ARRAYED_LIST [STRING_8]
+		do
+			l_path := temp_path ({STRING_32} "trace_journal.jsonl")
+			create j.make_on_file (l_path)
+			j.append (create {PT_TAKE_EVENT}.make_resume (1.0, id (5), 1))
+			j.trace ({STRING_32} "{%"t%":%"frame%",%"rt%":1.1}")
+			j.trace ({STRING_32} "{%"t%":%"heard%",%"rt%":1.2}")
+			assert_true ("buffered", j.has_trace_pending)
+			assert_integers_equal ("one line on disk", 1, utf8_lines (l_path).count)
+			j.append (create {PT_TAKE_EVENT}.make_flub (2.5, id (9), "clicker"))
+			assert_false ("flushed by the event", j.has_trace_pending)
+			l_lines := utf8_lines (l_path)
+			assert_integers_equal ("four lines", 4, l_lines.count)
+			assert_true ("frame second", l_lines [2].has_substring ("frame"))
+			assert_true ("heard third", l_lines [3].has_substring ("heard"))
+			assert_true ("flub last", l_lines [4].has_substring ("flub"))
+			assert_integers_equal ("trace lines written", 2, j.trace_lines_written)
+			create k.make_in_memory
+			k.replay_from (l_lines)
+			assert_integers_equal ("two events back", 2, k.count)
+			assert_integers_equal ("trace lines skipped", 2, k.skipped_lines)
+			create m.make_in_memory
+			m.trace ({STRING_32} "{%"t%":%"frame%"}")
+			assert_false ("practice drops the trace", m.has_trace_pending)
+		end
+
+	test_follow_trace_records_the_decision
+			-- A heard line carries the words, the move and its evidence; frames are due on a new
+			-- line, a snap, or after the interval.
+		local
+			a: PT_ALIGNER
+			f: PT_TRACKING_FOLLOWER
+			h: PT_HEARD_WORDS
+			t: PT_FOLLOW_TRACE
+			l_from: INTEGER
+		do
+			create a.make (moody, create {PT_WORD_MATCHER})
+			create f.make (moody.word_count, 150)
+			h := heard (0, <<{STRING_32} "This", {STRING_32} "is", {STRING_32} "Moody">>)
+			l_from := a.position
+			a.update (h)
+			f.on_alignment (a.last_alignment)
+			create t.make
+			if attached (create {SIMPLE_JSON}).parse (t.heard_line (1.5, h, l_from, a, f)) as al_value and then al_value.is_object then
+				assert_true ("kind", attached al_value.as_object.string_item ("t") as al_t and then al_t.same_string ("heard"))
+				assert_true ("words", attached al_value.as_object.string_item ("words") as al_w and then al_w.same_string ("This is Moody"))
+				assert_integers_equal ("from", 0, al_value.as_object.integer_item ("from").to_integer_32)
+				assert_integers_equal ("to", a.position, al_value.as_object.integer_item ("to").to_integer_32)
+				assert_integers_equal ("proposed", a.last_proposed, al_value.as_object.integer_item ("prop").to_integer_32)
+				assert_true ("moved", a.position = 3)
+			else
+				assert_true ("heard line is a JSON object", False)
+			end
+			assert_true ("first frame due", t.wants_frame (1.0, 2, False))
+			t.note_frame (1.0, 2)
+			assert_false ("not yet", t.wants_frame (1.05, 2, False))
+			assert_true ("new line", t.wants_frame (1.05, 3, False))
+			assert_true ("snap", t.wants_frame (1.05, 2, True))
+			assert_true ("interval", t.wants_frame (1.11, 2, False))
+		end
+
+	utf8_lines (a_path: READABLE_STRING_32): ARRAYED_LIST [STRING_8]
+			-- Non-empty lines of `a_path', as UTF-8.
+		do
+			create Result.make (8)
+			across file_text (a_path).split ('%N') as ic loop
+				if not ic.is_empty then
+					Result.extend ((create {SIMPLE_ENCODING}.make).utf_32_to_utf_8 (ic))
+				end
+			end
+		end
+
 feature -- T13 VAD gaps
 
 	test_silence_around_the_instructed_pause

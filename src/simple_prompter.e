@@ -31,6 +31,7 @@ feature {NONE} -- Initialization
 			create layout.make
 			create policy
 			create recording_clock.make
+			create follow_trace.make
 		ensure
 			settings_set: settings = a_settings
 			no_script: not has_script
@@ -338,6 +339,7 @@ feature -- Take Studio sessions
 		local
 			l_count_in: REAL_64
 		do
+			controller.journal.flush_trace
 			l_count_in := controller.count_in_seconds
 			session_cell := Void
 			create controller_cell.make (history, create {PT_JOURNAL}.make_in_memory, recording_clock, clock, follower, policy)
@@ -376,13 +378,20 @@ feature -- Following
 		end
 
 	feed_heard (a_heard: PT_HEARD_WORDS)
-			-- Decode result: align, steer the follower, sample into the controller.
+			-- Decode result: align, steer the follower, sample into the controller; while recording,
+			-- trace the decision into the journal.
 		require
 			loaded: has_script
+		local
+			l_from: INTEGER
 		do
+			l_from := aligner.position
 			aligner.update (a_heard)
 			follower.on_alignment (aligner.last_alignment)
 			controller.sample_alignment (aligner.last_alignment)
+			if controller.is_recording then
+				controller.journal.trace (follow_trace.heard_line (controller.current_rt, a_heard, l_from, aligner, follower))
+			end
 		end
 
 	tick (a_now_ms: REAL_64)
@@ -391,6 +400,7 @@ feature -- Following
 			not_backward: scroll.is_started implies a_now_ms >= scroll.last_ms
 		do
 			scroll.tick (a_now_ms)
+			trace_frame
 		ensure
 			ticked: scroll.last_ms = a_now_ms
 		end
@@ -449,6 +459,41 @@ feature {NONE} -- Implementation
 
 	session_cell: detachable PT_SESSION
 			-- The open Take Studio session, if any.
+
+	follow_trace: PT_FOLLOW_TRACE
+			-- Formats the follow trace written into the journal while recording.
+
+	trace_frame
+			-- While recording, trace the display (when due) and write buffered trace lines once a
+			-- second; after recording, write what is left.
+		require
+			loaded: has_script
+		local
+			l_rt: REAL_64
+			l_line, l_target_line: INTEGER
+			l_snapped: BOOLEAN
+		do
+			if controller.is_recording then
+				l_rt := controller.current_rt
+				if layout.word_count > 0 then
+					l_line := layout.line_of ((scroll.position.floor + 1).min (layout.word_count).max (1))
+					l_target_line := layout.line_of ((follower.target.floor + 1).min (layout.word_count).max (1))
+				end
+				if attached {PT_TRACKING_FOLLOWER} follower as al_tracking then
+					l_snapped := al_tracking.last_snapped
+				end
+				if follow_trace.wants_frame (l_rt, l_line, l_snapped) then
+					controller.journal.trace (follow_trace.frame_line (l_rt, follower, scroll, l_line, l_target_line))
+					follow_trace.note_frame (l_rt, l_line)
+				end
+				if follow_trace.wants_flush (l_rt) then
+					controller.journal.flush_trace
+					follow_trace.note_flush (l_rt)
+				end
+			elseif controller.journal.has_trace_pending then
+				controller.journal.flush_trace
+			end
+		end
 
 	rewire
 			-- Follow the current revision: new aligner, rebuilt layout, rescaled follower.

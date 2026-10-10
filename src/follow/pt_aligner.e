@@ -76,6 +76,16 @@ feature -- Access
 	last_alignment: PT_ALIGNMENT
 			-- Estimate produced by the last `update' or `reanchor'.
 
+	last_proposed: INTEGER
+			-- Where the last `update''s best match ended (the move it proposed; `position' when
+			-- there was no anchored match). For the follow trace.
+
+	last_needed: INTEGER
+			-- Anchors the last `update''s forward move needed (0 for a move of at most `Small_jump').
+
+	last_wide: BOOLEAN
+			-- Did the last `update' take its match from the wide search (up to `Window_ahead')?
+
 	spoken_distance (a_from, a_to: INTEGER): INTEGER
 			-- Words in `a_from' + 1 .. `a_to' that can be spoken (cue text is never read aloud, so
 			-- moving past a cue is not a jump; approved by Larry 2026-10-06).
@@ -122,6 +132,9 @@ feature -- Element change
 			l_rate, l_dt: REAL_64
 		do
 			l_rate := last_alignment.rate_wps
+			last_proposed := position
+			last_needed := 0
+			last_wide := False
 			if a_heard.window_start >= reanchored_at then
 				buffer_heard (a_heard)
 				l_heard := recent_tail
@@ -147,6 +160,7 @@ feature -- Element change
 					if best_explains_tail and best_anchors > l_anchors and best_end > l_end then
 							l_anchors := best_anchors
 							l_matched := best_matched
+							last_wide := True
 						else
 							best_end := l_end
 						end
@@ -158,11 +172,15 @@ feature -- Element change
 					end
 					if l_anchors > 0 then
 						l_new := best_end
+						last_proposed := l_new
 						if l_new < position then
 							if l_anchors >= Backward_evidence then
 								position := l_new
 							end
 						elseif l_new > position then
+							if spoken_distance (position, l_new) > Small_jump then
+								last_needed := required_anchors (spoken_distance (position, l_new))
+							end
 							if spoken_distance (position, l_new) <= Small_jump or else l_anchors >= required_anchors (spoken_distance (position, l_new)) then
 								position := l_new
 							end
@@ -201,6 +219,7 @@ feature -- Element change
 					last_alignment.anchor_count >= required_anchors (spoken_distance (old position, position))
 			confidence_range: confidence >= 0.0 and confidence <= 1.0
 			alignment_consistent: last_alignment.word_index = position
+			proposed_in_script: last_proposed >= 0 and last_proposed <= revision.word_count
 		end
 
 	reanchor (a_words_read: INTEGER; a_at_sample: INTEGER_64)
