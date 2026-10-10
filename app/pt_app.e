@@ -1,17 +1,19 @@
 note
 	description: "[
-		simple_prompter, plan Steps 1-3: the pill follows your voice. A small
-		control window (state, follow mode, speech, keys) owns the event pump; the
-		pill is a capture-excluded panel under the webcam. Speech runs on its own
+		simple_prompter: the pill follows your voice. Since 0.4.0 the pill is the
+		whole program - a capture-excluded panel under the webcam with its rails,
+		callouts and slide handle, and an icon in the notification area. The old
+		control window still owns the event pump, hidden (--window shows it). Speech runs on its own
 		processor (PT_SPEECH_WORKER: Silero + whisper on the GPU, ffmpeg on the
 		microphone); the 16 ms tick takes what it heard from the slot, feeds the
 		facade while reading, keeps the recording clock and the already-read
 		prompt current, finishes the count-in, advances the follower and the
 		smoothed scroll, and repaints the pill when anything it shows has changed.
 
-		Usage: simple_prompter_app [script.md|script.txt] [--capturable]
+		Usage: simple_prompter_app [script.md|script.txt] [--capturable] [--window]
 		(no script: the read test from the project fixtures, if present;
-		--capturable lets screen captures see the pill, for screenshots).
+		--capturable lets screen captures see the pill, for screenshots;
+		--window shows the old control window).
 	]"
 	author: "Larry Rix"
 
@@ -77,8 +79,12 @@ feature {NONE} -- Initialization
 			window.set_root (status_canvas)
 			window.set_on_shell_event (agent on_shell_event)
 			window.set_on_tick (agent on_heartbeat)
+			window.set_starts_hidden (not has_flag ({STRING_32} "--window"))
 			window.run
 				-- The window closed: give everything back.
+			if attached tray as al_tray then
+				al_tray.remove
+			end
 			across callouts as ic loop
 				ic.close
 			end
@@ -91,7 +97,7 @@ feature {NONE} -- Initialization
 
 feature -- Constants
 
-	Version: STRING_32 = "0.3.6"
+	Version: STRING_32 = "0.4.0"
 			-- Shown in the control window; keep in step with installer/simple_prompter.iss.
 
 	Tick_ms: INTEGER = 16
@@ -138,6 +144,7 @@ feature -- Access
 			-- Right of the pill: the script, Open script..., recent scripts.
 		attribute
 			create Result.make ({PT_CALLOUT}.Side_right, 320, theme)
+			Result.set_takes_files (True)
 		end
 
 	settings_callout: PT_CALLOUT
@@ -188,6 +195,10 @@ feature {NONE} -- The clock
 			if not is_started then
 				is_started := True
 				pill.open
+				if pill.panel.is_open then
+					pill.panel.set_accepts_files (True)
+				end
+				start_tray
 				router.register_all
 				window.set_fast_timer (Tick_ms)
 				show_latest_take
@@ -206,7 +217,11 @@ feature {NONE} -- The clock
 			when {SHELL_HOTKEYS}.Event_hotkey then
 				router.on_hotkey (a_a)
 				on_tick
-			when {SHELL_PANEL}.Event_press .. {SHELL_PANEL}.Event_moving then
+			when {SHELL_TRAY}.Event_click then
+				if attached tray as al_tray and then window.event_extra = al_tray.id then
+					on_tray_click (al_tray, a_a)
+				end
+			when {SHELL_PANEL}.Event_press .. {SHELL_PANEL}.Event_dropped then
 				if attached callout_at_slot (window.event_extra) as al_callout then
 					on_callout_event (al_callout, a_type, a_a, a_b)
 				elseif slide_handle.slot >= 0 and window.event_extra = slide_handle.slot then
@@ -245,6 +260,8 @@ feature {NONE} -- The clock
 			when {SHELL_PANEL}.Event_wheel then
 				router.on_wheel (a_a)
 				on_tick
+			when {SHELL_PANEL}.Event_dropped then
+				on_files (window.take_dropped_paths)
 			when {SHELL_PANEL}.Event_moving then
 				pill.panel.sync_geometry
 				follow_pill
@@ -340,7 +357,8 @@ feature {NONE} -- Opening scripts
 		end
 
 	on_files (a_paths: ARRAYED_LIST [STRING_32])
-			-- Files dropped on the control window: open the first script among them.
+			-- Files dropped on the pill, the Script callout or the control window: open the
+			-- first script among them.
 		local
 			l_done: BOOLEAN
 		do
@@ -349,6 +367,10 @@ feature {NONE} -- Opening scripts
 					open_script_file (ic)
 					l_done := True
 				end
+			end
+			if not l_done and not a_paths.is_empty then
+				script_note := {STRING_32} "Not a script: drop a .md or .txt file."
+				window.request_render
 			end
 		end
 
@@ -495,6 +517,47 @@ feature {NONE} -- Callouts (0.4.0)
 			end
 		end
 
+	tray: detachable SHELL_TRAY
+			-- The icon in the notification area: a click shows or hides the pill, a right
+			-- click offers a menu (0.4.0). Void where Windows refused one.
+
+	start_tray
+			-- Put the icon in the notification area.
+		local
+			l_tray: SHELL_TRAY
+		do
+			create l_tray.make ({STRING_32} "simple_prompter - click to show or hide the pill")
+			if l_tray.is_installed then
+				tray := l_tray
+			end
+		end
+
+	on_tray_click (a_tray: SHELL_TRAY; a_button: INTEGER)
+			-- The tray icon: a click shows or hides the pill; a right click offers a menu.
+		local
+			l_choice: INTEGER
+		do
+			if a_button = a_tray.Click_left then
+				router.on_control ({PT_CONTROL}.Hide)
+			elseif a_button = a_tray.Click_right then
+				l_choice := a_tray.choose (<<
+					(if pill.is_shown then {STRING_32} "Hide the pill%T(Ctrl+Alt+H)" else {STRING_32} "Show the pill%T(Ctrl+Alt+H)" end),
+					{STRING_32} "Open a script...%T(Ctrl+Alt+O)",
+					{STRING_32} "-",
+					{STRING_32} "Quit simple_prompter">>)
+				inspect l_choice
+				when 1 then
+					router.on_control ({PT_CONTROL}.Hide)
+				when 2 then
+					choose_script
+				when 4 then
+					window.close
+				else
+				end
+			end
+			on_tick
+		end
+
 	on_rail_press (a_code: INTEGER)
 			-- A rail button: open or close its callout, or quit.
 		do
@@ -611,6 +674,11 @@ feature {NONE} -- Callouts (0.4.0)
 				a_callout.track (a_x, a_y, clock.now_ms)
 			when {SHELL_PANEL}.Event_expose then
 				render_callout (a_callout)
+			when {SHELL_PANEL}.Event_dropped then
+				on_files (window.take_dropped_paths)
+				if a_callout.is_shown then
+					render_callout (a_callout)
+				end
 			else
 			end
 		end
@@ -817,7 +885,10 @@ feature {NONE} -- Callouts (0.4.0)
 			p.set_color (theme.background)
 			p.text (x + 14 * k, y + 20 * k, {STRING_32} "Open script...")
 			c.add_zone (201, x, y, l_bw, 30 * k, {STRING_32} "Choose a script file (.md or .txt)  (Ctrl+Alt+O)")
-			y := y + 30 * k + 26 * k
+			p.font (p.Role_ui, 12, False)
+			p.set_color (theme.ink_muted)
+			p.text (x, y + 30 * k + 22 * k, {STRING_32} "or drop a .md or .txt file on the pill or here")
+			y := y + 30 * k + 22 * k + 32 * k
 			if not settings.recent_scripts.is_empty then
 				p.font (p.Role_ui, 12, True)
 				p.set_color (theme.ink)

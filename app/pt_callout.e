@@ -91,6 +91,20 @@ feature -- Access
 			end
 		end
 
+	takes_files: BOOLEAN
+			-- Do files dropped on the callout arrive (`SHELL_PANEL.Event_dropped')?
+
+	set_takes_files (a_on: BOOLEAN)
+			-- Take dropped files from the next `show_beside' on, or not.
+		do
+			takes_files := a_on
+			if panel.is_open then
+				panel.set_accepts_files (a_on)
+			end
+		ensure
+			set: takes_files = a_on
+		end
+
 	is_shown: BOOLEAN
 		do
 			Result := panel.is_open and then panel.is_visible
@@ -142,6 +156,9 @@ feature -- Showing
 				panel.open (l_x, l_y, width, l_h)
 				if panel.is_open and not a_capturable then
 					panel.request_capture_exclusion
+				end
+				if panel.is_open and takes_files then
+					panel.set_accepts_files (True)
 				end
 			end
 			if panel.is_open then
