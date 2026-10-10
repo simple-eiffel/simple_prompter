@@ -149,6 +149,14 @@ feature -- Showing
 			end
 		end
 
+	follow (a_pill_x, a_pill_y, a_pill_w, a_pill_h: INTEGER)
+			-- Move along with a pill that is moving (no repaint: the picture moves with the window).
+		do
+			if is_shown then
+				show_beside (a_pill_x, a_pill_y, a_pill_w, a_pill_h, True)
+			end
+		end
+
 	hide
 		do
 			if panel.is_open and then panel.is_visible then

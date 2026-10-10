@@ -168,6 +168,7 @@ feature -- Lifecycle
 				panel.set_resizable ((Design_grip * scale).rounded.max (1).min (64),
 					(settings.Min_width * scale + 2 * padding + 2 * rails.rail_width).ceiling,
 					((measure.line_height + 2 * padding).max (rails.min_text_height) + bar.height).ceiling)
+				panel.set_sides_size_on_press (True)
 				panel.show (l_x, l_y, width, height)
 			end
 		end

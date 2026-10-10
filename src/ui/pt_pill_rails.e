@@ -35,6 +35,9 @@ feature -- Targets
 	Script_hit: INTEGER = 3
 	Settings_hit: INTEGER = 4
 	Take_hit: INTEGER = 5
+	Left_grip_hit: INTEGER = 6
+	Right_grip_hit: INTEGER = 7
+			-- The side edges: a plain press there sizes the pill (simple_shell 1.14.0).
 
 feature -- Lights
 
@@ -45,13 +48,16 @@ feature -- Lights
 
 feature -- Design pixels (times `scale')
 
-	Design_rail: REAL_64 = 48.0
+	Design_rail: REAL_64 = 54.0
+			-- Wide enough that a button never reaches into a side grip.
 	Design_button: REAL_64 = 32.0
 	Design_quit: REAL_64 = 24.0
 	Design_gap: REAL_64 = 6.0
 	Design_top: REAL_64 = 8.0
 	Design_light_slot: REAL_64 = 30.0
 			-- One light (icon and dot) in the Status button.
+	Design_side_grip: REAL_64 = 10.0
+			-- How near a side edge a press sizes the pill (PT_PILL.Design_grip).
 
 feature -- Access
 
@@ -115,8 +121,10 @@ feature -- Layout
 			zones.extend ([Settings_hit, l_x + (rail_width - b) / 2, l_y, b, b])
 			l_y := l_y + b + Design_gap * scale
 			zones.extend ([Take_hit, l_x + (rail_width - b) / 2, l_y, b, b])
+			zones.extend ([Left_grip_hit, 0.0, 0.0, Design_side_grip * scale, a_text_height])
+			zones.extend ([Right_grip_hit, a_width - Design_side_grip * scale, 0.0, Design_side_grip * scale, a_text_height])
 		ensure
-			five_buttons: zones.count = 5
+			five_buttons_two_grips: zones.count = 7
 		end
 
 	hit (a_x, a_y: REAL_64): INTEGER
@@ -142,7 +150,7 @@ feature -- Tooltips
 	tooltip_text (a_code: INTEGER): STRING_32
 			-- What button `a_code' does.
 		require
-			known: a_code >= Status_hit and a_code <= Take_hit
+			known: a_code >= Status_hit and a_code <= Right_grip_hit
 		do
 			inspect a_code
 			when Status_hit then
@@ -156,6 +164,8 @@ feature -- Tooltips
 				Result := {STRING_32} "Settings: camera, microphone, sync start, tooltips"
 			when Take_hit then
 				Result := {STRING_32} "Last take: render it, set its sync, preview cuts and things to check"
+			when Left_grip_hit, Right_grip_hit then
+				Result := {STRING_32} "Drag this edge to make the pill wider or narrower (Shift+drag the bottom for more lines)"
 			end
 		end
 

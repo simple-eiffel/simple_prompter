@@ -82,6 +82,7 @@ feature {NONE} -- Initialization
 			across callouts as ic loop
 				ic.close
 			end
+			slide_handle.close
 			edit_floor.close
 			stop_speech
 			router.release_all
@@ -156,6 +157,12 @@ feature -- Access
 			Result := <<status_callout, script_callout, settings_callout, take_callout>>
 		end
 
+	slide_handle: PT_SLIDE_HANDLE
+			-- The tab under the pill that slides it left and right.
+		attribute
+			create Result.make (theme)
+		end
+
 	last_callout_ms: REAL_64
 	last_callout_signature: INTEGER
 	last_rails_signature: INTEGER
@@ -184,6 +191,7 @@ feature {NONE} -- The clock
 				router.register_all
 				window.set_fast_timer (Tick_ms)
 				show_latest_take
+				place_handle
 				apply_tooltips
 				window.request_render
 			end
@@ -198,9 +206,11 @@ feature {NONE} -- The clock
 			when {SHELL_HOTKEYS}.Event_hotkey then
 				router.on_hotkey (a_a)
 				on_tick
-			when {SHELL_PANEL}.Event_press .. {SHELL_PANEL}.Event_resized then
+			when {SHELL_PANEL}.Event_press .. {SHELL_PANEL}.Event_moving then
 				if attached callout_at_slot (window.event_extra) as al_callout then
 					on_callout_event (al_callout, a_type, a_a, a_b)
+				elseif slide_handle.slot >= 0 and window.event_extra = slide_handle.slot then
+					on_handle_event (a_type, a_a, a_b)
 				else
 					on_pill_event (a_type, a_a, a_b)
 				end
@@ -235,12 +245,17 @@ feature {NONE} -- The clock
 			when {SHELL_PANEL}.Event_wheel then
 				router.on_wheel (a_a)
 				on_tick
+			when {SHELL_PANEL}.Event_moving then
+				pill.panel.sync_geometry
+				follow_pill
 			when {SHELL_PANEL}.Event_moved then
 				pill.remember_position (a_a, a_b)
 				place_callouts
+				place_handle
 			when {SHELL_PANEL}.Event_resized then
 				on_pill_resized (a_a, a_b)
 				place_callouts
+				place_handle
 			when {SHELL_PANEL}.Event_expose then
 				last_signature := -1
 				on_tick
@@ -282,6 +297,7 @@ feature {NONE} -- The clock
 					last_signature := -1
 				end
 				update_lights
+				follow_visibility (l_now)
 				if pill.rails.signature /= last_rails_signature then
 					last_rails_signature := pill.rails.signature
 					last_signature := -1
@@ -599,10 +615,76 @@ feature {NONE} -- Callouts (0.4.0)
 			end
 		end
 
+	on_handle_event (a_type, a_a, a_b: INTEGER)
+			-- The slide handle: the pill and its callouts follow it.
+		do
+			inspect a_type
+			when {SHELL_PANEL}.Event_moving then
+				pill.panel.place (slide_handle.pill_left_for (a_a, pill.panel.width), pill.panel.y, pill.panel.width, pill.panel.height)
+				follow_callouts_only
+			when {SHELL_PANEL}.Event_moved then
+				pill.remember_position (pill.panel.x, pill.panel.y)
+				place_callouts
+				place_handle
+			when {SHELL_PANEL}.Event_move then
+				slide_handle.track (clock.now_ms)
+			else
+			end
+		end
+
+	place_handle
+			-- The slide handle, centred under the pill.
+		do
+			if pill.is_shown then
+				slide_handle.show_under (pill.panel.x, pill.panel.y, pill.panel.width, pill.panel.height, pill.is_capturable)
+			end
+		end
+
+	follow_pill
+			-- The pill is moving (Shift+drag): its handle and callouts come along.
+		do
+			if slide_handle.is_shown then
+				slide_handle.panel.place (pill.panel.x + pill.panel.width // 2 - slide_handle.width // 2,
+					pill.panel.y + pill.panel.height, slide_handle.width, slide_handle.height)
+			end
+			follow_callouts_only
+		end
+
+	follow_callouts_only
+		do
+			across callouts as ic loop
+				ic.follow (pill.panel.x, pill.panel.y, pill.panel.width, pill.panel.height)
+			end
+		end
+
+	follow_visibility (a_now: REAL_64)
+			-- Hidden pill (Ctrl+Alt+H): its handle and callouts go too, and come back with it. The
+			-- handle's tooltip shows on the pill.
+		local
+			l_tip: STRING_32
+		do
+			if pill.is_shown and not slide_handle.is_shown then
+				place_handle
+			elseif not pill.is_shown and slide_handle.is_shown then
+				slide_handle.hide
+				across callouts as ic loop
+					ic.hide
+				end
+				sync_rails
+			end
+			slide_handle.refresh_hover (a_now)
+			l_tip := (if slide_handle.hover.is_tooltip_shown then slide_handle.Tip else {STRING_32} "" end)
+			if not l_tip.same_string (pill.renderer.handle_tip) then
+				pill.renderer.set_handle_tip (l_tip)
+				last_signature := -1
+			end
+		end
+
 	apply_tooltips
 			-- Tooltips on or off everywhere, as Settings says.
 		do
 			pill.set_tooltips_enabled (settings.shows_tooltips)
+			slide_handle.hover.set_enabled (settings.shows_tooltips)
 			across callouts as ic loop
 				ic.hover.set_enabled (settings.shows_tooltips)
 			end

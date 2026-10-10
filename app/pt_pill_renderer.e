@@ -65,6 +65,19 @@ feature -- Access
 	shows_grips: BOOLEAN
 			-- Draw the resize grips (while Shift is held)?
 
+	handle_tip: STRING_32
+			-- The slide handle's tooltip, shown just above it (empty: none).
+		attribute
+			create Result.make_empty
+		end
+
+	set_handle_tip (a_tip: READABLE_STRING_32)
+		do
+			handle_tip := a_tip.to_string_32
+		ensure
+			set: handle_tip.same_string (a_tip)
+		end
+
 feature -- Settings
 
 	set_shows_grips (a_on: BOOLEAN)
@@ -205,6 +218,28 @@ feature {NONE} -- Painting
 			if a_rails.hover.is_tooltip_shown and a_rails.is_laid_out then
 				rails_tooltip (p, a_rails, a_width, a_height, k)
 			end
+			if not handle_tip.is_empty then
+				centred_tip (p, handle_tip, a_width / 2, a_height - 6 * k, a_width, k)
+			end
+		end
+
+	centred_tip (p: SW_PAINTER; a_text: STRING_32; a_centre, a_bottom: REAL_64; a_width: INTEGER; k: REAL_64)
+			-- A tooltip centred on `a_centre', its bottom at `a_bottom', kept inside the pill.
+		local
+			l_w, l_h, l_x, l_pad: REAL_64
+		do
+			p.font (p.Role_ui, (font_size * 0.4).max (12.0), False)
+			l_pad := 8 * k
+			l_w := p.advance (a_text) + 2 * l_pad
+			l_h := p.font_ascent + p.font_descent + 2 * l_pad * 0.75
+			l_x := (a_centre - l_w / 2).max (4 * k).min (a_width - l_w - 4 * k)
+			p.set_color (Tooltip_slab)
+			p.rrect_fill (l_x, a_bottom - l_h, l_w, l_h, 6 * k)
+			p.set_color_alpha (Accent, 0.6)
+			p.set_line_width (1 * k)
+			p.rrect_stroke (l_x, a_bottom - l_h, l_w, l_h, 6 * k)
+			p.set_color (Reading_ink)
+			p.text (l_x + l_pad, a_bottom - l_h + l_pad * 0.75 + p.font_ascent, a_text)
 		end
 
 	rails (p: SW_PAINTER; r: PT_PILL_RAILS; k: REAL_64)
@@ -229,7 +264,7 @@ feature {NONE} -- Painting
 					p.set_color_alpha (Accent, 0.9)
 					p.set_line_width (1 * k)
 					p.rrect_stroke (x, y, w, h, 8 * k)
-				elseif r.hover.hovered = ic.code then
+				elseif r.hover.hovered = ic.code and ic.code < r.Left_grip_hit then
 					p.set_color_alpha (Accent, 0.3)
 					p.rrect_fill (x, y, w, h, 8 * k)
 				end
@@ -281,6 +316,10 @@ feature {NONE} -- Painting
 							cx + s * 1.1 * Teeth_x [j], cy + s * 1.1 * Teeth_y [j], lw * 1.3)
 						j := j + 1
 					end
+				when {PT_PILL_RAILS}.Left_grip_hit, {PT_PILL_RAILS}.Right_grip_hit then
+						-- A short bar at the edge: this edge sizes the pill.
+					p.set_color_alpha (Upcoming_ink, (if r.hover.hovered = ic.code then 0.7 else 0.28 end))
+					p.rrect_fill ((if ic.code = r.Left_grip_hit then 3 * k else x + w - 6 * k end), y + h * 0.38, 3 * k, h * 0.24, 1.5 * k)
 				when {PT_PILL_RAILS}.Take_hit then
 						-- A clapperboard.
 					cy := y + h / 2

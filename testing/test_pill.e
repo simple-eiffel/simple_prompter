@@ -373,8 +373,8 @@ feature -- Tests: pill-only UI (0.4.0)
 		do
 			create r.make (1.5)
 			r.lay_out (900, r.min_text_height)
-			assert_integers_equal ("five buttons", 5, r.zones.count)
-			l_codes := <<r.Status_hit, r.Quit_hit, r.Script_hit, r.Settings_hit, r.Take_hit>>
+			assert_integers_equal ("five buttons, two side grips", 7, r.zones.count)
+			l_codes := <<r.Status_hit, r.Quit_hit, r.Script_hit, r.Settings_hit, r.Take_hit, r.Left_grip_hit, r.Right_grip_hit>>
 			across l_codes as ic loop
 				if attached r.zone (ic) as al_z then
 					assert_integers_equal ("hit " + ic.out, ic, r.hit (al_z.x + al_z.w / 2, al_z.y + al_z.h / 2))
