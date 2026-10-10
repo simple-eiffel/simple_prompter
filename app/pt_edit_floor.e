@@ -241,6 +241,7 @@ feature {NONE} -- Actions
 			end
 			l_line.append ({STRING_32} " " + quoted (a_file))
 			create preview.make
+			preview.set_ends_with_owner (True)
 			preview.start (l_line)
 			if attached preview.last_error as al_e then
 				status_note := {STRING_32} "could not start ffplay: " + al_e

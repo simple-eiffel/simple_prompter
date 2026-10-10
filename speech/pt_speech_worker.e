@@ -338,6 +338,9 @@ feature {NONE} -- Listening
 			l_ok := (create {SIMPLE_FILE}.make (a_tee)).delete
 			l_line := command_line (a_plan.arguments)
 			create process.make
+				-- If the prompter dies (crash, Task Manager), Windows ends this ffmpeg too:
+				-- an orphan keeps the camera and the microphone.
+			process.set_ends_with_owner (True)
 			process.start (l_line)
 			if attached process.last_error as al_e then
 				failed := True
@@ -501,6 +504,7 @@ feature {NONE} -- Camera health (2026-10-08)
 				webcam_probe_wanted := False
 				last_probe_ms := now_ms
 				create camera_probe.make
+				camera_probe.set_ends_with_owner (True)
 				camera_probe.start (command_line ((create {PT_CAMERA_CHECK}.make (recording_devices)).arguments))
 				if attached camera_probe.last_error as al_e then
 					report_camera (a_slot, {PT_CAMERA_CHECK}.No_picture, False, camera + {STRING_32} ": could not start ffmpeg to check it (" + al_e + {STRING_32} ")")

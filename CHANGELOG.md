@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.3] - 2026-10-09
+
+### Fixed
+- A prompter that ended without closing (crash, Task Manager, a forced stop)
+  left its ffmpeg running: the camera probe or the recording kept the camera
+  and microphone and its working folder. The capture, camera-probe and preview
+  processes now end with the prompter however it ends (simple_process 1.2.0
+  `set_ends_with_owner`, a Windows kill-on-close job). Checked by force-killing
+  the prompter three times mid-probe: the probe was gone within 150 ms each
+  time. The final render is left untied on purpose: it finishes on its own.
+
 ## [0.3.2] - 2026-10-09
 
 ### Added
