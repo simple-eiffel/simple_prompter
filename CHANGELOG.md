@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.4] - 2026-10-10
+
 ### Added
 - Program icon (app/resources/simple_prompter.ico, seven sizes from 16 to 256,
   made by scripts/make_icon.py): the pill in miniature, three script lines
