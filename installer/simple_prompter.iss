@@ -37,7 +37,8 @@ Compression=lzma2/max
 SolidCompression=yes
 WizardStyle=modern
 DisableProgramGroupPage=yes
-UninstallDisplayIcon={app}\{#AppExeName}
+SetupIconFile=..\app\resources\simple_prompter.ico
+UninstallDisplayIcon={app}\simple_prompter.ico
 
 ; Per-user install: no UAC prompt. The app writes only to %APPDATA%.
 PrivilegesRequired=lowest
@@ -64,13 +65,14 @@ Source: "{#WhisperBin}\ggml-cuda.dll"; DestDir: "{app}"; Flags: ignoreversion
 Source: "{#SileroModel}"; DestDir: "{app}\models"; Flags: ignoreversion
 Source: "..\samples\Welcome to simple_prompter.md"; DestDir: "{app}\samples"; Flags: ignoreversion
 Source: "..\samples\Voice read test.md"; DestDir: "{app}\samples"; Flags: ignoreversion
+Source: "..\app\resources\simple_prompter.ico"; DestDir: "{app}"; Flags: ignoreversion
 Source: "README.txt"; DestDir: "{app}"; Flags: ignoreversion isreadme
 
 [Icons]
-Name: "{group}\{#AppName}";           Filename: "{app}\{#AppExeName}"; WorkingDir: "{app}"
+Name: "{group}\{#AppName}";           Filename: "{app}\{#AppExeName}"; WorkingDir: "{app}"; IconFilename: "{app}\simple_prompter.ico"
 Name: "{group}\Sample scripts";        Filename: "{app}\samples"
 Name: "{group}\Uninstall {#AppName}"; Filename: "{uninstallexe}"
-Name: "{autodesktop}\{#AppName}";     Filename: "{app}\{#AppExeName}"; WorkingDir: "{app}"; Tasks: desktopicon
+Name: "{autodesktop}\{#AppName}";     Filename: "{app}\{#AppExeName}"; WorkingDir: "{app}"; IconFilename: "{app}\simple_prompter.ico"; Tasks: desktopicon
 
 [Run]
 Filename: "{app}\{#AppExeName}"; WorkingDir: "{app}"; Description: "Start {#AppName}"; Flags: nowait postinstall skipifsilent

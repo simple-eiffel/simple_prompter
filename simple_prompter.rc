@@ -1,5 +1,9 @@
 #include <windows.h>
 
+/* The program icon (scripts/make_icon.py). The Makefile runs rc from
+   EIFGENs\<target>\F_code, so the path climbs back to the project. */
+1 ICON "../../../app/resources/simple_prompter.ico"
+
 STRINGTABLE
 BEGIN
 	1 "This Program was made using EiffelStudio using Visual Studio C++"

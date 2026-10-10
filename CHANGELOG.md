@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- Program icon (app/resources/simple_prompter.ico, seven sizes from 16 to 256,
+  made by scripts/make_icon.py): the pill in miniature, three script lines
+  with the blue follow caret on the one being read and the red record dot,
+  in the pill's own colors. The exe carries it (`1 ICON` in simple_prompter.rc,
+  compiled in by the build), so Explorer, the taskbar and the control window's
+  title bar show it (simple_shell 1.13.1); so do the installer, Start menu and
+  desktop shortcuts, and the Apps & features entry.
+
 ## [0.3.3] - 2026-10-09
 
 ### Fixed
