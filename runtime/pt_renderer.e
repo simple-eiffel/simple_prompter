@@ -67,6 +67,12 @@ feature -- Commands
 			else
 				output_path := a_folder.out_dir + {STRING_32} "\final.mp4"
 				l_filter := a_folder.out_dir + {STRING_32} "\final.filter"
+					-- A new render replaces what an earlier Publish kept (0.5.0): Publish reads the
+					-- render from "final (before cleanup).mp4" when it is there.
+				across <<{STRING_32} "\final (before cleanup).mp4", {STRING_32} "\final (analyzer original).srt",
+					{STRING_32} "\final (analyzer original).vtt">> as ic loop
+					l_ok := (create {SIMPLE_FILE}.make (a_folder.out_dir + ic)).delete
+				end
 				create l_plan.make (ffmpeg, Fade_ms, False)
 				l_plan.set_video_delay (a_video_delay_ms)
 				l_ok := (create {SIMPLE_FILE}.make (l_filter)).set_content (l_plan.filter_script (a_analysis.cuts))

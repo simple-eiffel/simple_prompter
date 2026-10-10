@@ -7,6 +7,40 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-10-10
+
+### Added
+- Publish, in the Last take panel: everything needed to post a take to YouTube, Facebook
+  Reels and X, run by the speech worker (about two minutes for a three-minute take; the
+  window stays live and shows each stage):
+  - The finished final.mp4: the silence before the first word cut to a quarter second,
+    the video opening on the thumbnail and dissolving into the picture while the voice
+    starts at once (out\thumbnail.jpg or .png, else the first thumbnail_A* image), the last
+    frame held and faded to black after the last word, the sound at YouTube's loudness
+    (-14 LUFS). The render is kept as "final (before cleanup).mp4", so Publish can run
+    again after a new thumbnail.
+  - captions.en_US.SRT (the name Facebook Reels wants): captions of what was said, from
+    whisper on the finished video, in the script's wording wherever a sentence was read as
+    written. Whisper's inventions are left out: words heard in silence ("Thank you." over a
+    silent ending) and phrases echoed once too often. The render's captions are kept as
+    "final (analyzer original)".
+  - Chapters timed to the finished video, one per paragraph that starts at least 10 s after
+    the last (YouTube's rule), at most eight.
+  - youtube.txt (title, description, chapters, hashtags), facebook.txt (the Reel's
+    description) and x.txt (one line to lead the post). The local AI (Ollama on this
+    machine's GPU) writes the title, description, hashtags, chapter names, a question for
+    Facebook and the X line; without it every part comes from the script.
+  - Settings (settings.toml): publish_link (closes the Facebook post), publish_hashtags,
+    ollama_url (default http://localhost:11435), ollama_model (empty: the first model
+    installed that is not for OCR or embeddings), use_ollama.
+  - Thumbnails are still made outside the program, on request.
+
+### Fixed
+- The opening line could be cut off (Reel 4 lost "Worthless servant!"): when the aligner
+  did not match the first words, the first cut started at the first matched word. The
+  video's first cut now starts before speech that runs on, with gaps under a second, from
+  up to 3 s before the first matched word.
+
 ## [0.4.0] - 2026-10-10
 
 ### Changed

@@ -32,6 +32,11 @@ feature {NONE} -- Initialization
 			follow_mode := {PT_FOLLOW_MODE}.Tracking
 			create recent_scripts.make (Max_recent)
 			shows_tooltips := True
+			create publish_link.make_empty
+			create publish_hashtags.make_from_string (Default_hashtags)
+			create ollama_url.make_from_string (Default_ollama_url)
+			create ollama_model.make_empty
+			uses_ollama := True
 		ensure
 			memory_only: path = Void
 			nothing_saved: save_count = 0
@@ -89,6 +94,20 @@ feature -- Access
 			-- moves the picture this much earlier (PT_CAPTURE_PLAN.video_delay_ms). 0 by default.
 	shows_tooltips: BOOLEAN
 			-- Show tooltips on the pill and its callouts? (Settings; on until the reader turns them off.)
+
+	publish_link: STRING_32
+			-- Closes the Facebook post as "More at <link>" (0.5.0 Publish); empty: no link line.
+	publish_hashtags: STRING_32
+			-- Hashtags for the posts when the local AI gives none, space-separated.
+	ollama_url: STRING_32
+			-- Where Ollama listens (the local AI that names chapters and writes titles).
+	ollama_model: STRING_32
+			-- Ollama's model to use; empty: the first one installed that is not for OCR or embeddings.
+	uses_ollama: BOOLEAN
+			-- Ask the local AI for titles, chapter names and posts? Off: everything from the script.
+
+	Default_hashtags: STRING_32 = "#Jesus #Faith #BibleStudy"
+	Default_ollama_url: STRING_32 = "http://localhost:11435"
 
 	recent_scripts: ARRAYED_LIST [STRING_32]
 			-- The scripts opened last, newest first (at most `Max_recent').
@@ -198,6 +217,9 @@ feature {NONE} -- Implementation
 					.with_boolean ("pill_placed", has_pill_position).with_integer ("pill_x", pill_x).with_integer ("pill_y", pill_y)
 					.with_string ("last_script", last_script).with_integer ("follow_mode", follow_mode)
 					.with_boolean ("show_tooltips", shows_tooltips)
+					.with_string ("publish_link", publish_link).with_string ("publish_hashtags", publish_hashtags)
+					.with_string ("ollama_url", ollama_url).with_string ("ollama_model", ollama_model)
+					.with_boolean ("use_ollama", uses_ollama)
 				across 1 |..| recent_scripts.count as ic loop
 					l_table := l_table.with_string ("recent_" + ic.out, recent_scripts [ic])
 				end
@@ -415,6 +437,21 @@ feature {NONE} -- Loading
 			end
 			if t.has ("show_tooltips") then
 				shows_tooltips := t.boolean_item ("show_tooltips")
+			end
+			if attached t.string_item ("publish_link") as al_s then
+				publish_link := al_s
+			end
+			if attached t.string_item ("publish_hashtags") as al_s and then not al_s.is_empty then
+				publish_hashtags := al_s
+			end
+			if attached t.string_item ("ollama_url") as al_s and then al_s.starts_with ({STRING_32} "http") then
+				ollama_url := al_s
+			end
+			if attached t.string_item ("ollama_model") as al_s then
+				ollama_model := al_s
+			end
+			if t.has ("use_ollama") then
+				uses_ollama := t.boolean_item ("use_ollama")
 			end
 			recent_scripts.wipe_out
 			across 1 |..| Max_recent as ic loop

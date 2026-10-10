@@ -71,6 +71,40 @@ feature -- Access
 			set: on_sync_changed = a_action
 		end
 
+	on_publish: detachable PROCEDURE
+			-- Told when Publish is clicked (the app asks the speech worker, 0.5.0).
+
+	set_on_publish (a_action: PROCEDURE)
+		do
+			on_publish := a_action
+		ensure
+			set: on_publish = a_action
+		end
+
+	publish_status: STRING_32
+			-- What Publish is doing, or did.
+		attribute
+			create Result.make_empty
+		end
+
+	is_publishing: BOOLEAN
+
+	set_publish_status (a_text: READABLE_STRING_32; a_busy: BOOLEAN)
+		do
+			publish_status := a_text.to_string_32.twin
+			is_publishing := a_busy
+		ensure
+			busy_set: is_publishing = a_busy
+		end
+
+	take_root: detachable STRING_32
+			-- The shown take's session folder.
+		do
+			if attached take as al_take and then attached al_take.folder as al_folder then
+				Result := al_folder.root.twin
+			end
+		end
+
 	bottom: REAL_64
 			-- Where the last `paint' ended (its height, from its top).
 
@@ -86,6 +120,8 @@ feature -- Access
 			inspect a_action
 			when Action_render then
 				Result := {STRING_32} "Render final.mp4 with captions and chapters, using this take's sync"
+			when Action_publish then
+				Result := {STRING_32} "Publish: finish final.mp4 (opens on the thumbnail in out, fades to black, YouTube loudness), captions as spoken (captions.en_US.SRT), chapters, youtube.txt, facebook.txt, x.txt"
 			when Action_play_final then
 				Result := {STRING_32} "Play final.mp4"
 			when Action_open_folder then
@@ -181,6 +217,7 @@ feature -- Display
 				button (p, a_x, l_y - 18 * k, 92 * k, 26 * k, (if renderer.is_rendering then {STRING_32} "Rendering" else {STRING_32} "Render" end), Action_render, k)
 				button (p, a_x + 100 * k, l_y - 18 * k, 92 * k, 26 * k, {STRING_32} "Play final", Action_play_final, k)
 				button (p, a_x + 200 * k, l_y - 18 * k, 104 * k, 26 * k, {STRING_32} "Open folder", Action_open_folder, k)
+				button (p, a_x + 312 * k, l_y - 18 * k, 96 * k, 26 * k, (if is_publishing then {STRING_32} "Publishing" else {STRING_32} "Publish" end), Action_publish, k)
 				l_y := l_y + 24 * k
 				if attached sync as al_sync then
 					p.font (p.Role_ui, 12, True)
@@ -202,6 +239,9 @@ feature -- Display
 				p.set_color (Muted)
 				if not renderer.status.is_empty then
 					l_y := wrapped (p, a_x, l_y, a_w, renderer.status, 20 * k)
+				end
+				if not publish_status.is_empty then
+					l_y := wrapped (p, a_x, l_y, a_w, publish_status, 20 * k)
 				end
 				if not status_note.is_empty then
 					p.set_color (Danger)
@@ -279,6 +319,7 @@ feature {NONE} -- Actions
 	Action_sync_up: INTEGER = 7
 	Action_sync_preview: INTEGER = 8
 	Action_measure: INTEGER = 9
+	Action_publish: INTEGER = 10
 
 	act (a_action, a_index: INTEGER)
 		do
@@ -289,6 +330,18 @@ feature {NONE} -- Actions
 					if not renderer.is_rendering then
 						renderer.start (al_folder, al_history.current_revision, al_analysis, al_journal, sync_ms)
 						status_note := {STRING_32} ""
+					end
+				when Action_publish then
+					if is_publishing or renderer.is_rendering then
+						status_note := {STRING_32} "wait: " + (if is_publishing then {STRING_32} "publishing" else {STRING_32} "rendering" end)
+					elseif (create {SIMPLE_FILE}.make (al_folder.out_dir + {STRING_32} "\final.mp4")).exists
+						or (create {SIMPLE_FILE}.make (al_folder.out_dir + {STRING_32} "\final (before cleanup).mp4")).exists then
+						status_note := {STRING_32} ""
+						if attached on_publish as al_action then
+							al_action.call (Void)
+						end
+					else
+						status_note := {STRING_32} "render first: there is no final.mp4 yet"
 					end
 				when Action_play_final then
 					if (create {SIMPLE_FILE}.make (al_folder.out_dir + {STRING_32} "\final.mp4")).exists then

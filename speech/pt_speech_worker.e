@@ -125,6 +125,10 @@ feature -- Execution
 						vad := l_vad
 						decoder := l_decoder
 						create analysis_job.make (create {PT_WHISPER_TRANSCRIBER}.make (l_vad.detector, l_decoder.recognizer))
+						create publish_job.make (create {PT_WHISPER_TRANSCRIBER}.make (l_vad.detector, l_decoder.recognizer), ffmpeg)
+						if attached publish_job as al_publish then
+							al_publish.set_on_stage (agent tell_stage)
+						end
 						from
 						until
 							stop_wanted (al_slot) or failed
@@ -139,6 +143,8 @@ feature -- Execution
 								start_recording (al_slot)
 							elseif not is_recording and then analysis_wanted (al_slot) then
 								run_analysis (al_slot)
+							elseif not is_recording and then publish_wanted (al_slot) then
+								run_publish
 							elseif not is_recording and then devices_wanted (al_slot) then
 								change_devices (al_slot)
 							elseif not is_listening and then listen_wanted (al_slot) then
@@ -215,6 +221,9 @@ feature {NONE} -- Listening
 		end
 
 	analysis_job: detachable PT_ANALYSIS_JOB
+
+	publish_job: detachable PT_PUBLISH_JOB
+			-- Publishes a rendered take (0.5.0) on the loaded models.
 			-- Analyzes wrapped takes on the loaded models (debate 01).
 
 	current_tee: STRING_32
@@ -284,6 +293,44 @@ feature {NONE} -- Listening
 			if is_listening then
 				is_recording := True
 				finish_at := 0.0
+			end
+		end
+
+	run_publish
+			-- Publish the requested take (a minute or more: ffmpeg twice, whisper, the local AI). The
+			-- slot is held only to read the request and to report, never across the work: a routine
+			-- with the slot as a separate argument holds it until it returns, and the window reads
+			-- the slot every tick.
+		require
+			not_recording: not is_recording
+		local
+			l_request: TUPLE [root, link, hashtags, ai_url, ai_model: STRING_32; uses_ai: BOOLEAN]
+		do
+			if attached slot as al_slot then
+				l_request := publish_request (al_slot)
+				report (al_slot, {PT_SPEECH_SLOT}.Publishing, {STRING_32} "publishing the take")
+				if is_listening then
+					stop_listening
+				end
+				if attached publish_job as al_job then
+					al_job.run (l_request.root, l_request.link, l_request.hashtags, l_request.ai_url, l_request.ai_model, l_request.uses_ai)
+					report_publish (al_slot, al_job.succeeded, al_job.summary)
+				else
+					report_publish (al_slot, False, {STRING_32} "publishing unavailable: the speech models are not loaded")
+				end
+				if listen_wanted (al_slot) then
+					start_listening (al_slot)
+				else
+					report (al_slot, {PT_SPEECH_SLOT}.Ready, {STRING_32} "speech ready")
+				end
+			end
+		end
+
+	tell_stage (a_text: STRING_32)
+			-- The publish job's progress, for the window.
+		do
+			if attached slot as al_slot then
+				report (al_slot, {PT_SPEECH_SLOT}.Publishing, a_text)
 			end
 		end
 
@@ -641,6 +688,24 @@ feature {NONE} -- Slot calls: each locks the slot for one short call
 	requested_duration (a_slot: separate PT_SPEECH_SLOT): REAL_64
 		do
 			Result := a_slot.analysis_duration
+		end
+
+	publish_wanted (a_slot: separate PT_SPEECH_SLOT): BOOLEAN
+		do
+			Result := a_slot.publish_requested
+		end
+
+	publish_request (a_slot: separate PT_SPEECH_SLOT): TUPLE [root, link, hashtags, ai_url, ai_model: STRING_32; uses_ai: BOOLEAN]
+			-- The requested publish, copied to this processor.
+		do
+			Result := [create {STRING_32}.make_from_separate (a_slot.publish_root), create {STRING_32}.make_from_separate (a_slot.publish_link),
+				create {STRING_32}.make_from_separate (a_slot.publish_hashtags), create {STRING_32}.make_from_separate (a_slot.publish_ai_url),
+				create {STRING_32}.make_from_separate (a_slot.publish_ai_model), a_slot.publish_uses_ai]
+		end
+
+	report_publish (a_slot: separate PT_SPEECH_SLOT; a_succeeded: BOOLEAN; a_summary: STRING_32)
+		do
+			a_slot.put_publish_finished (a_succeeded, a_summary)
 		end
 
 	report_analysis (a_slot: separate PT_SPEECH_SLOT; a_succeeded: BOOLEAN; a_summary: STRING_32)
