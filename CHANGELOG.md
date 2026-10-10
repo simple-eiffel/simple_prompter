@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.1] - 2026-10-10
+
+### Added
+- Follow trace: while a take is recorded, the journal also records what voice following
+  did, so a jump of the text can be traced to its cause. A "heard" line per decode (the
+  words heard, the aligner's position before and after, the move its best match proposed,
+  the anchors found and needed, whether the wide search won) and a "frame" line about ten
+  times a second and whenever the reading row's line changes or the follower snaps (the
+  follower's target, velocity, steering goal and speaking state, the displayed position,
+  its line and the target's line). Trace lines are buffered and written about once a second
+  and before every journal event; the take analyzer skips them.
+
 ## [0.5.0] - 2026-10-10
 
 ### Added

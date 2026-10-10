@@ -15,7 +15,7 @@ Part of the [Simple Eiffel](https://github.com/simple-eiffel) ecosystem.
 
 ## Status
 
-**0.5.0, in use on Windows 11** (per-user installer: `installer/simple_prompter.iss`)
+**0.5.1, in use on Windows 11** (per-user installer: `installer/simple_prompter.iss`)
 - The pill is the whole program: a text pill under the webcam, hidden from screen captures,
   with Status lights, Script, Settings and Last take callouts beside it, a slide handle under
   it, tooltips on everything (and a switch to turn them off), and an icon in the notification
@@ -24,7 +24,7 @@ Part of the [Simple Eiffel](https://github.com/simple-eiffel) ecosystem.
 - Recording from a camera and microphone (OBS Virtual Camera works) with ffmpeg on one
   clock; the take studio analyzes the take, renders final.mp4, and keeps a per-take
   picture-to-sound sync that Measure can set from a clap.
-- 248 tests pass in the contract-checked build. The follower is verified against real
+- 250 tests pass in the contract-checked build. The follower is verified against real
   recordings: it stays within a line of the reader, holds still during an ad-lib, catches up
   after a skipped paragraph, and never scrolls backward.
 
@@ -79,6 +79,10 @@ end
   video; their byte count is the clock, so marks and video stay in sync by construction.
 - **The journal is the truth**: one JSONL line per event, flushed immediately, so a crash loses
   at most a torn last line, which replay skips.
+- **The follow trace rides in the journal** (0.5.1): while recording, "heard" lines (each
+  decode: words heard, the aligner's move and its evidence) and "frame" lines (the follower's
+  target, the displayed position and its line, ten times a second) explain any jump of the
+  text. They are written about once a second; replay skips them.
 
 ## Using the pill
 

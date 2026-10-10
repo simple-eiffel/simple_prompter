@@ -20,6 +20,7 @@ feature {NONE} -- Initialization
 		do
 			create event_list.make (64)
 			create codec.make
+			create trace_buffer.make (4096)
 		ensure
 			empty: count = 0
 			memory_only: not is_persistent
@@ -123,6 +124,7 @@ feature -- Element change
 		do
 			event_list.extend (a_event)
 			last_rt := a_event.rt
+			flush_trace
 			if attached path as al_path then
 					-- SIMPLE_FILE.append_line opens, writes and closes per call: one flushed line (Q6).
 				if (create {SIMPLE_FILE}.make (al_path)).append_line (codec.encode (a_event)) then
@@ -158,7 +160,52 @@ feature -- Element change
 			skips_counted: skipped_lines >= old skipped_lines
 		end
 
+feature -- Follow trace
+
+	trace (a_line: READABLE_STRING_32)
+			-- Buffer one follow-trace line (PT_FOLLOW_TRACE); it is written before the next event
+			-- or by `flush_trace'. Replay skips its kinds; a memory journal drops it.
+		require
+			one_line: not a_line.has ('%N')
+		do
+			if is_persistent then
+				trace_buffer.append (a_line)
+				trace_buffer.append_character ('%N')
+				trace_lines := trace_lines + 1
+			end
+		ensure
+			counted: is_persistent implies trace_lines = old trace_lines + 1
+			memory_only_dropped: not is_persistent implies trace_buffer.is_empty
+		end
+
+	flush_trace
+			-- Write the buffered trace lines.
+		do
+			if attached path as al_path and not trace_buffer.is_empty then
+				if (create {SIMPLE_FILE}.make (al_path)).append_text (trace_buffer) then
+					trace_lines_written := trace_lines
+				end
+				trace_buffer.wipe_out
+			end
+		ensure
+			emptied: trace_buffer.is_empty
+		end
+
+	trace_lines: INTEGER
+			-- Trace lines given to `trace'.
+
+	trace_lines_written: INTEGER
+			-- Trace lines on disk as of the last successful flush.
+
+	has_trace_pending: BOOLEAN
+		do
+			Result := not trace_buffer.is_empty
+		end
+
 feature {NONE} -- Implementation
+
+	trace_buffer: STRING_32
+			-- Trace lines not yet written, each ending in a new line.
 
 	event_list: ARRAYED_LIST [PT_TAKE_EVENT]
 
