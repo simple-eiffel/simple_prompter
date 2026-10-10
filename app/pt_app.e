@@ -79,6 +79,9 @@ feature {NONE} -- Initialization
 			window.set_on_tick (agent on_heartbeat)
 			window.run
 				-- The window closed: give everything back.
+			across callouts as ic loop
+				ic.close
+			end
 			edit_floor.close
 			stop_speech
 			router.release_all
@@ -124,6 +127,39 @@ feature -- Access
 	is_settings_shown: BOOLEAN
 			-- Does the left column show the Settings page?
 
+	status_callout: PT_CALLOUT
+			-- Left of the pill: microphone, camera, following, keys (0.4.0).
+		attribute
+			create Result.make ({PT_CALLOUT}.Side_left, 300, theme)
+		end
+
+	script_callout: PT_CALLOUT
+			-- Right of the pill: the script, Open script..., recent scripts.
+		attribute
+			create Result.make ({PT_CALLOUT}.Side_right, 320, theme)
+		end
+
+	settings_callout: PT_CALLOUT
+			-- Right of the pill: camera, microphone, sync start, tooltips.
+		attribute
+			create Result.make ({PT_CALLOUT}.Side_right, 380, theme)
+		end
+
+	take_callout: PT_CALLOUT
+			-- Below the pill: the Last take panel.
+		attribute
+			create Result.make ({PT_CALLOUT}.Side_below, 560, theme)
+		end
+
+	callouts: ARRAY [PT_CALLOUT]
+		do
+			Result := <<status_callout, script_callout, settings_callout, take_callout>>
+		end
+
+	last_callout_ms: REAL_64
+	last_callout_signature: INTEGER
+	last_rails_signature: INTEGER
+
 feature {NONE} -- The clock
 
 	is_started: BOOLEAN
@@ -148,6 +184,7 @@ feature {NONE} -- The clock
 				router.register_all
 				window.set_fast_timer (Tick_ms)
 				show_latest_take
+				apply_tooltips
 				window.request_render
 			end
 			refresh_status
@@ -161,11 +198,32 @@ feature {NONE} -- The clock
 			when {SHELL_HOTKEYS}.Event_hotkey then
 				router.on_hotkey (a_a)
 				on_tick
+			when {SHELL_PANEL}.Event_press .. {SHELL_PANEL}.Event_resized then
+				if attached callout_at_slot (window.event_extra) as al_callout then
+					on_callout_event (al_callout, a_type, a_a, a_b)
+				else
+					on_pill_event (a_type, a_a, a_b)
+				end
+			else
+			end
+		end
+
+	on_pill_event (a_type, a_a, a_b: INTEGER)
+			-- An event from the pill's panel.
+		local
+			l_rail: INTEGER
+		do
+			inspect a_type
 			when {SHELL_PANEL}.Event_press then
+				if pill.rails.is_laid_out then
+					l_rail := pill.rails.hit (a_a, a_b)
+				end
 				if pill.bar.is_laid_out and then pill.bar.is_in_bar (a_b) then
 					on_bar_press (a_a, a_b)
-				else
-					router.on_press (geometry.word_at (a_a, a_b, prompter.scroll.y_offset))
+				elseif l_rail /= 0 then
+					on_rail_press (l_rail)
+				elseif not pill.rails.is_in_rail (a_a, pill.panel.width) then
+					router.on_press (geometry.word_at (a_a - pill.text_left.rounded, a_b, prompter.scroll.y_offset))
 				end
 				on_tick
 			when {SHELL_PANEL}.Event_move then
@@ -179,8 +237,10 @@ feature {NONE} -- The clock
 				on_tick
 			when {SHELL_PANEL}.Event_moved then
 				pill.remember_position (a_a, a_b)
+				place_callouts
 			when {SHELL_PANEL}.Event_resized then
 				on_pill_resized (a_a, a_b)
+				place_callouts
 			when {SHELL_PANEL}.Event_expose then
 				last_signature := -1
 				on_tick
@@ -221,6 +281,12 @@ feature {NONE} -- The clock
 					last_bar_signature := pill.bar.signature
 					last_signature := -1
 				end
+				update_lights
+				if pill.rails.signature /= last_rails_signature then
+					last_rails_signature := pill.rails.signature
+					last_signature := -1
+				end
+				follow_callouts (l_now)
 				if pill.is_shift_held /= grips_shown then
 					grips_shown := not grips_shown
 					pill.set_shows_grips (grips_shown)
@@ -336,19 +402,26 @@ feature {NONE} -- Opening scripts
 
 	toggle_settings
 			-- Show the Settings page (listing Windows' devices afresh), or go back.
-		local
-			l_listing: STRING_32
 		do
 			if is_settings_shown then
 				is_settings_shown := False
 			else
-				l_listing := (create {SIMPLE_PROCESS}.make).command_output ({STRING_32} "%"" + ffmpeg_path
-					+ {STRING_32} "%" -hide_banner -list_devices true -f dshow -i dummy")
-				settings_page.offer (create {PT_DEVICE_LIST}.make_from_listing (l_listing), settings.camera_name,
-					settings.microphone_name, settings.video_delay_ms)
+				offer_devices
 				is_settings_shown := True
 			end
 			window.request_render
+		end
+
+	offer_devices
+			-- Fill the Settings page with Windows' devices, listed afresh, and the current choices.
+		local
+			l_listing: STRING_32
+		do
+			l_listing := (create {SIMPLE_PROCESS}.make).command_output ({STRING_32} "%"" + ffmpeg_path
+				+ {STRING_32} "%" -hide_banner -list_devices true -f dshow -i dummy")
+			settings_page.offer (create {PT_DEVICE_LIST}.make_from_listing (l_listing), settings.camera_name,
+				settings.microphone_name, settings.video_delay_ms)
+			settings_page.set_tooltips_on (settings.shows_tooltips)
 		end
 
 	on_settings_press (a_code: INTEGER)
@@ -356,6 +429,11 @@ feature {NONE} -- Opening scripts
 		do
 			if a_code = settings_page.Done_hit then
 				is_settings_shown := False
+				settings_callout.hide
+				sync_rails
+			elseif a_code = settings_page.Tooltips_hit then
+				settings.set_shows_tooltips (not settings.shows_tooltips)
+				apply_tooltips
 			elseif not prompter.controller.is_recording then
 				settings_page.set_locked (False)
 				if settings_page.is_camera_row (a_code) then
@@ -388,6 +466,364 @@ feature {NONE} -- Opening scripts
 			end
 		end
 			-- Where the Open button was last drawn (canvas coordinates).
+
+feature {NONE} -- Callouts (0.4.0)
+
+	callout_at_slot (a_slot: INTEGER): detachable PT_CALLOUT
+			-- The callout whose panel has `a_slot', if any.
+		do
+			across callouts as ic until attached Result loop
+				if ic.slot >= 0 and ic.slot = a_slot then
+					Result := ic
+				end
+			end
+		end
+
+	on_rail_press (a_code: INTEGER)
+			-- A rail button: open or close its callout, or quit.
+		do
+			inspect a_code
+			when {PT_PILL_RAILS}.Status_hit then
+				toggle_callout (status_callout)
+			when {PT_PILL_RAILS}.Quit_hit then
+				window.close
+			when {PT_PILL_RAILS}.Script_hit then
+				settings_callout.hide
+				toggle_callout (script_callout)
+			when {PT_PILL_RAILS}.Settings_hit then
+				script_callout.hide
+				if not settings_callout.is_shown then
+					offer_devices
+				end
+				toggle_callout (settings_callout)
+			when {PT_PILL_RAILS}.Take_hit then
+				toggle_callout (take_callout)
+			else
+			end
+			sync_rails
+		end
+
+	toggle_callout (a_callout: PT_CALLOUT)
+		do
+			if a_callout.is_shown then
+				a_callout.hide
+			else
+				a_callout.hover.set_enabled (settings.shows_tooltips)
+				a_callout.show_beside (pill.panel.x, pill.panel.y, pill.panel.width, pill.panel.height, pill.is_capturable)
+				render_callout (a_callout)
+			end
+		end
+
+	sync_rails
+			-- Light the rail buttons whose callouts are open.
+		do
+			pill.rails.set_open (status_callout.is_shown, script_callout.is_shown, settings_callout.is_shown, take_callout.is_shown)
+		end
+
+	place_callouts
+			-- Keep the open callouts beside the pill (it moved or changed size).
+		do
+			across callouts as ic loop
+				if ic.is_shown then
+					ic.show_beside (pill.panel.x, pill.panel.y, pill.panel.width, pill.panel.height, pill.is_capturable)
+					render_callout (ic)
+				end
+			end
+		end
+
+	render_callout (a_callout: PT_CALLOUT)
+		do
+			if a_callout = status_callout then
+				a_callout.render (agent paint_status_callout)
+			elseif a_callout = script_callout then
+				a_callout.render (agent paint_script_callout)
+			elseif a_callout = settings_callout then
+				a_callout.render (agent paint_settings_callout)
+			else
+				a_callout.render (agent paint_take_callout)
+			end
+		end
+
+	follow_callouts (a_now: REAL_64)
+			-- Each tick: forget hovers the pointer left, and repaint the open callouts when their
+			-- hover changed or every 400 ms (status and render progress change on their own).
+		local
+			l_signature: INTEGER
+		do
+			across callouts as ic loop
+				if ic.is_shown then
+					ic.refresh_hover (a_now)
+					l_signature := l_signature * 31 + ic.hover.signature + 1
+				end
+			end
+			if l_signature /= last_callout_signature or a_now - last_callout_ms >= 400 then
+				last_callout_signature := l_signature
+				last_callout_ms := a_now
+				across callouts as ic loop
+					if ic.is_shown then
+						render_callout (ic)
+					end
+				end
+			end
+		end
+
+	on_callout_event (a_callout: PT_CALLOUT; a_type, a_x, a_y: INTEGER)
+			-- An event from one of the callouts.
+		local
+			l_code: INTEGER
+		do
+			inspect a_type
+			when {SHELL_PANEL}.Event_press then
+				l_code := a_callout.zone_at (a_x, a_y)
+				if l_code = a_callout.Close_zone then
+					a_callout.hide
+					sync_rails
+				elseif a_callout = settings_callout then
+					if l_code /= 0 then
+						on_settings_press (l_code)
+					end
+				elseif a_callout = script_callout then
+					on_script_press (l_code)
+				elseif a_callout = take_callout then
+					edit_floor.press (a_x, a_y)
+				end
+				if a_callout.is_shown then
+					render_callout (a_callout)
+				end
+				on_tick
+			when {SHELL_PANEL}.Event_move then
+				a_callout.track (a_x, a_y, clock.now_ms)
+			when {SHELL_PANEL}.Event_expose then
+				render_callout (a_callout)
+			else
+			end
+		end
+
+	apply_tooltips
+			-- Tooltips on or off everywhere, as Settings says.
+		do
+			pill.set_tooltips_enabled (settings.shows_tooltips)
+			across callouts as ic loop
+				ic.hover.set_enabled (settings.shows_tooltips)
+			end
+			settings_page.set_tooltips_on (settings.shows_tooltips)
+		end
+
+	update_lights
+			-- The Status lights on the pill's left rail.
+		local
+			l_microphone, l_camera, l_follow: INTEGER
+		do
+			if speech_state = {PT_SPEECH_SLOT}.Failed then
+				l_microphone := {PT_PILL_RAILS}.Light_problem
+			elseif speech_state = {PT_SPEECH_SLOT}.Listening or speech_state = {PT_SPEECH_SLOT}.Recording then
+				l_microphone := {PT_PILL_RAILS}.Light_good
+			else
+				l_microphone := {PT_PILL_RAILS}.Light_check
+			end
+			if prompter.controller.is_recording and video_stalled then
+				l_camera := {PT_PILL_RAILS}.Light_problem
+			elseif camera_verdict = {PT_CAMERA_CHECK}.Live then
+				l_camera := (if camera_dark then {PT_PILL_RAILS}.Light_check else {PT_PILL_RAILS}.Light_good end)
+			elseif camera_verdict = {PT_CAMERA_CHECK}.Unchecked then
+				l_camera := {PT_PILL_RAILS}.Light_off
+			else
+				l_camera := {PT_PILL_RAILS}.Light_problem
+			end
+			if prompter.mode = {PT_FOLLOW_MODE}.Constant then
+				l_follow := {PT_PILL_RAILS}.Light_off
+			elseif speech_state = {PT_SPEECH_SLOT}.Failed then
+				l_follow := {PT_PILL_RAILS}.Light_problem
+			elseif not mode_note.is_empty or badge.has_substring ({STRING_32} "OFF SCRIPT") then
+				l_follow := {PT_PILL_RAILS}.Light_check
+			else
+				l_follow := {PT_PILL_RAILS}.Light_good
+			end
+			pill.rails.set_lights (l_microphone, l_camera, l_follow)
+		end
+
+	paint_status_callout (p: SW_PAINTER; c: PT_CALLOUT)
+			-- Microphone, camera, following (and video while recording), then the keys.
+		local
+			k, x, y, w: REAL_64
+		do
+			k := theme.text_scale
+			x := c.padding
+			w := c.width - 2 * c.padding
+			y := c.padding + 16 * k
+			p.font (p.Role_ui, 15, True)
+			p.set_color (theme.ink)
+			p.text (x, y, {STRING_32} "Status")
+			y := y + 16 * k
+			y := status_row (p, c, x, y, w, {STRING_32} "Microphone", speech_status, pill.rails.microphone_light, 101,
+				{STRING_32} "The microphone voice following listens to and takes record (change it in Settings)", k)
+			y := status_row (p, c, x, y, w, {STRING_32} "Camera", camera_status, pill.rails.camera_light, 102,
+				{STRING_32} "The camera takes record; a virtual camera is checked every 10 seconds for a live picture", k)
+			y := status_row (p, c, x, y, w, {STRING_32} "Following", state_name + {STRING_32} " - " + mode_name, pill.rails.follow_light, 103,
+				{STRING_32} "How the pill follows you, and what it is doing now", k)
+			if prompter.controller.is_recording and not video_status.is_empty then
+				y := status_row (p, c, x, y, w, {STRING_32} "Video", video_status,
+					(if video_stalled then {PT_PILL_RAILS}.Light_problem else {PT_PILL_RAILS}.Light_good end), 104,
+					{STRING_32} "Frames reaching the recording, live", k)
+			end
+			y := y + 6 * k
+			p.set_color (theme.outline)
+			p.fill_rect (x, y, w, 1)
+			y := y + 22 * k
+			p.font (p.Role_ui, 13, True)
+			p.set_color (theme.ink)
+			p.text (x, y, {STRING_32} "Keys (work in any program)")
+			c.add_zone (105, x, y - 16 * k, w, 22 * k, {STRING_32} "These keys work even while another program has the focus")
+			p.font (p.Role_ui, 12, False)
+			p.set_color (theme.ink_muted)
+			across router.key_names as ic loop
+				y := wrap_to (p, x + 8 * k, y + 19 * k, w - 8 * k, ic, 18 * k) - 18 * k
+			end
+			y := y + 28 * k
+			p.font (p.Role_ui, 13, True)
+			p.set_color (theme.ink)
+			p.text (x, y, {STRING_32} "Mouse on the pill")
+			p.font (p.Role_ui, 12, False)
+			p.set_color (theme.ink_muted)
+			across <<{STRING_32} "click: hold    held: click a word to start there", {STRING_32} "right-click: go    wheel: back / forward",
+					{STRING_32} "hold Shift: drag to move, drag an edge or corner to size">> as ic loop
+				y := wrap_to (p, x + 8 * k, y + 19 * k, w - 8 * k, ic, 18 * k) - 18 * k
+			end
+			c.set_content_height (y + 6 * k)
+		end
+
+	status_row (p: SW_PAINTER; c: PT_CALLOUT; a_x, a_y, a_w: REAL_64; a_title, a_text: READABLE_STRING_32; a_light, a_code: INTEGER;
+			a_tip: READABLE_STRING_32; k: REAL_64): REAL_64
+			-- One status line: its light, its name, what it says; answers the y below it.
+		local
+			l_top: REAL_64
+		do
+			l_top := a_y
+			p.set_color (pill.renderer.light_colour (a_light))
+			p.circle_fill (a_x + 5 * k, a_y + 12 * k, 4.5 * k)
+			p.font (p.Role_ui, 13, True)
+			p.set_color (theme.ink)
+			p.text (a_x + 18 * k, a_y + 16 * k, a_title)
+			p.font (p.Role_ui, 12, False)
+			p.set_color (theme.ink_muted)
+			Result := wrap_to (p, a_x + 18 * k, a_y + 34 * k, a_w - 18 * k, a_text, 17 * k) + 2 * k
+			c.add_zone (a_code, a_x, l_top, a_w, Result - l_top, a_tip)
+		end
+
+	paint_script_callout (p: SW_PAINTER; c: PT_CALLOUT)
+			-- The script now, Open script..., and the recent scripts.
+		local
+			k, x, y, w, l_bw: REAL_64
+			i: INTEGER
+			l_name: STRING_32
+		do
+			k := theme.text_scale
+			x := c.padding
+			w := c.width - 2 * c.padding
+			y := c.padding + 16 * k
+			p.font (p.Role_ui, 15, True)
+			p.set_color (theme.ink)
+			p.text (x, y, {STRING_32} "Script")
+			p.font (p.Role_ui, 12, False)
+			p.set_color (theme.ink_muted)
+			y := wrap_to (p, x, y + 24 * k, w, script_note, 18 * k)
+			y := y + 4 * k
+			l_bw := 140 * k
+			p.set_color (theme.accent)
+			p.rrect_fill (x, y, l_bw, 30 * k, 7 * k)
+			p.font (p.Role_ui, 13, True)
+			p.set_color (theme.background)
+			p.text (x + 14 * k, y + 20 * k, {STRING_32} "Open script...")
+			c.add_zone (201, x, y, l_bw, 30 * k, {STRING_32} "Choose a script file (.md or .txt)  (Ctrl+Alt+O)")
+			y := y + 30 * k + 26 * k
+			if not settings.recent_scripts.is_empty then
+				p.font (p.Role_ui, 12, True)
+				p.set_color (theme.ink)
+				p.text (x, y, {STRING_32} "Recent")
+				y := y + 8 * k
+				from i := 1 until i > settings.recent_scripts.count loop
+					l_name := file_name (settings.recent_scripts [i])
+					if i = 1 then
+						p.set_color (theme.outline)
+						p.rrect_fill (x - 4 * k, y, w + 8 * k, 26 * k, 5 * k)
+					end
+					p.font (p.Role_ui, 12, i = 1)
+					p.set_color (if i = 1 then theme.ink else theme.ink_muted end)
+					p.text (x + 4 * k, y + 18 * k, short_name (l_name, 40))
+					c.add_zone (210 + i, x - 4 * k, y, w + 8 * k, 26 * k,
+						(if i = 1 then {STRING_32} "Open again: " else {STRING_32} "Open " end) + settings.recent_scripts [i])
+					y := y + 28 * k
+					i := i + 1
+				end
+			end
+			c.set_content_height (y + 4 * k)
+		end
+
+	on_script_press (a_code: INTEGER)
+			-- A click on the Script callout.
+		local
+			l_index: INTEGER
+		do
+			if a_code = 201 then
+				choose_script
+			elseif a_code > 210 and a_code <= 210 + settings.recent_scripts.count then
+				l_index := a_code - 210
+				open_script_file (settings.recent_scripts [l_index].twin)
+			end
+		end
+
+	paint_settings_callout (p: SW_PAINTER; c: PT_CALLOUT)
+		do
+			paint_settings_content (p, c.padding, c.padding - 4 * theme.text_scale, c.width - 2 * c.padding - 30 * theme.text_scale,
+				theme.text_scale, c)
+		end
+
+	paint_take_callout (p: SW_PAINTER; c: PT_CALLOUT)
+			-- The Last take panel.
+		local
+			i: INTEGER
+			k: REAL_64
+		do
+			k := theme.text_scale
+			edit_floor.paint (p, c.padding, 0, c.width - 2 * c.padding - 30 * k, k)
+			from i := 1 until i > edit_floor.clickables.count loop
+				c.add_zone (1000 + i, edit_floor.clickables [i].x, edit_floor.clickables [i].y, edit_floor.clickables [i].w,
+					edit_floor.clickables [i].h, edit_floor.row_tip (edit_floor.clickables [i].action, edit_floor.clickables [i].index))
+				i := i + 1
+			end
+			c.set_content_height (edit_floor.bottom)
+		end
+
+	wrap_to (p: SW_PAINTER; a_x, a_y, a_w: REAL_64; a_text: READABLE_STRING_32; a_step: REAL_64): REAL_64
+			-- Draw `a_text' from (`a_x', `a_y') wrapped to `a_w'; answer the y below it.
+		local
+			l_y: REAL_64
+		do
+			l_y := a_y
+			across (create {PT_WRAP}).lines (p, a_text, a_w) as ic loop
+				p.text (a_x, l_y, ic)
+				l_y := l_y + a_step
+			end
+			Result := l_y
+		end
+
+	file_name (a_path: READABLE_STRING_32): STRING_32
+		do
+			if attached (create {PATH}.make_from_string (a_path)).entry as al_entry then
+				Result := al_entry.name
+			else
+				Result := a_path.to_string_32
+			end
+		end
+
+	short_name (a_text: READABLE_STRING_32; a_max: INTEGER): STRING_32
+		do
+			if a_text.count <= a_max then
+				Result := a_text.to_string_32
+			else
+				Result := a_text.substring (1, a_max - 3).to_string_32 + {STRING_32} "..."
+			end
+		end
 
 feature {NONE} -- Pill content
 
@@ -576,13 +1012,22 @@ feature {NONE} -- Control window
 		end
 
 	paint_settings_page (p: SW_PAINTER; a_left, a_top, k: REAL_64)
-			-- The Settings page: camera and microphone lists, the picture delay, Done.
+			-- The Settings page in the control window's left column.
+		do
+			paint_settings_content (p, a_left, a_top, Left_column_width * k, k, Void)
+		end
+
+	paint_settings_content (p: SW_PAINTER; a_left, a_top, a_width, k: REAL_64; a_callout: detachable PT_CALLOUT)
+			-- The Settings page: camera and microphone lists, the sync start, the tooltips switch, Done.
+			-- In `a_callout', every target also gets its tooltip.
 		local
 			l_i: INTEGER
-			l_name: STRING_32
+			l_name, l_tip: STRING_32
+			l_found: BOOLEAN
 		do
 			settings_page.set_locked (prompter.controller.is_recording)
-			settings_page.lay_out (a_left, a_top, Left_column_width * k, k)
+			settings_page.set_tooltips_on (settings.shows_tooltips)
+			settings_page.lay_out (a_left, a_top, a_width, k)
 			p.font (p.Role_ui, 16, True)
 			p.set_color (theme.ink)
 			p.text (a_left, settings_page.title_y, {STRING_32} "Settings")
@@ -598,16 +1043,22 @@ feature {NONE} -- Control window
 			settings_heading (p, a_left, settings_page.microphone_heading_y, {STRING_32} "Microphone (the sound)", k)
 			settings_heading (p, a_left, settings_page.delay_heading_y, {STRING_32} "Sync: where each new take starts", k)
 			across settings_page.zones as ic loop
+				create l_tip.make_empty
 				if settings_page.is_camera_row (ic.code) then
 					l_i := ic.code - settings_page.Camera_base
 					l_name := settings_page.cameras [l_i]
-					settings_row (p, ic.x, ic.y, ic.w, ic.h, settings_page.device_text (l_name, l_i <= settings_page.found_cameras),
-						l_name.same_string (settings_page.camera), l_i <= settings_page.found_cameras, k)
+					l_found := l_i <= settings_page.found_cameras
+					settings_row (p, ic.x, ic.y, ic.w, ic.h, settings_page.device_text (l_name, l_found),
+						l_name.same_string (settings_page.camera), l_found, k)
+					l_tip := {STRING_32} "Record the picture from " + l_name
+						+ (if l_found then {STRING_32} "" else {STRING_32} " (Windows does not offer it now)" end)
 				elseif settings_page.is_microphone_row (ic.code) then
 					l_i := ic.code - settings_page.Microphone_base
 					l_name := settings_page.microphones [l_i]
-					settings_row (p, ic.x, ic.y, ic.w, ic.h, settings_page.device_text (l_name, l_i <= settings_page.found_microphones),
-						l_name.same_string (settings_page.microphone), l_i <= settings_page.found_microphones, k)
+					l_found := l_i <= settings_page.found_microphones
+					settings_row (p, ic.x, ic.y, ic.w, ic.h, settings_page.device_text (l_name, l_found),
+						l_name.same_string (settings_page.microphone), l_found, k)
+					l_tip := {STRING_32} "Record the sound from " + l_name + {STRING_32} " (voice following listens to it too)"
 				elseif ic.code = settings_page.Delay_down_hit or ic.code = settings_page.Delay_up_hit then
 					p.set_color (theme.outline)
 					p.rrect_fill (ic.x, ic.y, ic.w, ic.h, 6 * k)
@@ -618,19 +1069,33 @@ feature {NONE} -- Control window
 						p.font (p.Role_ui, 14, True)
 						p.set_color (theme.ink)
 						p.text (ic.x + ic.w + 18 * k, ic.y + 19 * k, settings_page.delay_text)
+						l_tip := {STRING_32} "New takes start with the picture 10 ms later"
+					else
+						l_tip := {STRING_32} "New takes start with the picture 10 ms earlier"
 					end
+				elseif ic.code = settings_page.Tooltips_hit then
+					settings_row (p, ic.x, ic.y, ic.w, ic.h, {STRING_32} "Show tooltips", settings_page.is_tooltips_on, True, k)
+					l_tip := (if settings_page.is_tooltips_on then {STRING_32} "Turn tooltips off (turn them back on here)" else {STRING_32} "Turn tooltips on" end)
 				elseif ic.code = settings_page.Done_hit then
 					p.set_color (theme.accent)
 					p.rrect_fill (ic.x, ic.y, ic.w, ic.h, 6 * k)
 					p.font (p.Role_ui, 13, True)
 					p.set_color (theme.background)
 					p.text (ic.x + 36 * k, ic.y + 19 * k, {STRING_32} "Done")
+					l_tip := {STRING_32} "Close Settings"
+				end
+				if attached a_callout as al_c and then not l_tip.is_empty then
+					al_c.add_zone (ic.code, ic.x, ic.y, ic.w, ic.h, l_tip)
 				end
 			end
 			p.font (p.Role_ui, 13, False)
 			p.set_color (theme.ink_muted)
-			l_name := {STRING_32} "How far the picture runs behind the sound. Adjust or Measure any take in the Last take panel; your last choice starts the next take."
-			if wrapped (p, a_left, settings_page.hint_y, l_name, 18 * k) > 0 then
+			l_name := {STRING_32} "How far the picture runs behind the sound. Adjust or Measure any take in Last take; your last choice starts the next take."
+			if attached a_callout as al_c then
+				al_c.set_content_height (settings_page.bottom)
+				if wrap_to (p, a_left, settings_page.hint_y, a_width, l_name, 18 * k) > 0 then
+				end
+			elseif wrapped (p, a_left, settings_page.hint_y, l_name, 18 * k) > 0 then
 			end
 		end
 

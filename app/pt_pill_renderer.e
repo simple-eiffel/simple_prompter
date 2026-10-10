@@ -5,8 +5,10 @@ note
 		bright), a reading marker, the caret word while held, and a small badge
 		(HELD, the count-in digits, CLICK-THROUGH). Under the text, the transport
 		bar: the progress line and the video-player buttons (icons drawn, not font
-		glyphs), and a tooltip over the button the pointer rests on. Draws offscreen,
-		then copies to the panel's device context in one step.
+		glyphs), and a tooltip over the button the pointer rests on. Beside the text,
+		the rails (0.4.0, PT_PILL_RAILS): the Status lights on the left; Quit, Script,
+		Settings and Last take on the right. Draws offscreen, then copies to the
+		panel's device context in one step.
 	]"
 	author: "Larry Rix"
 
@@ -40,6 +42,20 @@ feature -- Colours
 	Record_red: NATURAL_32 = 0xEF4444
 	Reject_ink: NATURAL_32 = 0xF87171
 	Tooltip_slab: NATURAL_32 = 0x262A33
+	Good_green: NATURAL_32 = 0x22C55E
+	Quit_ink: NATURAL_32 = 0x8A909C
+
+	Teeth_x: ARRAY [REAL_64]
+			-- The gear's six teeth, every 60 degrees (cosines).
+		once
+			Result := <<1.0, 0.5, -0.5, -1.0, -0.5, 0.5>>
+		end
+
+	Teeth_y: ARRAY [REAL_64]
+			-- ... and their sines.
+		once
+			Result := <<0.0, 0.866, 0.866, 0.0, -0.866, -0.866>>
+		end
 
 feature -- Access
 
@@ -61,7 +77,7 @@ feature -- Settings
 feature -- Rendering
 
 	render (a_dc: POINTER; a_width, a_height: INTEGER; a_prompter: SIMPLE_PROMPTER; a_geometry: PT_PILL_GEOMETRY;
-			a_caret: INTEGER; a_badge: READABLE_STRING_32; a_bar: PT_TRANSPORT_BAR)
+			a_caret: INTEGER; a_badge: READABLE_STRING_32; a_bar: PT_TRANSPORT_BAR; a_rails: PT_PILL_RAILS)
 			-- Draw the pill for `a_prompter' into device context `a_dc'.
 		require
 			dc_present: a_dc /= default_pointer
@@ -77,18 +93,35 @@ feature -- Rendering
 			end
 			create l_context.make (surface)
 			create l_painter.make (l_context, theme)
-			paint (l_painter, a_width, a_height, a_prompter, a_geometry, a_caret, a_badge, a_bar)
+			paint (l_painter, a_width, a_height, a_prompter, a_geometry, a_caret, a_badge, a_bar, a_rails)
 			l_context.destroy
 			blit (a_dc)
+		end
+
+feature -- Lights
+
+	light_colour (a_light: INTEGER): NATURAL_32
+			-- The colour of a Status light (PT_PILL_RAILS.Light_*).
+		do
+			inspect a_light
+			when {PT_PILL_RAILS}.Light_good then
+				Result := Good_green
+			when {PT_PILL_RAILS}.Light_check then
+				Result := Badge_ink
+			when {PT_PILL_RAILS}.Light_problem then
+				Result := Record_red
+			else
+				Result := Read_ink
+			end
 		end
 
 feature {NONE} -- Painting
 
 	paint (p: SW_PAINTER; a_width, a_height: INTEGER; a_prompter: SIMPLE_PROMPTER; a_geometry: PT_PILL_GEOMETRY;
-			a_caret: INTEGER; a_badge: READABLE_STRING_32; a_bar: PT_TRANSPORT_BAR)
+			a_caret: INTEGER; a_badge: READABLE_STRING_32; a_bar: PT_TRANSPORT_BAR; a_rails: PT_PILL_RAILS)
 		local
-			l_offset, l_top, l_baseline, l_position, l_reading_top, k, l_text_bottom: REAL_64
-			l_line, l_first, l_last, i, l_read: INTEGER
+			l_offset, l_top, l_baseline, l_position, l_reading_top, k, l_text_bottom, l_shift: REAL_64
+			l_line, l_first, l_last, i, l_read, l_text_width: INTEGER
 			l_revision: PT_SCRIPT_REVISION
 			l_layout: PT_LAYOUT
 		do
@@ -102,6 +135,11 @@ feature {NONE} -- Painting
 				-- The slab.
 			p.set_color (Slab)
 			p.fill_rect (0, 0, a_width, a_height)
+				-- The text sits between the rails.
+			l_shift := a_rails.rail_width
+			l_text_width := (a_width - 2 * l_shift).rounded.max (1)
+			p.context.save.do_nothing
+			p.context.translate (l_shift, 0).do_nothing
 				-- The reading marker.
 			k := theme.text_scale
 			l_reading_top := a_geometry.padding + a_geometry.reading_line
@@ -110,7 +148,7 @@ feature {NONE} -- Painting
 				-- The lines that show, clipped to the text area so a line beyond the
 				-- visible rows never peeks into the padding.
 			p.context.save.do_nothing
-			p.context.rectangle (a_geometry.padding, a_geometry.padding, a_width - 2 * a_geometry.padding,
+			p.context.rectangle (a_geometry.padding, a_geometry.padding, l_text_width - 2 * a_geometry.padding,
 				l_text_bottom - 2 * a_geometry.padding).clip.do_nothing
 			p.font (p.Role_mono, font_size, False)
 			l_first := a_geometry.first_visible_line (l_offset)
@@ -145,20 +183,144 @@ feature {NONE} -- Painting
 			end
 			p.context.restore.do_nothing
 				-- Soft edges: a line scrolling past never shows as cut-off glyph fragments.
-			fade (p, 0, a_geometry.padding + l_layout.line_height * 0.35, True, a_width)
-			fade (p, l_text_bottom - a_geometry.padding - l_layout.line_height * 0.35, l_text_bottom, False, a_width)
-			transport (p, a_bar, k)
-				-- The badge.
+			fade (p, 0, a_geometry.padding + l_layout.line_height * 0.35, True, l_text_width)
+			fade (p, l_text_bottom - a_geometry.padding - l_layout.line_height * 0.35, l_text_bottom, False, l_text_width)
+				-- The badge, top right of the text.
 			if not a_badge.is_empty then
 				p.font (p.Role_ui, (font_size * 0.45).max (11.0), True)
 				p.set_color (Badge_ink)
-				p.text (a_width - p.advance (a_badge) - 14 * k, 18 * k, a_badge)
+				p.text (l_text_width - p.advance (a_badge) - 14 * k, 18 * k, a_badge)
+			end
+			p.context.restore.do_nothing
+			transport (p, a_bar, k)
+			if a_rails.is_laid_out then
+				rails (p, a_rails, k)
 			end
 			if shows_grips then
 				grips (p, a_width, a_height, k)
 			end
 			if a_bar.is_tooltip_shown and a_bar.is_laid_out then
 				transport_tooltip (p, a_bar, a_width, k)
+			end
+			if a_rails.hover.is_tooltip_shown and a_rails.is_laid_out then
+				rails_tooltip (p, a_rails, a_width, a_height, k)
+			end
+		end
+
+	rails (p: SW_PAINTER; r: PT_PILL_RAILS; k: REAL_64)
+			-- The Status lights on the left rail; Quit, Script, Settings and Last take on the right.
+		local
+			l_lit: BOOLEAN
+			x, y, w, h, cx, cy, s, lw: REAL_64
+			j: INTEGER
+		do
+			lw := (1.8 * k).max (1.0)
+			across r.zones as ic loop
+				x := ic.x
+				y := ic.y
+				w := ic.w
+				h := ic.h
+				cx := x + w / 2
+				l_lit := (ic.code = r.Status_hit and r.is_status_open) or (ic.code = r.Script_hit and r.is_script_open)
+					or (ic.code = r.Settings_hit and r.is_settings_open) or (ic.code = r.Take_hit and r.is_take_open)
+				if l_lit then
+					p.set_color (Tooltip_slab)
+					p.rrect_fill (x, y, w, h, 8 * k)
+					p.set_color_alpha (Accent, 0.9)
+					p.set_line_width (1 * k)
+					p.rrect_stroke (x, y, w, h, 8 * k)
+				elseif r.hover.hovered = ic.code then
+					p.set_color_alpha (Accent, 0.3)
+					p.rrect_fill (x, y, w, h, 8 * k)
+				end
+				p.set_color (Upcoming_ink)
+				p.set_line_width (lw)
+				s := 7 * k
+				inspect ic.code
+				when {PT_PILL_RAILS}.Status_hit then
+					from j := 0 until j > 2 loop
+						cy := y + (j + 0.5) * h / 3 - 4 * k
+						p.set_color (Upcoming_ink)
+						inspect j
+						when 0 then
+								-- Microphone: a capsule and its stand.
+							p.rrect_stroke (cx - 3 * k, cy - 6 * k, 6 * k, 10 * k, 3 * k)
+							p.line (cx, cy + 4 * k, cx, cy + 6 * k, lw)
+						when 1 then
+								-- Camera: a body and a lens wedge.
+							p.rrect_stroke (cx - 7 * k, cy - 4 * k, 10 * k, 8 * k, 2 * k)
+							p.triangle_fill (cx + 3 * k, cy, cx + 7 * k, cy - 4 * k, cx + 7 * k, cy + 4 * k)
+						else
+								-- Following: a sound wave.
+							p.line (cx - 6 * k, cy - 2 * k, cx - 6 * k, cy + 2 * k, lw)
+							p.line (cx - 3 * k, cy - 5 * k, cx - 3 * k, cy + 5 * k, lw)
+							p.line (cx, cy - 7 * k, cx, cy + 7 * k, lw)
+							p.line (cx + 3 * k, cy - 4 * k, cx + 3 * k, cy + 4 * k, lw)
+							p.line (cx + 6 * k, cy - 1 * k, cx + 6 * k, cy + 1 * k, lw)
+						end
+						p.set_color (light_colour (if j = 0 then r.microphone_light elseif j = 1 then r.camera_light else r.follow_light end))
+						p.circle_fill (cx, cy + 12 * k, 3.5 * k)
+						j := j + 1
+					end
+				when {PT_PILL_RAILS}.Quit_hit then
+					p.set_color (Quit_ink)
+					p.line (cx - 5 * k, y + h / 2 - 5 * k, cx + 5 * k, y + h / 2 + 5 * k, lw)
+					p.line (cx + 5 * k, y + h / 2 - 5 * k, cx - 5 * k, y + h / 2 + 5 * k, lw)
+				when {PT_PILL_RAILS}.Script_hit then
+						-- A page with two lines of text.
+					cy := y + h / 2
+					p.rrect_stroke (cx - 6 * k, cy - 8 * k, 12 * k, 16 * k, 2 * k)
+					p.line (cx - 3 * k, cy - 1 * k, cx + 3 * k, cy - 1 * k, lw)
+					p.line (cx - 3 * k, cy + 3 * k, cx + 2 * k, cy + 3 * k, lw)
+				when {PT_PILL_RAILS}.Settings_hit then
+						-- A gear: a ring and six teeth.
+					cy := y + h / 2
+					p.arc_stroke (cx, cy, s * 0.6, 0, 2 * Pi)
+					from j := 1 until j > 6 loop
+						p.line (cx + s * 0.75 * Teeth_x [j], cy + s * 0.75 * Teeth_y [j],
+							cx + s * 1.1 * Teeth_x [j], cy + s * 1.1 * Teeth_y [j], lw * 1.3)
+						j := j + 1
+					end
+				when {PT_PILL_RAILS}.Take_hit then
+						-- A clapperboard.
+					cy := y + h / 2
+					p.rrect_stroke (cx - 8 * k, cy - 3 * k, 16 * k, 11 * k, 2 * k)
+					p.line (cx - 8 * k, cy - 5 * k, cx + 8 * k, cy - 8 * k, lw)
+					p.line (cx - 3 * k, cy - 6 * k, cx - 1 * k, cy - 3 * k, lw)
+					p.line (cx + 3 * k, cy - 7 * k, cx + 5 * k, cy - 4 * k, lw)
+				end
+			end
+		end
+
+
+	rails_tooltip (p: SW_PAINTER; r: PT_PILL_RAILS; a_width, a_height: INTEGER; k: REAL_64)
+			-- The hovered rail button's tooltip, beside it, kept inside the pill.
+		require
+			showing: r.hover.is_tooltip_shown
+		local
+			l_text: STRING_32
+			l_w, l_h, l_x, l_y, l_pad: REAL_64
+		do
+			if attached r.zone (r.hover.hovered) as al_z then
+				l_text := r.hover.tooltip
+				p.font (p.Role_ui, (font_size * 0.4).max (12.0), False)
+				l_pad := 8 * k
+				l_w := p.advance (l_text) + 2 * l_pad
+				l_h := p.font_ascent + p.font_descent + 2 * l_pad * 0.75
+				if al_z.x < a_width / 2 then
+					l_x := al_z.x + al_z.w + 6 * k
+				else
+					l_x := al_z.x - l_w - 6 * k
+				end
+				l_x := l_x.max (4 * k).min (a_width - l_w - 4 * k)
+				l_y := al_z.y.min (a_height - l_h - 4 * k).max (4 * k)
+				p.set_color (Tooltip_slab)
+				p.rrect_fill (l_x, l_y, l_w, l_h, 6 * k)
+				p.set_color_alpha (Accent, 0.6)
+				p.set_line_width (1 * k)
+				p.rrect_stroke (l_x, l_y, l_w, l_h, 6 * k)
+				p.set_color (Reading_ink)
+				p.text (l_x + l_pad, l_y + l_pad * 0.75 + p.font_ascent, l_text)
 			end
 		end
 
