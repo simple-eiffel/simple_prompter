@@ -448,6 +448,7 @@ feature {NONE} -- Test sets
 			run_test (agent t.test_few_new_anchors_still_follow, "few_new_anchors_still_follow")
 			run_test (agent t.test_search_ends_at_the_visible_words, "search_ends_at_the_visible_words")
 			run_test (agent t.test_nudge_puts_text_and_pointer_on_the_next_line, "nudge_puts_text_and_pointer_on_the_next_line")
+			run_test (agent t.test_held_wheel_scrolls_the_text_back, "held_wheel_scrolls_the_text_back")
 			run_test (agent t.test_wheel_moves_a_line_per_notch, "wheel_moves_a_line_per_notch")
 			run_test (agent t.test_words_before_a_reanchor_are_dropped_by_time, "words_before_a_reanchor_are_dropped_by_time")
 			run_test (agent t.test_visible_words_stop_above_the_fade, "visible_words_stop_above_the_fade")

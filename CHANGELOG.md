@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.8] - 2026-10-11
+
+### Fixed
+- Held, the wheel (and Ctrl+Alt+Left/Right) moved the caret a sentence at a time but the
+  text stayed put, so Larry could not see the sentences he stepped back to before
+  restarting (Reel 4, 11:11 take). Each step now brings the text to the caret.
+
 ## [0.5.7] - 2026-10-11
 
 ### Added
