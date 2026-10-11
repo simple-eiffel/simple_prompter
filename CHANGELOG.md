@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.1] - 2026-10-11
+
+### Changed
+- Rebuilt clean against the ecosystem libraries merged on 2026-10-11 (simple_cairo 1.4.0,
+  which adds outlined text for the coming in-Eiffel thumbnails and covers). No behavior change.
+
 ## [0.6.0] - 2026-10-11
 
 ### Added

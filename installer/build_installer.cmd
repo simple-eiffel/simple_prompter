@@ -6,8 +6,10 @@ rem Output: installer\output\simple_prompter-<version>-Setup.exe
 setlocal
 set "ROOT=%~dp0.."
 set "ISCC=C:\Program Files (x86)\Inno Setup 6\ISCC.exe"
+rem Git's bash: a plain "bash" can resolve to the WSL launcher, where /d/prod does not exist.
+set "GITBASH=C:\Program Files\Git\bin\bash.exe"
 pushd "%ROOT%"
-bash -c "/d/prod/ec.sh test -config simple_prompter.ecf -target simple_prompter_app -clean" || goto :failed
+"%GITBASH%" -c "/d/prod/ec.sh test -config simple_prompter.ecf -target simple_prompter_app -clean" || goto :failed
 if not exist "EIFGENs\simple_prompter_app\F_code\simple_prompter.exe" goto :failed
 popd
 "%ISCC%" "%~dp0simple_prompter.iss" || goto :failed_iscc

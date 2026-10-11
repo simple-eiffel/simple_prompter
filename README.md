@@ -15,7 +15,7 @@ Part of the [Simple Eiffel](https://github.com/simple-eiffel) ecosystem.
 
 ## Status
 
-**0.6.0, in use on Windows 11** (per-user installer: `installer/simple_prompter.iss`)
+**0.6.1, in use on Windows 11** (per-user installer: `installer/simple_prompter.iss`)
 - The pill is the whole program: a text pill under the webcam, hidden from screen captures,
   with Status lights, Script, Settings and Last take callouts beside it, a slide handle under
   it, tooltips on everything (and a switch to turn them off), and an icon in the notification
