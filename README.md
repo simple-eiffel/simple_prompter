@@ -15,7 +15,7 @@ Part of the [Simple Eiffel](https://github.com/simple-eiffel) ecosystem.
 
 ## Status
 
-**0.6.1, in use on Windows 11** (per-user installer: `installer/simple_prompter.iss`)
+**0.7.0, in use on Windows 11** (per-user installer: `installer/simple_prompter.iss`)
 - The pill is the whole program: a text pill under the webcam, hidden from screen captures,
   with Status lights, Script, Settings and Last take callouts beside it, a slide handle under
   it, tooltips on everything (and a switch to turn them off), and an icon in the notification
@@ -100,12 +100,15 @@ end
   edge. Size and place are remembered.
 - **Tray icon:** click it to show or hide the pill; right-click it for a menu.
 - **Keys:** Ctrl+Alt+H hides or shows the pill, Ctrl+Alt+O opens a script, Ctrl+Alt+R records.
-- **Publish (Last take panel):** after Render, finishes the take for posting: final.mp4
-  opening on the thumbnail in `out\` and fading to black at YouTube's loudness,
-  `captions.en_US.SRT` (what was said), chapters, and `youtube.txt`, `facebook.txt`,
-  `x.txt`, `transcript.txt`, and `reel.mp4`, the vertical Facebook Reel with the title and
-  captions drawn in, opening on `cover.jpg` when there is one. The local AI (Ollama) writes
-  titles and chapter names when it is running.
+- **Publish (Last take panel):** after Render, finishes the take for posting:
+  `captions.en_US.SRT` (what was said), chapters, `youtube.txt`, `facebook.txt`, `x.txt`,
+  `transcript.txt`; since 0.7.0 thumbnails A and B and `cover.jpg` when `out\` has none (the
+  local AI picks the frame from a contact sheet and writes the words; the speaker is cut out
+  with BiRefNet-portrait, which leaves the chair out; pictures you put in `out\` are kept);
+  then final.mp4 opening on thumbnail A and fading to black at YouTube's loudness, and
+  `reel.mp4`, the vertical Facebook Reel opening on `cover.jpg` with the title and captions
+  drawn in. The local AI (Ollama) writes titles, chapter names and the picture words when it
+  is running; without it the pictures use the script's title.
 
 ## Building
 

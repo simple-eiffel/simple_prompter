@@ -179,7 +179,7 @@ feature -- Access
 			when Action_render then
 				Result := {STRING_32} "Render final.mp4 with captions and chapters, using this take's sync"
 			when Action_publish then
-				Result := {STRING_32} "Publish: finish final.mp4 (opens on the thumbnail in out, fades to black, YouTube loudness), captions as spoken (captions.en_US.SRT), chapters, youtube.txt, facebook.txt, x.txt, transcript.txt, and reel.mp4: the vertical Facebook Reel with the title and captions drawn in, opening on cover.jpg when out has one"
+				Result := {STRING_32} "Publish: captions as spoken (captions.en_US.SRT), chapters, youtube.txt, facebook.txt, x.txt, transcript.txt; thumbnails A and B and cover.jpg when out has none (the local AI picks the frame and the words; yours are kept); then final.mp4 (opens on the thumbnail, fades to black, YouTube loudness) and reel.mp4, the vertical Facebook Reel opening on cover.jpg with the title and captions drawn in"
 			when Action_play_final then
 				Result := {STRING_32} "Play final.mp4 in Windows' video player"
 			when Action_open_folder then

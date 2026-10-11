@@ -7,6 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-10-11
+
+### Added
+- Publish makes the pictures (Larry: "get the simple_prompter to do this thumbnail and builder
+  work through the Publish process"): thumbnails A and B (1280x720) and cover.jpg (1080x1920),
+  after the words and before the video, so final.mp4 opens on thumbnail A and reel.mp4 on the
+  cover. Only when out\ has none: hand-made pictures are kept.
+  - The frame: 24 candidates across the speech; the local AI's vision picks the best face
+    from a numbered contact sheet (PT_CONTACT_SHEET, PT_OLLAMA_WRITER.pick_frame), else the
+    frame about 9 seconds in (PT_FRAME_PLAN).
+  - The cutout: BiRefNet-portrait on simple_image_ai, which leaves the chair out (chosen by
+    measurement on three takes; u2net kept it, and a symmetry rule and a stillness rule both
+    failed), unloaded after use.
+  - The words: the AI's suggestions now include a word to strike out, two thumbnail lines and
+    the main Bible reference; without the AI, the script's title (PT_PICTURE_WORDS).
+  - The layout: PT_PICTURE_COMPOSER on simple_image, the one Claude used by hand.
+- Ships onnxruntime.dll 1.17.3. The cutout model is read from where rembg keeps it
+  (%USERPROFILE%\.rembg\models\birefnet-portrait); without it Publish says so and goes on.
+- Tests: words, frame plan, contact sheet, composer on a drawn frame (278 in all); a live test
+  runs Publish on a copy of a real take and checks the pictures and what opens on them.
+
 ## [0.6.1] - 2026-10-11
 
 ### Changed
