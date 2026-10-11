@@ -320,6 +320,10 @@ feature {NONE} -- Painting
 						-- A short bar at the edge: this edge sizes the pill.
 					p.set_color_alpha (Upcoming_ink, (if r.hover.hovered = ic.code then 0.7 else 0.28 end))
 					p.rrect_fill ((if ic.code = r.Left_grip_hit then 3 * k else x + w - 6 * k end), y + h * 0.38, 3 * k, h * 0.24, 1.5 * k)
+				when {PT_PILL_RAILS}.Bottom_grip_hit then
+						-- A short bar at the bottom edge: it sizes the pill's height.
+					p.set_color_alpha (Upcoming_ink, (if r.hover.hovered = ic.code then 0.7 else 0.28 end))
+					p.rrect_fill (x + w * 0.44, y + h - 5 * k, w * 0.12, 3 * k, 1.5 * k)
 				when {PT_PILL_RAILS}.Take_hit then
 						-- A clapperboard.
 					cy := y + h / 2

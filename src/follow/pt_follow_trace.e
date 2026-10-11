@@ -1,10 +1,12 @@
 note
 	description: "[
 		The follow trace (0.5.1): what voice following did while a take was recorded, as
-		journal lines the take analyzer skips. A "heard" line per decode: the words heard,
+		journal lines the take analyzer skips. A "heard" line per decode: the words heard
+		and their start times in the window (0.5.3, so a take can be replayed exactly),
 		the aligner's position before and after, the move its best match proposed, the
-		anchors found and needed, the words new since the last move and their anchors, the
-		gap before the first new match (0.5.2), and the follower's target.
+		anchors found and needed, the words new since the last move and their anchors
+		(0.5.2), and the follower's target. A "nudge" line when the reader pushes the text
+		on a line (0.5.3).
 		A "frame" line at most every `Frame_interval' seconds, and whenever the line on
 		the reading row changes or the follower snaps: the follower's target, velocity and
 		steering goal, the displayed position, its line and the target's line. Together
@@ -68,15 +70,18 @@ feature -- Lines
 			-- The line for decode `a_heard' at `a_rt', the aligner having moved from `a_from'.
 		local
 			o: SIMPLE_JSON_OBJECT
-			l_words: STRING_32
+			l_words, l_times: STRING_32
 			i: INTEGER
 		do
 			create l_words.make (80)
+			create l_times.make (40)
 			from i := 1 until i > a_heard.count loop
 				if not l_words.is_empty then
 					l_words.append_character (' ')
+					l_times.append_character (' ')
 				end
 				l_words.append (a_heard.word (i).text)
+				l_times.append (rounded (a_heard.word (i).t0).out)
 				i := i + 1
 			end
 			o := (create {SIMPLE_JSON}).new_object
@@ -85,6 +90,7 @@ feature -- Lines
 			o := o.put_real (rounded (a_heard.window_start / 16_000), "w0")
 			o := o.put_real (rounded (a_heard.window_end / 16_000), "w1")
 			o := o.put_string (l_words, "words")
+			o := o.put_string (l_times, "times")
 			o := o.put_string (joined (a_aligner.heard_tail), "tail")
 			o := o.put_integer (a_from, "from")
 			o := o.put_integer (a_aligner.position, "to")
@@ -93,7 +99,6 @@ feature -- Lines
 			o := o.put_integer (a_aligner.last_needed, "need")
 			o := o.put_integer (a_aligner.last_new_words, "new")
 			o := o.put_integer (a_aligner.last_fresh_anchors, "fresh")
-			o := o.put_integer (a_aligner.last_gap, "gap")
 			o := o.put_real (rounded (a_aligner.confidence), "conf")
 			o := o.put_string (script_word (a_aligner.revision, a_aligner.position), "at")
 			o := o.put_string (script_word (a_aligner.revision, a_aligner.last_proposed), "prop_at")
@@ -124,6 +129,21 @@ feature -- Lines
 			o := o.put_real (rounded (a_scroll.position), "pos")
 			o := o.put_integer (a_line, "line")
 			o := o.put_integer (a_target_line, "tline")
+			Result := o.as_json
+		ensure
+			one_line: not Result.has ('%N')
+		end
+
+	nudge_line (a_rt: REAL_64; a_from, a_to: INTEGER): STRING_32
+			-- The line for a nudge at `a_rt' that put the reader from word `a_from' on `a_to'.
+		local
+			o: SIMPLE_JSON_OBJECT
+		do
+			o := (create {SIMPLE_JSON}).new_object
+			o := o.put_string ({STRING_32} "nudge", "t")
+			o := o.put_real (rounded (a_rt), "rt")
+			o := o.put_integer (a_from, "from")
+			o := o.put_integer (a_to, "to")
 			Result := o.as_json
 		ensure
 			one_line: not Result.has ('%N')

@@ -6,11 +6,15 @@ note
 		itself across overlapping windows). Only anchored (non-stop) matches may
 		move the position; big jumps need more anchors; moving backward needs
 		strong evidence (DR-016, DR-017).
-		The text flows, it never skips (Larry, 2026-10-11: "DO NOT SKIP ahead based on
-		anything at all ... wait for my words to return to the script"): only words heard
-		since the last move are evidence for the next one, and the first of them must
-		continue from the reader's place (at most `Small_jump' spoken words on). Off script,
-		or past a skipped passage, the position waits for the reader to come back to it.
+		The text never runs ahead of the reader (Larry, 2026-10-11): only words heard since
+		the last move can move it again, and never further than those words (plus
+		`Small_jump' for words the recognizer dropped). 0.5.2 also demanded that the first
+		new word continue from the reader's place; once the reader got ahead that gap only
+		grew, and the text stopped for good (0.5.3 removes it: "I either need this to FOLLOW
+		ME or allow me to force the scroll forward").
+		The reader is always on the words the pill shows, or off script (Larry, 2026-10-11:
+		"Period. Full stop."): when the prompter tells it the last visible word, the
+		forward search ends there.
 	]"
 	author: "Larry Rix"
 
@@ -85,16 +89,15 @@ feature -- Access
 	last_needed: INTEGER
 			-- Anchors the last `update''s forward move needed (0 for a move of at most `Small_jump').
 
+	visible_last: INTEGER
+			-- Last script word the pill shows (0 = not known: search `Normal_ahead' words on).
+
 	last_fresh_anchors: INTEGER
 			-- Anchored matches of the last `update''s best match among words heard since the
 			-- last move (only these may move the position).
 
 	last_new_words: INTEGER
 			-- Words heard since the last move, as the last `update' weighed them.
-
-	last_gap: INTEGER
-			-- Spoken words between the position and the first new word the last `update''s
-			-- forward proposal matched (0 when it proposed no forward move).
 
 	fresh_words: INTEGER
 			-- Words heard since the position last moved (or the newest words were explained there).
@@ -153,14 +156,17 @@ feature -- Element change
 			last_proposed := position
 			last_needed := 0
 			last_fresh_anchors := 0
-			last_gap := 0
 			if a_heard.window_start >= reanchored_at then
 				buffer_heard (a_heard)
 				last_new_words := fresh_words
 				l_heard := recent_tail
 				l_k := l_heard.count
 				l_lo := (position - Window_back + 1).max (1)
-				l_hi := (position + Normal_ahead).min (revision.word_count)
+				if visible_last > 0 then
+					l_hi := visible_last.max (position).min (revision.word_count)
+				else
+					l_hi := (position + Normal_ahead).min (revision.word_count)
+				end
 				if l_k > 0 and l_lo <= l_hi then
 						-- Rows from `l_k - fresh_words + 1' on are new; the rest already moved the text
 						-- (Reel 2, 2026-10-11: a re-heard "got it half right" moved on to the echo
@@ -174,15 +180,15 @@ feature -- Element change
 						last_proposed := l_new
 						if best_fresh > 0 then
 							if l_new < position then
-								if best_fresh >= Backward_evidence then
+								if l_anchors >= Backward_evidence then
 									move_to (l_new)
 								end
 							elseif l_new > position then
-								last_gap := gap_before (best_first)
 								if spoken_distance (position, l_new) > Small_jump then
 									last_needed := required_anchors (spoken_distance (position, l_new))
 								end
-								if last_gap <= Small_jump and best_fresh >= required_anchors (spoken_distance (position, l_new)) then
+								if spoken_distance (position, l_new) <= fresh_words + Small_jump
+									and l_anchors >= required_anchors (spoken_distance (position, l_new)) then
 									move_to (l_new)
 								end
 							else
@@ -216,17 +222,29 @@ feature -- Element change
 		ensure
 			stale_ignored: a_heard.window_start < reanchored_at implies (position = old position and confidence = old confidence)
 			within_script: position >= 0 and position <= revision.word_count
-			window_bound: position <= old position + Normal_ahead
+			window_bound: visible_last = 0 implies position <= old position + Normal_ahead
+			on_the_page: visible_last > 0 implies position <= visible_last.max (old position)
 			forward_bias: position < old position implies last_alignment.anchor_count >= Backward_evidence
 			stop_words_inert: last_alignment.anchor_count = 0 implies position = old position
 			jump_evidence: position > old position and then spoken_distance (old position, position) > Small_jump implies
 					last_alignment.anchor_count >= required_anchors (spoken_distance (old position, position))
 			new_words_only: position /= old position implies last_fresh_anchors >= 1
-			flows: position > old position implies last_gap <= Small_jump
+			never_ahead_of_speech: position > old position implies
+					spoken_distance (old position, position) <= last_new_words + Small_jump
 			moved_consumes: position /= old position implies fresh_words = 0
 			confidence_range: confidence >= 0.0 and confidence <= 1.0
 			alignment_consistent: last_alignment.word_index = position
 			proposed_in_script: last_proposed >= 0 and last_proposed <= revision.word_count
+		end
+
+	set_visible_last (a_word: INTEGER)
+			-- The pill shows script words up to `a_word' (0 = not known).
+		require
+			in_script: a_word >= 0 and a_word <= revision.word_count
+		do
+			visible_last := a_word
+		ensure
+			set: visible_last = a_word
 		end
 
 	reanchor (a_words_read: INTEGER; a_at_sample: INTEGER_64)
@@ -282,27 +300,13 @@ feature {NONE} -- Alignment
 			spent: fresh_words = 0
 		end
 
-	gap_before (a_first: INTEGER): INTEGER
-			-- Spoken words between the position and script word `a_first' (0 when `a_first' is
-			-- at or before the next word, or 0 = none).
-		require
-			in_script: a_first >= 0 and a_first <= revision.word_count
-		do
-			if a_first > position + 1 then
-				Result := spoken_distance (position, a_first - 1)
-			end
-		ensure
-			non_negative: Result >= 0
-		end
-
 	best_end: INTEGER
 	best_anchors: INTEGER
 	best_matched: INTEGER
 	best_explains_tail: BOOLEAN
 	best_fresh: INTEGER
-	best_first: INTEGER
 			-- Result of `best_alignment' (tail: the newest heard word was matched; fresh: anchors
-			-- among new heard words; first: the script word the first new heard word matched, 0 = none).
+			-- among new heard words).
 
 	fresh_row: INTEGER
 			-- First heard row of the current `best_alignment' that is new.
@@ -315,15 +319,6 @@ feature {NONE} -- Alignment
 			end
 		end
 
-	first_after (a_first, a_row, a_index: INTEGER): INTEGER
-			-- The path's first new match after heard row `a_row' matched script word `a_index'.
-		do
-			if a_first = 0 and a_row >= fresh_row then
-				Result := a_index
-			else
-				Result := a_first
-			end
-		end
 
 	matcher_stop (a_normalized: READABLE_STRING_32): BOOLEAN
 		do
@@ -463,15 +458,15 @@ feature {NONE} -- Alignment
 
 	best_alignment (a_heard: ARRAYED_LIST [STRING_32]; a_lo, a_hi, a_fresh_row: INTEGER)
 			-- Local alignment of `a_heard' against script words `a_lo'..`a_hi' that ends with the
-			-- newest heard word; sets best_end, best_anchors, best_matched, best_fresh, best_first
-			-- (heard rows from `a_fresh_row' on are new). Steps: one heard word ~ one script word;
+			-- newest heard word; sets best_end, best_anchors, best_matched, best_fresh (heard rows
+			-- from `a_fresh_row' on are new). Steps: one heard word ~ one script word;
 			-- two heard words ~ one script word ("for example" ~ "e.g."); one heard token ~ two or
 			-- three script words ("cpp" ~ "c p p"); skips cost 1.
 		require
 			fresh_row_valid: a_fresh_row >= 1
 		local
 			l_k, l_m, i, j, s, l_cand, l_best: INTEGER
-			l_score, l_anch, l_match, l_fresh, l_first: ARRAY2 [INTEGER]
+			l_score, l_anch, l_match, l_fresh: ARRAY2 [INTEGER]
 			l_last_match: ARRAY2 [BOOLEAN]
 			l_pair, l_joined: STRING_32
 		do
@@ -482,19 +477,18 @@ feature {NONE} -- Alignment
 			create l_anch.make_filled (0, l_k + 1, l_m + 1)
 			create l_match.make_filled (0, l_k + 1, l_m + 1)
 			create l_fresh.make_filled (0, l_k + 1, l_m + 1)
-			create l_first.make_filled (0, l_k + 1, l_m + 1)
 			fresh_row := a_fresh_row
 			from i := 1 until i > l_k loop
 				from j := 1 until j > l_m loop
 					s := a_lo + j - 1
 						-- local start (score 0) is the default
-					keep (l_score, l_anch, l_match, l_fresh, l_first, i, j, l_score [i, j + 1] - 1, l_anch [i, j + 1], l_match [i, j + 1],
-						l_fresh [i, j + 1], l_first [i, j + 1])
-					keep (l_score, l_anch, l_match, l_fresh, l_first, i, j, l_score [i + 1, j] - 1, l_anch [i + 1, j], l_match [i + 1, j],
-						l_fresh [i + 1, j], l_first [i + 1, j])
+					keep (l_score, l_anch, l_match, l_fresh, i, j, l_score [i, j + 1] - 1, l_anch [i, j + 1], l_match [i, j + 1],
+						l_fresh [i, j + 1])
+					keep (l_score, l_anch, l_match, l_fresh, i, j, l_score [i + 1, j] - 1, l_anch [i + 1, j], l_match [i + 1, j],
+						l_fresh [i + 1, j])
 					if cached_match (a_heard [i], s) then
-						keep (l_score, l_anch, l_match, l_fresh, l_first, i, j, l_score [i, j] + weight (s), l_anch [i, j] + anchor_of (s), l_match [i, j] + 1,
-							l_fresh [i, j] + fresh_anchor (i, s), first_after (l_first [i, j], i, s))
+						keep (l_score, l_anch, l_match, l_fresh, i, j, l_score [i, j] + weight (s), l_anch [i, j] + anchor_of (s), l_match [i, j] + 1,
+							l_fresh [i, j] + fresh_anchor (i, s))
 						if l_score [i + 1, j + 1] = l_score [i, j] + weight (s) then
 							l_last_match [i + 1, j + 1] := True
 						end
@@ -502,17 +496,17 @@ feature {NONE} -- Alignment
 					if i >= 2 and then could_be_spoken_span (a_heard [i - 1], a_heard [i], revision.word (s)) then
 						l_pair := a_heard [i - 1] + {STRING_32} " " + a_heard [i]
 						if matcher.matches (l_pair, revision.word (s)) then
-							keep (l_score, l_anch, l_match, l_fresh, l_first, i, j, l_score [i - 1, j] + weight (s), l_anch [i - 1, j] + anchor_of (s), l_match [i - 1, j] + 1,
-								l_fresh [i - 1, j] + fresh_anchor (i, s), first_after (l_first [i - 1, j], i, s))
+							keep (l_score, l_anch, l_match, l_fresh, i, j, l_score [i - 1, j] + weight (s), l_anch [i - 1, j] + anchor_of (s), l_match [i - 1, j] + 1,
+								l_fresh [i - 1, j] + fresh_anchor (i, s))
 						end
 					end
 					if j >= 2 and then a_heard [i].count >= revision.word (s - 1).normalized.count + revision.word (s).normalized.count
 						and then a_heard [i].starts_with (revision.word (s - 1).normalized) then
 						l_joined := revision.word (s - 1).normalized + {STRING_32} " " + revision.word (s).normalized
 						if matcher.equivalences.are_equivalent (a_heard [i], l_joined) then
-							keep (l_score, l_anch, l_match, l_fresh, l_first, i, j, l_score [i, j - 1] + weight (s - 1) + weight (s),
+							keep (l_score, l_anch, l_match, l_fresh, i, j, l_score [i, j - 1] + weight (s - 1) + weight (s),
 								l_anch [i, j - 1] + anchor_of (s - 1) + anchor_of (s), l_match [i, j - 1] + 2,
-								l_fresh [i, j - 1] + fresh_anchor (i, s - 1) + fresh_anchor (i, s), first_after (l_first [i, j - 1], i, s - 1))
+								l_fresh [i, j - 1] + fresh_anchor (i, s - 1) + fresh_anchor (i, s))
 						end
 					end
 					if j >= 3 and then a_heard [i].starts_with (revision.word (s - 2).normalized)
@@ -520,10 +514,9 @@ feature {NONE} -- Alignment
 						l_joined := revision.word (s - 2).normalized + {STRING_32} " " + revision.word (s - 1).normalized
 							+ {STRING_32} " " + revision.word (s).normalized
 						if matcher.equivalences.are_equivalent (a_heard [i], l_joined) then
-							keep (l_score, l_anch, l_match, l_fresh, l_first, i, j, l_score [i, j - 2] + weight (s - 2) + weight (s - 1) + weight (s),
+							keep (l_score, l_anch, l_match, l_fresh, i, j, l_score [i, j - 2] + weight (s - 2) + weight (s - 1) + weight (s),
 								l_anch [i, j - 2] + anchor_of (s - 2) + anchor_of (s - 1) + anchor_of (s), l_match [i, j - 2] + 3,
-								l_fresh [i, j - 2] + fresh_anchor (i, s - 2) + fresh_anchor (i, s - 1) + fresh_anchor (i, s),
-								first_after (l_first [i, j - 2], i, s - 2))
+								l_fresh [i, j - 2] + fresh_anchor (i, s - 2) + fresh_anchor (i, s - 1) + fresh_anchor (i, s))
 						end
 					end
 					j := j + 1
@@ -536,7 +529,6 @@ feature {NONE} -- Alignment
 			best_matched := 0
 			best_explains_tail := False
 			best_fresh := 0
-			best_first := 0
 			l_best := 0
 			from j := 1 until j > l_m loop
 				l_cand := l_score [l_k + 1, j + 1]
@@ -547,7 +539,6 @@ feature {NONE} -- Alignment
 					best_matched := l_match [l_k + 1, j + 1]
 					best_explains_tail := l_last_match [l_k + 1, j + 1]
 					best_fresh := l_fresh [l_k + 1, j + 1]
-					best_first := l_first [l_k + 1, j + 1]
 				end
 				j := j + 1
 			end
@@ -597,7 +588,7 @@ feature {NONE} -- Alignment
 				or else (a_word.normalized.starts_with (a_first) and a_word.normalized.ends_with (a_second)))
 		end
 
-	keep (a_score, a_anch, a_match, a_fresh, a_first: ARRAY2 [INTEGER]; a_i, a_j, a_cand, a_anchors, a_matched, a_fresh_anchors, a_first_word: INTEGER)
+	keep (a_score, a_anch, a_match, a_fresh: ARRAY2 [INTEGER]; a_i, a_j, a_cand, a_anchors, a_matched, a_fresh_anchors: INTEGER)
 			-- Cell (a_i, a_j) (stored at [a_i + 1, a_j + 1]) keeps the better of its value and the candidate.
 		do
 			if a_cand > a_score [a_i + 1, a_j + 1] or else (a_cand = a_score [a_i + 1, a_j + 1] and a_cand > 0 and a_anchors > a_anch [a_i + 1, a_j + 1]) then
@@ -605,7 +596,6 @@ feature {NONE} -- Alignment
 				a_anch [a_i + 1, a_j + 1] := a_anchors.max (0)
 				a_match [a_i + 1, a_j + 1] := a_matched.max (a_anchors.max (0))
 				a_fresh [a_i + 1, a_j + 1] := a_fresh_anchors.max (0).min (a_anchors.max (0))
-				a_first [a_i + 1, a_j + 1] := a_first_word
 			end
 		end
 

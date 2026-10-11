@@ -163,6 +163,9 @@ feature -- Commands
 				pill.toggle_shown
 			elseif a_control = {PT_CONTROL}.Click_through then
 				pill.toggle_click_through
+			elseif (a_control = {PT_CONTROL}.Forward or a_control = {PT_CONTROL}.Clicker_forward)
+				and prompter.controller.state = {PT_TAKE_STATE}.Reading then
+				prompter.nudge_forward
 			else
 				try_action (resolver.action_for (a_control, prompter.controller.state, prompter.controller.is_recording))
 			end
@@ -189,9 +192,14 @@ feature -- Commands
 		end
 
 	on_wheel (a_delta: INTEGER)
-			-- Wheel on the pill: step back (up) or forward (down) while held.
+			-- Wheel on the pill: step back (up) or forward (down) while held; down while reading
+			-- pushes the text on a line.
 		do
-			if prompter.controller.state = {PT_TAKE_STATE}.Held then
+			if prompter.controller.state = {PT_TAKE_STATE}.Reading then
+				if a_delta < 0 then
+					prompter.nudge_forward
+				end
+			elseif prompter.controller.state = {PT_TAKE_STATE}.Held then
 				if a_delta > 0 then
 					try_action ({PT_ACTION}.Back)
 				elseif a_delta < 0 then
@@ -218,8 +226,11 @@ feature -- Transport bar
 				hold_if_reading
 				try_action ({PT_ACTION}.Back)
 			when {PT_TRANSPORT_BAR}.Forward_button then
-				hold_if_reading
-				try_action ({PT_ACTION}.Forward)
+				if prompter.controller.state = {PT_TAKE_STATE}.Reading then
+					prompter.nudge_forward
+				else
+					try_action ({PT_ACTION}.Forward)
+				end
 			when {PT_TRANSPORT_BAR}.Again_button then
 				on_control ({PT_CONTROL}.Again)
 			when {PT_TRANSPORT_BAR}.Play_button then
@@ -376,7 +387,7 @@ feature {NONE} -- Implementation
 			when {PT_CONTROL}.Again then Result := {STRING_32} "again (restart the sentence)"
 			when {PT_CONTROL}.Go then Result := {STRING_32} "go"
 			when {PT_CONTROL}.Back then Result := {STRING_32} "back a sentence (held)"
-			when {PT_CONTROL}.Forward then Result := {STRING_32} "forward a sentence (held)"
+			when {PT_CONTROL}.Forward then Result := {STRING_32} "next line (reading) / forward a sentence (held)"
 			when {PT_CONTROL}.Play_stop then Result := {STRING_32} "play / stop"
 			when {PT_CONTROL}.Hide then Result := {STRING_32} "hide / show the pill"
 			when {PT_CONTROL}.Click_through then Result := {STRING_32} "click-through on / off"

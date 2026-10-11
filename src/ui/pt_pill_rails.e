@@ -38,6 +38,9 @@ feature -- Targets
 	Left_grip_hit: INTEGER = 6
 	Right_grip_hit: INTEGER = 7
 			-- The side edges: a plain press there sizes the pill (simple_shell 1.14.0).
+	Bottom_grip_hit: INTEGER = 8
+			-- The bottom edge: a plain press there makes the pill taller or shorter, its top
+			-- staying under the webcam (simple_shell 1.15.0; Larry, 2026-10-11).
 
 feature -- Lights
 
@@ -102,10 +105,11 @@ feature -- Access
 
 feature -- Layout
 
-	lay_out (a_width, a_text_height: REAL_64)
-			-- Place the buttons on a pill `a_width' wide whose text area is `a_text_height' high.
+	lay_out (a_width, a_text_height, a_height: REAL_64)
+			-- Place the buttons on a pill `a_width' x `a_height' whose text area is `a_text_height' high.
 		require
 			wide_enough: a_width > 2 * rail_width
+			text_inside: a_text_height <= a_height
 		local
 			l_x, l_y, b: REAL_64
 		do
@@ -123,8 +127,9 @@ feature -- Layout
 			zones.extend ([Take_hit, l_x + (rail_width - b) / 2, l_y, b, b])
 			zones.extend ([Left_grip_hit, 0.0, 0.0, Design_side_grip * scale, a_text_height])
 			zones.extend ([Right_grip_hit, a_width - Design_side_grip * scale, 0.0, Design_side_grip * scale, a_text_height])
+			zones.extend ([Bottom_grip_hit, 0.0, a_height - Design_side_grip * scale, a_width, Design_side_grip * scale])
 		ensure
-			five_buttons_two_grips: zones.count = 7
+			five_buttons_three_grips: zones.count = 8
 		end
 
 	hit (a_x, a_y: REAL_64): INTEGER
@@ -150,7 +155,7 @@ feature -- Tooltips
 	tooltip_text (a_code: INTEGER): STRING_32
 			-- What button `a_code' does.
 		require
-			known: a_code >= Status_hit and a_code <= Right_grip_hit
+			known: a_code >= Status_hit and a_code <= Bottom_grip_hit
 		do
 			inspect a_code
 			when Status_hit then
@@ -165,7 +170,9 @@ feature -- Tooltips
 			when Take_hit then
 				Result := {STRING_32} "Last take: render it, set its sync, preview cuts and things to check"
 			when Left_grip_hit, Right_grip_hit then
-				Result := {STRING_32} "Drag this edge to make the pill wider or narrower (Shift+drag the bottom for more lines)"
+				Result := {STRING_32} "Drag this edge to make the pill wider or narrower"
+			when Bottom_grip_hit then
+				Result := {STRING_32} "Drag the bottom edge to show more or fewer lines (the top stays put)"
 			end
 		end
 

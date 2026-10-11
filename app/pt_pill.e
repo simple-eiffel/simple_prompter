@@ -3,8 +3,10 @@ note
 		The pill: a capture-excluded SHELL_PANEL just below the webcam, painted
 		by PT_PILL_RENDERER. It sits at the top centre of the primary monitor
 		until the reader Shift+drags it; where it was dropped is remembered in
-		the settings. Shift+drag on an edge or corner sizes it: the height snaps
-		to whole lines and the width becomes the text column, both remembered.
+		the settings. Dragging a side edge sizes its width, the bottom edge its height
+		(0.5.3: the top stays under the webcam), as does Shift+drag on any edge or corner:
+		the height snaps to whole lines and the width becomes the text column, both
+		remembered.
 		Hide and click-through are toggles the hotkeys reach. Under the script text
 		sits the transport bar (PT_TRANSPORT_BAR): a progress line and video-player
 		buttons, always showing, with tooltips.
@@ -169,6 +171,7 @@ feature -- Lifecycle
 					(settings.Min_width * scale + 2 * padding + 2 * rails.rail_width).ceiling,
 					((measure.line_height + 2 * padding).max (rails.min_text_height) + bar.height).ceiling)
 				panel.set_sides_size_on_press (True)
+				panel.set_bottom_sizes_on_press (True)
 				panel.show (l_x, l_y, width, height)
 			end
 		end
@@ -309,7 +312,7 @@ feature -- Commands
 						bar.lay_out (0.0, panel.height - bar.height, panel.width)
 					end
 					if panel.width > 2 * rails.rail_width then
-						rails.lay_out (panel.width, panel.height - bar.height)
+						rails.lay_out (panel.width, panel.height - bar.height, panel.height)
 					end
 					renderer.render (l_dc, panel.width, panel.height, a_prompter, a_geometry, a_caret, a_badge, bar, rails)
 					panel.release_dc (l_dc)

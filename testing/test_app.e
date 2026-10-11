@@ -271,6 +271,8 @@ feature {NONE} -- Test sets
 			run_test (agent t.test_tracking_follows_larry_within_a_line, "tracking_follows_larry_within_a_line")
 			run_test (agent t.test_tracking_holds_during_the_ad_lib, "tracking_holds_during_the_ad_lib")
 			run_test (agent t.test_tracking_waits_at_the_skipped_paragraph, "tracking_waits_at_the_skipped_paragraph")
+			run_test (agent t.test_devils_half_right_never_jumps_to_the_echo, "devils_half_right_never_jumps_to_the_echo")
+			run_test (agent t.test_devils_half_right_follows_to_the_end, "devils_half_right_follows_to_the_end")
 			run_test (agent t.test_tracking_never_moves_backward, "tracking_never_moves_backward")
 			run_test (agent t.test_aligner_meets_frame_budget, "aligner_meets_frame_budget")
 			run_test (agent t.test_misreads_on_larry_read_01, "misreads_on_larry_read_01")
@@ -441,6 +443,10 @@ feature {NONE} -- Test sets
 			run_test (agent t.test_close_words_of_one_window_all_count, "close_words_of_one_window_all_count")
 			run_test (agent t.test_restamped_words_are_not_buffered_twice, "restamped_words_are_not_buffered_twice")
 			run_test (agent t.test_reheard_words_never_move_twice, "reheard_words_never_move_twice")
+			run_test (agent t.test_few_new_anchors_still_follow, "few_new_anchors_still_follow")
+			run_test (agent t.test_search_ends_at_the_visible_words, "search_ends_at_the_visible_words")
+			run_test (agent t.test_nudge_puts_text_and_pointer_on_the_next_line, "nudge_puts_text_and_pointer_on_the_next_line")
+			run_test (agent t.test_visible_words_stop_above_the_fade, "visible_words_stop_above_the_fade")
 			run_test (agent t.test_column_width_relays_out_in_place, "column_width_relays_out_in_place")
 		end
 

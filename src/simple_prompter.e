@@ -386,12 +386,79 @@ feature -- Following
 			l_from: INTEGER
 		do
 			l_from := aligner.position
+			aligner.set_visible_last (visible_last_word)
 			aligner.update (a_heard)
 			follower.on_alignment (aligner.last_alignment)
 			controller.sample_alignment (aligner.last_alignment)
 			if controller.is_recording then
 				controller.journal.trace (follow_trace.heard_line (controller.current_rt, a_heard, l_from, aligner, follower))
 			end
+		end
+
+	visible_last_word: INTEGER
+			-- Last script word fully shown on the pill: on a line that ends above the faded band
+			-- at the bottom of the text (Larry, 2026-10-11: "slightly greyed-out or half-visible
+			-- do NOT count. They are the next words/lines coming into view"). Lines are placed
+			-- as PT_PILL_GEOMETRY.line_top places them (reading row on the second line when three
+			-- or more lines show) and the band is PT_PILL_RENDERER's bottom fade (0.35 of a
+			-- line). Never before the end of the reading row's line; 0 with no layout.
+		local
+			l_lh, l_reading, l_usable, l_top: REAL_64
+			l_line: INTEGER
+		do
+			if layout.word_count > 0 and layout.line_count > 0 then
+				l_lh := layout.line_height
+				if settings.lines_visible >= 3 then
+					l_reading := l_lh
+				end
+				l_usable := settings.lines_visible * l_lh - Fade_lines * l_lh
+				from l_line := layout.line_count until Result > 0 or l_line < 1 loop
+					l_top := l_reading + l_lh / 2 + layout.line (l_line).y - scroll.y_offset.max (l_lh / 2)
+					if l_top + l_lh <= l_usable then
+						Result := layout.line (l_line).last_word
+					end
+					l_line := l_line - 1
+				end
+				Result := Result.max (layout.line (layout.line_of ((scroll.position.floor + 1).min (layout.word_count).max (1))).last_word)
+					.min (history.current_revision.word_count)
+			end
+		ensure
+			in_script: Result >= 0 and Result <= history.current_revision.word_count
+		end
+
+	Fade_lines: REAL_64 = 0.35
+			-- Height of the pill's bottom fade, in lines (PT_PILL_RENDERER).
+
+	nudge_forward
+			-- The reader is ahead of the text (Larry, 2026-10-11: "allow me to force the scroll
+			-- forward so I can read the text and force the pointer in the software to where I am
+			-- reading"): put the text and the aligner on the line after the reading row, without
+			-- stopping, and follow on from there.
+		require
+			loaded: has_script
+			reading: controller.state = {PT_TAKE_STATE}.Reading
+		local
+			l_from, l_to, l_line: INTEGER
+		do
+			l_from := aligner.position
+			if layout.word_count > 0 then
+					-- From where the text is heading, so that quick presses each move a line.
+				l_line := layout.line_of ((scroll.position.max (follower.target).floor + 1).min (layout.word_count).max (1))
+				if l_line < layout.line_count then
+					l_to := layout.line (l_line + 1).first_word - 1
+				else
+					l_to := layout.word_count
+				end
+			end
+			l_to := l_to.max (l_from).max (follower.target.floor).min (history.current_revision.word_count)
+			aligner.reanchor (l_to, recording_clock.sample_count)
+			follower.set_caret (l_to)
+			if controller.is_recording then
+				controller.journal.trace (follow_trace.nudge_line (controller.current_rt, l_from, l_to))
+			end
+		ensure
+			never_backward: aligner.position >= old aligner.position
+			follower_placed: follower.target = aligner.position.to_double
 		end
 
 	tick (a_now_ms: REAL_64)

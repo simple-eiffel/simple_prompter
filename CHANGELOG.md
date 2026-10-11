@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.3] - 2026-10-11
+
+### Fixed
+- 0.5.2 stopped following: it also required the first new word to continue within four
+  words of the text's place, and once the reader got ahead that gap only grew (Reel 2,
+  08:39, the text stopped at "Jesus" at 18.6 s while Larry read on). That rule is gone.
+  The text now follows on any new speech, never further than the words heard since it
+  last moved (plus four), and only within the words fully shown on the pill: the reader
+  is on the visible words or off script (Larry: "Period. Full stop."). Lines in the
+  bottom fade do not count.
+
+### Added
+- Nudge: while reading, Ctrl+Alt+Right, the bar's Forward button or the mouse wheel down
+  on the pill puts the text and the follower's place on the next line without stopping.
+- The pill grows taller: drag its bottom edge (simple_shell 1.15.0); the top stays under
+  the webcam, the height snaps to whole lines and is remembered between sessions.
+- Follow trace "heard" lines carry each word's start time, so a take replays exactly,
+  and a "nudge" line records each nudge.
+
 ## [0.5.2] - 2026-10-11
 
 ### Changed
