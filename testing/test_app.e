@@ -487,6 +487,9 @@ feature {NONE} -- Test sets
 			run_test (agent t.test_snapper_leaves_far_speech_out, "snapper_leaves_far_speech_out")
 			run_test (agent t.test_snapper_keeps_a_trailing_last_word, "snapper_keeps_a_trailing_last_word")
 			run_test (agent t.test_snapper_leaves_late_speech_out, "snapper_leaves_late_speech_out")
+			run_test (agent t.test_reel_title_and_captions, "reel_title_and_captions")
+			run_test (agent t.test_reel_ffmpeg_graph_and_arguments, "reel_ffmpeg_graph_and_arguments")
+			run_test (agent t.test_transcript_is_the_script_text, "transcript_is_the_script_text")
 			run_test (agent t.test_publish_settings_round_trip, "publish_settings_round_trip")
 		end
 

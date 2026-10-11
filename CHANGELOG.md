@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.9] - 2026-10-11
+
+### Added
+- Publish makes the vertical Facebook Reel, reel.mp4 (1080x1920, PT_REEL_PLAN): a blurred
+  backdrop, the picture cropped to the speaker and the icon in the middle, the script's
+  title in the top band, and the captions burned in, large, below (Reels autoplay muted).
+  When out\ has cover.jpg (a vertical cover, made outside the program like the
+  thumbnails) the reel opens on it, dissolving into the picture as the voice starts.
+  On screen the spoken "quote," becomes an opening quotation mark; the captions file keeps
+  what was said.
+- Publish writes transcript.txt: the script's title and spoken paragraphs, for Facebook's
+  text transcript.
+- The filter paths are escaped for both of ffmpeg's readings, checked with a real run in a
+  folder named "Devil's Half Right" (a one-level escape lost the apostrophe).
+
 ## [0.5.8] - 2026-10-11
 
 ### Fixed
