@@ -4,8 +4,9 @@ note
 		testing/fixtures/larry_read_01.words.tsv) through PT_ALIGNER over the parsed
 		read_test_01.md, in 3 s windows every 250 ms as the live pipeline would decode.
 		Acceptance for Tracking (approved intent Q5): within one line (8 words) of
-		distinctive words, hold during the ad-lib, jump the skipped paragraph, never move
-		backward (Larry made no restarts).
+		distinctive words, hold during the ad-lib, never move backward (Larry made no
+		restarts). 0.5.2: the text never skips (Larry, 2026-10-11), so at the skipped
+		paragraph it waits instead of jumping; checkpoints stop before the skip.
 	]"
 	author: "Larry Rix"
 	testing: "covers"
@@ -28,8 +29,7 @@ feature -- Tests
 			l_steps := replay (l_revision)
 			create l_failures.make_empty
 			across << {STRING_32} "teleprompter", {STRING_32} "camera", {STRING_32} "specification",
-				{STRING_32} "gigabytes", {STRING_32} "watching", {STRING_32} "repeated", {STRING_32} "waits",
-				{STRING_32} "processors", {STRING_32} "construction", {STRING_32} "patience" >> as ic loop
+				{STRING_32} "gigabytes", {STRING_32} "watching", {STRING_32} "repeated", {STRING_32} "waits" >> as ic loop
 				check_point (l_revision, l_steps, ic, l_failures)
 			end
 			assert_true ({STRING_32} "within one line at every checkpoint" + l_failures, l_failures.is_empty)
@@ -43,15 +43,18 @@ feature -- Tests
 			assert_integers_equal ("no movement from 83 s to 93.5 s", position_at (l_steps, 83.0), position_at (l_steps, 93.5))
 		end
 
-	test_tracking_jumps_the_skipped_paragraph
+	test_tracking_waits_at_the_skipped_paragraph
+			-- Larry read on past a paragraph; the text never skips it, it waits there to the end.
 		local
 			l_steps: ARRAYED_LIST [INTEGER]
 			l_revision: PT_SCRIPT_REVISION
 		do
 			l_revision := script
 			l_steps := replay (l_revision)
-			assert_greater_than ("past 'lost' (end of the skipped paragraph) one second after 'processors' (the third content word after the skip)",
-				position_at (l_steps, heard_time ({STRING_32} "processors") + 1.0), index_of_word (l_revision, {STRING_32} "lost"))
+			assert_true ("never past 'skipped' (start of the skipped paragraph)",
+				l_steps.last < index_of_word (l_revision, {STRING_32} "skipped"))
+			assert_true ("followed up to the skip", position_at (l_steps, heard_time ({STRING_32} "waits") + 1.0)
+				>= index_of_word (l_revision, {STRING_32} "waits") - 8)
 		end
 
 	test_tracking_never_moves_backward

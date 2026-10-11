@@ -15,7 +15,7 @@ Part of the [Simple Eiffel](https://github.com/simple-eiffel) ecosystem.
 
 ## Status
 
-**0.5.1, in use on Windows 11** (per-user installer: `installer/simple_prompter.iss`)
+**0.5.2, in use on Windows 11** (per-user installer: `installer/simple_prompter.iss`)
 - The pill is the whole program: a text pill under the webcam, hidden from screen captures,
   with Status lights, Script, Settings and Last take callouts beside it, a slide handle under
   it, tooltips on everything (and a switch to turn them off), and an icon in the notification
@@ -24,15 +24,17 @@ Part of the [Simple Eiffel](https://github.com/simple-eiffel) ecosystem.
 - Recording from a camera and microphone (OBS Virtual Camera works) with ffmpeg on one
   clock; the take studio analyzes the take, renders final.mp4, and keeps a per-take
   picture-to-sound sync that Measure can set from a clap.
-- 250 tests pass in the contract-checked build. The follower is verified against real
-  recordings: it stays within a line of the reader, holds still during an ad-lib, catches up
-  after a skipped paragraph, and never scrolls backward.
+- 251 tests pass in the contract-checked build. The follower is verified against real
+  recordings: it stays within a line of the reader, holds still during an ad-lib, waits at a
+  skipped paragraph instead of jumping it, and never scrolls backward.
 
 ## What it does
 
 **Voice following.** A small text pill sits under your webcam. As you read, it scrolls with
 you: voice activity drives the motion, and speech recognition plus a forward-only aligner keep
-it on the word you are reading. It tolerates the way people really read: homophones
+it on the word you are reading. The text flows and never skips ahead: only new words
+move it, and only on from where you are, so after an ad-lib or a skipped line it waits for
+you to come back to the script. It tolerates the way people really read: homophones
 ("their/there"), spoken abbreviations ("for example" for "e.g."), numbers read as words,
 split compounds, and the odd garbled word.
 
