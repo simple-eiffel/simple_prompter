@@ -128,7 +128,7 @@ feature -- Pictures
 		local
 			l_background: IMG_IMAGE
 			l_canvas: IMG_CANVAS
-			l_scale, l_top: REAL_64
+			l_scale, l_top, l_size: REAL_64
 			l_lines: LIST [STRING_32]
 			i: INTEGER
 		do
@@ -154,8 +154,14 @@ feature -- Pictures
 					l_top := last_bottom + 30
 				end
 			end
+			-- One size for every line, the size the widest line fits at (2026-10-11 live run: lines
+			-- fitted one by one made "DOES" twice the size of "EVERYTHING THE").
+			l_size := line_size (l_lines.count)
+			across l_lines as ic loop
+				l_size := l_size.min (fitted (ic, Impact, line_size (l_lines.count), Text_width, 12))
+			end
 			from i := 1 until i > l_lines.count loop
-				draw_line (l_canvas, l_lines [i], Impact, fitted (l_lines [i], Impact, line_size (l_lines.count), Text_width, 12),
+				draw_line (l_canvas, l_lines [i], Impact, l_size,
 					34, l_top, line_color (a_second, i, l_lines.count), 12, True, False)
 				l_top := last_bottom - 6
 				i := i + 1

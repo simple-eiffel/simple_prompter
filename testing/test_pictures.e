@@ -54,6 +54,9 @@ feature -- Words
 			create w.make ({STRING_32} "Dumb Jesus?", create {PT_PUBLISH_SUGGESTIONS}.make_empty)
 			assert_integers_equal ("one line", 1, w.title_lines.count)
 			assert_integers_equal ("three at most",  3, w.balanced ({STRING_32} "THE SON CAN DO NOTHING THAT STARTS IN HIMSELF", 3).count)
+			-- 2026-10-11 live run: two lines read better than "DOES / EVERYTHING THE / FATHER DOES".
+			assert_integers_equal ("two lines when they fit", 2, w.balanced ({STRING_32} "DOES EVERYTHING THE FATHER DOES", 3).count)
+			assert_true ("split before THE", w.balanced ({STRING_32} "DOES EVERYTHING THE FATHER DOES", 3).first.same_string ({STRING_32} "DOES EVERYTHING"))
 			-- 2026-10-11 live run: "FROM / HIMSELF, NOT BY" was badly balanced.
 			assert_true ("best split, first line", w.balanced ({STRING_32} "FROM HIMSELF, NOT BY", 3).first.same_string ({STRING_32} "FROM HIMSELF,"))
 			assert_true ("best split, second line", w.balanced ({STRING_32} "FROM HIMSELF, NOT BY", 3).last.same_string ({STRING_32} "NOT BY"))
@@ -112,7 +115,7 @@ feature -- Composer
 			c := drawn_composer
 			assert_true ("found the speaker", c.has_person)
 			create w.make ({STRING_32} "Jesus Was Helpless?", create {PT_PUBLISH_SUGGESTIONS}.make_from_json (
-				{STRING_32} "{%"thumbnail_struck%": %"Helpless%", %"thumbnail_a%": %"Read the next line%", %"thumbnail_b%": %"Nothing... or everything?%", %"reference%": %"John 5:19%"}"))
+				{STRING_32} "{%"thumbnail_struck%": %"Helpless%", %"thumbnail_a%": %"Does everything the Father does%", %"thumbnail_b%": %"Nothing... or everything?%", %"reference%": %"John 5:19%"}"))
 			l_a := c.thumbnail (w, False)
 			l_b := c.thumbnail (w, True)
 			l_cover := c.cover (w)
