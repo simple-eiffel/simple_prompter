@@ -91,6 +91,83 @@ feature -- Tests
 			assert_integers_equal ("follows the new words", script_index (r, {STRING_32} "mean"), a.position)
 		end
 
+	test_few_new_anchors_still_follow
+			-- Take 2026-10-11 08:39, 18.6 s (0.5.2): after "Jesus" the buffer gained only "the the
+			-- and and says" (one new anchor), the move to "says" needed two, and 0.5.2 counted new
+			-- anchors only, so the text stopped there for good while Larry read on. Old words give
+			-- the context; new words bound how far the text may go.
+		local
+			a: PT_ALIGNER
+			r: PT_SCRIPT_REVISION
+		do
+			r := parsed ({STRING_32} "Matthew chapter four. The devil takes Jesus to the pinnacle of the temple and says, If You are the Son of God, throw Yourself down.")
+			create a.make (r, create {PT_WORD_MATCHER})
+			a.update (timed_window (0, <<[{STRING_32} "matthew", 0.3], [{STRING_32} "chapter", 0.7], [{STRING_32} "four", 1.1],
+				[{STRING_32} "the", 1.5], [{STRING_32} "devil", 1.8], [{STRING_32} "takes", 2.2], [{STRING_32} "jesus", 2.6]>>))
+			assert_integers_equal ("on 'Jesus'", script_index (r, {STRING_32} "jesus"), a.position)
+			a.update (timed_window (48_000, <<[{STRING_32} "the", 0.3], [{STRING_32} "the", 0.8], [{STRING_32} "and", 1.4],
+				[{STRING_32} "and", 1.9], [{STRING_32} "says", 2.4]>>))
+			assert_integers_equal ("on to 'says'", script_index (r, {STRING_32} "says"), a.position)
+		end
+
+	test_search_ends_at_the_visible_words
+			-- Larry, 2026-10-11: the reader is on the visible words or off script. A phrase read
+			-- past the last visible word never moves the text; the same phrase on the page does.
+		local
+			a: PT_ALIGNER
+			r: PT_SCRIPT_REVISION
+		do
+			r := parsed ({STRING_32} "Alpha bravo charlie delta echo foxtrot golf hotel india juliet kilo lima mike november oscar papa quebec.")
+			create a.make (r, create {PT_WORD_MATCHER})
+			a.reanchor (script_index (r, {STRING_32} "hotel"), 0)
+			a.set_visible_last (script_index (r, {STRING_32} "india"))
+			a.update (timed_window (0, <<[{STRING_32} "india", 0.5], [{STRING_32} "juliet", 0.9], [{STRING_32} "kilo", 1.3]>>))
+			assert_true ("no further than the page", a.position <= script_index (r, {STRING_32} "india"))
+			a.set_visible_last (r.word_count)
+			a.update (timed_window (32_000, <<[{STRING_32} "juliet", 0.5], [{STRING_32} "kilo", 0.9], [{STRING_32} "lima", 1.3]>>))
+			assert_integers_equal ("on the page: follows", script_index (r, {STRING_32} "lima"), a.position)
+		end
+
+	test_nudge_puts_text_and_pointer_on_the_next_line
+			-- Larry, 2026-10-11: "allow me to force the scroll forward ... and force the pointer in
+			-- the software to where I am reading". While reading, a nudge moves both to the line
+			-- after the reading row, and the reading goes on.
+		local
+			p: SIMPLE_PROMPTER
+			l_next: INTEGER
+		do
+			create p.make_with_settings (create {PT_SETTINGS}.make_in_memory)
+			p := p.with_measure (create {PT_FIXED_MEASURE}.make (10.0, 20.0), 200.0)
+			p.load_script_text ({STRING_32} "t", {STRING_32} "One two three four five six seven eight nine ten. Eleven twelve thirteen fourteen fifteen sixteen seventeen eighteen.")
+			p.perform ({PT_ACTION}.Play)
+			p.perform ({PT_ACTION}.Count_in_done)
+			assert_true ("more than one line", p.layout.line_count >= 3)
+			l_next := p.layout.line (2).first_word - 1
+			p.nudge_forward
+			assert_integers_equal ("pointer on the next line", l_next, p.aligner.position)
+			assert_true ("text on the next line", p.follower.target = l_next.to_double)
+			assert_integers_equal ("still reading", {PT_TAKE_STATE}.Reading, p.controller.state)
+			p.nudge_forward
+			assert_integers_equal ("and the one after", p.layout.line (3).first_word - 1, p.aligner.position)
+		end
+
+	test_visible_words_stop_above_the_fade
+			-- Larry, 2026-10-11: only fully shown words count; the faded bottom line is the next
+			-- line coming into view. Five lines show: the reading row (second) and the two under
+			-- it are clear, the fifth sits in the fade.
+		local
+			p: SIMPLE_PROMPTER
+			s: PT_SETTINGS
+		do
+			create s.make_in_memory
+			s.set_lines_visible (5)
+			create p.make_with_settings (s)
+			p := p.with_measure (create {PT_FIXED_MEASURE}.make (10.0, 20.0), 200.0)
+			p.load_script_text ({STRING_32} "t", {STRING_32} "One two three four five six seven eight nine ten. Eleven twelve thirteen fourteen fifteen sixteen seventeen eighteen nineteen twenty. Twenty-one twenty-two twenty-three twenty-four twenty-five twenty-six.")
+			assert_true ("enough lines", p.layout.line_count >= 5)
+			assert_integers_equal ("three clear lines from the top", p.layout.line (3).last_word, p.visible_last_word)
+		end
+
 	test_column_width_relays_out_in_place
 			-- Sizing the pill narrower lays the script out on more lines and keeps the reader's place.
 		local

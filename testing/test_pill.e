@@ -372,14 +372,16 @@ feature -- Tests: pill-only UI (0.4.0)
 			l_codes: ARRAY [INTEGER]
 		do
 			create r.make (1.5)
-			r.lay_out (900, r.min_text_height)
-			assert_integers_equal ("five buttons, two side grips", 7, r.zones.count)
-			l_codes := <<r.Status_hit, r.Quit_hit, r.Script_hit, r.Settings_hit, r.Take_hit, r.Left_grip_hit, r.Right_grip_hit>>
+			r.lay_out (900, r.min_text_height, r.min_text_height + 78)
+			assert_integers_equal ("five buttons, two side grips, a bottom grip", 8, r.zones.count)
+			l_codes := <<r.Status_hit, r.Quit_hit, r.Script_hit, r.Settings_hit, r.Take_hit, r.Left_grip_hit, r.Right_grip_hit, r.Bottom_grip_hit>>
 			across l_codes as ic loop
 				if attached r.zone (ic) as al_z then
 					assert_integers_equal ("hit " + ic.out, ic, r.hit (al_z.x + al_z.w / 2, al_z.y + al_z.h / 2))
 					assert_false ("tooltip " + ic.out, r.tooltip_text (ic).is_empty)
-					assert_true ("on a rail " + ic.out, r.is_in_rail (al_z.x + al_z.w / 2, 900))
+					if ic /= r.Bottom_grip_hit then
+						assert_true ("on a rail " + ic.out, r.is_in_rail (al_z.x + al_z.w / 2, 900))
+					end
 				else
 					assert_true ("placed " + ic.out, False)
 				end

@@ -53,8 +53,9 @@ feature -- Buttons (left to right)
 
 feature -- Constants (design pixels)
 
-	Design_height: REAL_64 = 50.0
-			-- Whole bar: progress band, button row, bottom margin.
+	Design_height: REAL_64 = 52.0
+			-- Whole bar: progress band, button row, bottom margin (10, clear of the pill's
+			-- bottom grip; 0.5.3).
 	Design_progress_band: REAL_64 = 12.0
 			-- Band at the top holding the progress line; a click in it jumps.
 	Design_button: REAL_64 = 30.0
@@ -184,7 +185,7 @@ feature -- Display state
 					Result := {STRING_32} "Go: read on from the caret  (Ctrl+Alt+Space)"
 				end
 			when Forward_button then
-				Result := {STRING_32} "Forward a sentence  (Ctrl+Alt+Right)"
+				Result := {STRING_32} "Forward: next line while reading, a sentence when held  (Ctrl+Alt+Right)"
 			when Record_button then
 				if not is_rolling then
 					Result := {STRING_32} "Record a take  (Ctrl+Alt+R)"

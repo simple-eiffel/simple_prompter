@@ -72,6 +72,38 @@ feature -- Tests
 			assert_integers_equal ("no backward moves", 0, l_back)
 		end
 
+	test_devils_half_right_never_jumps_to_the_echo
+			-- Take 2026-10-11 08:07 (0.5.1): at 4.9 s the re-heard first sentence moved the text to
+			-- its echo "he got it exactly half right" two lines down. Replayed from the journal's
+			-- heard lines, the text never reaches the echo.
+		local
+			l_revision: PT_SCRIPT_REVISION
+			l_steps: ARRAYED_LIST [INTEGER]
+			l_most: INTEGER
+		do
+			l_revision := devils_script
+			l_steps := replay_heard ("testing/fixtures/devils_half_right_0807.heard.tsv", l_revision)
+			across l_steps as ic loop
+				l_most := l_most.max (ic)
+			end
+			assert_true ("never as far as 'quoted' (he stopped at 'what do I mean'): " + l_most.out,
+				l_most < index_of_word (l_revision, {STRING_32} "quoted"))
+		end
+
+	test_devils_half_right_follows_to_the_end
+			-- Take 2026-10-11 08:39 (0.5.2): the text stopped at "Jesus" (18.6 s) while Larry read on
+			-- to "concerning" (27.6 s). Replayed from the journal's heard lines, it follows him there.
+		local
+			l_revision: PT_SCRIPT_REVISION
+			l_steps: ARRAYED_LIST [INTEGER]
+		do
+			l_revision := devils_script
+			l_steps := replay_heard ("testing/fixtures/devils_half_right_0839.heard.tsv", l_revision)
+			assert_true ("within a line of 'concerning' at the end: " + l_steps.last.out,
+				l_steps.last >= index_of_word (l_revision, {STRING_32} "concerning") - 8
+				and l_steps.last <= index_of_word (l_revision, {STRING_32} "concerning") + 4)
+		end
+
 	test_aligner_meets_frame_budget
 			-- NFR-003: one aligner update over the whole replay costs less than a 60 Hz GUI frame
 			-- (16 ms), even in this contract-checked build. Measured 2026-10-05: 2.5 ms here,
@@ -240,6 +272,52 @@ feature {NONE} -- Replay
 			create p.make
 			p.parse ({STRING_32} "read_test_01", file_text ("testing/fixtures/read_test_01.md"), 1, create {PT_ID_SOURCE}.make)
 			Result := p.last_revision
+		end
+
+	devils_script: PT_SCRIPT_REVISION
+			-- Reel 2 "Devil's Half Right" (2026-10-11).
+		local
+			p: PT_SCRIPT_PARSER
+		do
+			create p.make
+			p.parse ({STRING_32} "devils_half_right", file_text ("testing/fixtures/devils_half_right.md"), 1, create {PT_ID_SOURCE}.make)
+			Result := p.last_revision
+		end
+
+	replay_heard (a_fixture: READABLE_STRING_GENERAL; a_revision: PT_SCRIPT_REVISION): ARRAYED_LIST [INTEGER]
+			-- Aligner position after each decode of `a_fixture' (a take's journal "heard" lines:
+			-- window start and end in seconds, the words). The journal keeps no word times, so the
+			-- words are spaced 0.3 s apart ending 0.2 s before the window ends, as live decodes
+			-- place the newest speech.
+		local
+			a: PT_ALIGNER
+			n: PT_NORMALIZER
+			l_fields, l_texts: LIST [STRING_32]
+			l_words: ARRAYED_LIST [PT_HEARD_WORD]
+			l_w0, l_span, l_t0: REAL_64
+			i: INTEGER
+		do
+			create a.make (a_revision, create {PT_WORD_MATCHER})
+			create n
+			create Result.make (128)
+			across file_text (a_fixture).split ('%N') as ic loop
+				l_fields := ic.split ('%T')
+				if l_fields.count = 3 and then l_fields [1].is_double and then l_fields [2].is_double then
+					l_w0 := l_fields [1].to_double
+					l_span := l_fields [2].to_double - l_w0
+					create l_words.make (8)
+					l_texts := l_fields [3].split (' ')
+					from i := 1 until i > l_texts.count loop
+						if not n.normalized (l_texts [i]).is_empty then
+							l_t0 := (l_span - 0.2 - (l_texts.count - i) * 0.3).max (0.0)
+							l_words.extend (create {PT_HEARD_WORD}.make (l_texts [i], n.normalized (l_texts [i]), l_t0, l_t0 + 0.25, 0.9))
+						end
+						i := i + 1
+					end
+					a.update (create {PT_HEARD_WORDS}.make ((l_w0 * 16_000).truncated_to_integer_64, 48_000, l_words))
+					Result.extend (a.position)
+				end
+			end
 		end
 
 	heard_words: ARRAYED_LIST [TUPLE [t0, t1: REAL_64; text: STRING_32]]
