@@ -239,6 +239,68 @@ feature -- Vertical reel (0.5.9)
 			assert_false ("no cover, no loop", across l_args as ic some ic.same_string ({STRING_32} "-loop") end)
 		end
 
+	test_ffmpeg_progress_readings
+			-- The Render and Publish progress bars read ffmpeg's last "time=" against the length.
+		local
+			f: PT_FFMPEG_PROGRESS
+		do
+			create f.make
+			assert_true ("one reading", f.last_seconds ({STRING_32} "frame=   90 fps=0.0 q=-0.0 Lsize=N/A time=00:00:03.00 bitrate=N/A speed= 340x") = 3.0)
+			assert_true ("the last of several", f.last_seconds ({STRING_32} "time=00:00:01.50 x%Rframe=2 time=00:01:02.25 y%R") = 62.25)
+			assert_true ("N/A is no reading", f.last_seconds ({STRING_32} "frame=0 time=N/A bitrate=N/A") = -1)
+			assert_true ("no reading at all", f.last_seconds ({STRING_32} "Input #0, matroska") = -1)
+			assert_true ("halfway", f.fraction ({STRING_32} "time=00:01:30.00 ", 180.0) = 0.5)
+			assert_true ("never past the end", f.fraction ({STRING_32} "time=00:03:10.00 ", 180.0) = 1.0)
+			assert_true ("hours", f.clock_seconds ({STRING_32} "1:00:01.5") = 3601.5)
+		end
+
+	test_floor_rules_table
+			-- The table Larry approved, 2026-10-11.
+		local
+			r: PT_FLOOR_RULES
+		do
+				-- Idle with a render: everything on.
+			create r.make (False, False, False, True, True)
+			assert_true ("idle: all on", r.is_enabled (r.Render) and r.is_enabled (r.Play_final) and r.is_enabled (r.Open_folder)
+				and r.is_enabled (r.Publish) and r.is_enabled (r.Sync_step) and r.is_enabled (r.Preview) and r.is_enabled (r.Measure))
+				-- Rendering.
+			create r.make (True, False, False, False, False)
+			assert_true ("rendering: Render busy", r.is_busy (r.Render) and not r.is_enabled (r.Render))
+			assert_false ("rendering: no Play final, Publish or sync step", r.is_enabled (r.Play_final) or r.is_enabled (r.Publish) or r.is_enabled (r.Sync_step))
+			assert_true ("rendering: folder, previews, Measure on", r.is_enabled (r.Open_folder) and r.is_enabled (r.Preview) and r.is_enabled (r.Measure))
+			assert_true ("a reason", r.reason (r.Publish).same_string ({STRING_32} "wait: rendering"))
+				-- Publishing.
+			create r.make (False, True, False, True, True)
+			assert_true ("publishing: Publish busy", r.is_busy (r.Publish))
+			assert_false ("publishing: no Render or Play final", r.is_enabled (r.Render) or r.is_enabled (r.Play_final))
+			assert_true ("publishing: sync, previews, Measure, folder on", r.is_enabled (r.Sync_step) and r.is_enabled (r.Preview)
+				and r.is_enabled (r.Measure) and r.is_enabled (r.Open_folder))
+				-- Measuring.
+			create r.make (False, False, True, True, True)
+			assert_true ("measuring: Measure busy", r.is_busy (r.Measure))
+			assert_false ("measuring: no sync step", r.is_enabled (r.Sync_step))
+			assert_true ("measuring: Render, Play final, Publish on", r.is_enabled (r.Render) and r.is_enabled (r.Play_final) and r.is_enabled (r.Publish))
+				-- No render yet.
+			create r.make (False, False, False, False, False)
+			assert_false ("nothing to play or publish", r.is_enabled (r.Play_final) or r.is_enabled (r.Publish))
+			assert_true ("Publish after Publish: the kept render counts", (create {PT_FLOOR_RULES}.make (False, False, False, False, True)).is_enabled (r.Publish))
+		end
+
+	test_measure_slot
+			-- Measure's mailbox: progress clamped, the result marks it done.
+		local
+			s: PT_MEASURE_SLOT
+		do
+			create s.make
+			assert_false ("running", s.is_done)
+			s.put_progress (1.7)
+			assert_true ("clamped", s.progress = 1.0)
+			s.put_progress (0.4)
+			s.put_result (True, 120, 3.5, {STRING_32} "measured 120 ms from 2 claps")
+			assert_true ("done", s.is_done and s.is_found and s.delay_ms = 120 and s.first_clap = 3.5 and s.progress = 1.0)
+			assert_true ("summary", s.summary.same_string ({STRING_32} "measured 120 ms from 2 claps"))
+		end
+
 	test_transcript_is_the_script_text
 			-- transcript.txt: the title and the spoken paragraphs, cues and headings left out.
 		local

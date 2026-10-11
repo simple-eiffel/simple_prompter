@@ -46,6 +46,10 @@ feature -- Access
 	succeeded: BOOLEAN
 			-- Did the last render produce final.mp4?
 
+	progress: REAL_64
+			-- How far the render has got (0..1), from ffmpeg's time readings against the final
+			-- video's length (0.6.0, the Render button's progress bar).
+
 feature -- Commands
 
 	start (a_folder: PT_SESSION_FOLDER; a_revision: PT_SCRIPT_REVISION; a_analysis: PT_ANALYSIS; a_journal: PT_JOURNAL; a_video_delay_ms: INTEGER)
@@ -88,6 +92,8 @@ feature -- Commands
 					l_line.append (quoted (ic))
 				end
 				create process.make
+				progress := 0
+				expected_seconds := a_analysis.cuts.output_duration.max (0.1)
 				process.start (l_line)
 				if attached process.last_error as al_e then
 					status := {STRING_32} "could not start ffmpeg: " + al_e
@@ -107,17 +113,22 @@ feature -- Commands
 			if is_rendering then
 				l_text := process.read_available_output
 				process.accumulated_output.wipe_out
+				if attached l_text as al_text and then (create {PT_FFMPEG_PROGRESS}.make).fraction (al_text, expected_seconds) >= 0 then
+					progress := progress.max ((create {PT_FFMPEG_PROGRESS}.make).fraction (al_text, expected_seconds))
+				end
 				if not process.is_running then
 					l_text := process.read_available_output
 					is_rendering := False
 					succeeded := process.exit_code = 0 and then (create {SIMPLE_FILE}.make (output_path)).exists
 					if succeeded then
+						progress := 1
 						status := {STRING_32} "rendered in " + ((now_ms - started_ms) / 1000).truncated_to_integer.out + {STRING_32} " s: final.mp4, final.srt, final.vtt, chapters.txt"
 					else
 						status := {STRING_32} "render failed (ffmpeg exit " + process.exit_code.out + {STRING_32} ")" + tail_of (l_text)
 					end
 				else
-					status := {STRING_32} "rendering... " + ((now_ms - started_ms) / 1000).truncated_to_integer.out + {STRING_32} " s"
+					status := {STRING_32} "rendering... " + (progress * 100).truncated_to_integer.out + {STRING_32} "%%, "
+						+ ((now_ms - started_ms) / 1000).truncated_to_integer.out + {STRING_32} " s"
 				end
 			end
 		end
@@ -141,6 +152,8 @@ feature {NONE} -- Implementation
 
 	process: SIMPLE_ASYNC_PROCESS
 	started_ms: REAL_64
+	expected_seconds: REAL_64
+			-- Length of the video being written.
 
 	quoted (a_text: READABLE_STRING_32): STRING_32
 			-- `a_text' as one command-line argument, always a new string.
@@ -169,5 +182,9 @@ feature {NONE} -- Implementation
 		alias
 			"LARGE_INTEGER f, c; QueryPerformanceFrequency (&f); QueryPerformanceCounter (&c); return (EIF_REAL_64) c.QuadPart * 1000.0 / (EIF_REAL_64) f.QuadPart;"
 		end
+
+
+invariant
+	progress_range: progress >= 0 and progress <= 1
 
 end

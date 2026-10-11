@@ -4,7 +4,8 @@ note
 		(tee.f32, 16 kHz float), finds the claps, and for each asks ffmpeg for
 		1.2 s of the raw video around it as 64 x 36 gray frames at 60 a second
 		(a scratch file in the take's analysis folder, deleted after). Blocks for
-		about a second per clap tried.
+		about a second per clap tried, so since 0.6.0 it runs on its own processor
+		(PT_MEASURE_WORKER) and tells `on_progress' how far it has got.
 	]"
 	author: "Larry Rix"
 
@@ -38,6 +39,16 @@ feature -- Access
 	summary: STRING_32
 			-- What the last measurement found, for the panel.
 
+	on_progress: detachable PROCEDURE [REAL_64]
+			-- Told how far `run' has got (0..1).
+
+	set_on_progress (a_action: PROCEDURE [REAL_64])
+		do
+			on_progress := a_action
+		ensure
+			set: on_progress = a_action
+		end
+
 feature -- Measuring
 
 	run (a_raw, a_tee, a_work_dir: READABLE_STRING_32)
@@ -50,7 +61,7 @@ feature -- Measuring
 			l_frames: ARRAY [NATURAL_8]
 			l_gray, l_line, l_out: STRING_32
 			l_start: REAL_64
-			l_size: INTEGER
+			l_size, l_done: INTEGER
 			l_ok: BOOLEAN
 		do
 			create measure.make
@@ -58,7 +69,9 @@ feature -- Measuring
 				summary := {STRING_32} "this take's recording files are missing"
 			else
 				l_samples := tee_samples (a_tee)
+				tell (0.2)
 				measure.find_claps (l_samples, l_samples.count)
+				tell (0.3)
 				if measure.claps.is_empty then
 					summary := {STRING_32} "no clap found: clap sharply 2 or 3 times, hands in the picture"
 				else
@@ -77,6 +90,8 @@ feature -- Measuring
 								measure.add_clap_frames (ic, l_start, l_frames.area, l_size, l_frames.count // l_size)
 							end
 						end
+						l_done := l_done + 1
+						tell (0.3 + 0.7 * l_done / measure.claps.count)
 					end
 					l_ok := (create {SIMPLE_FILE}.make (l_gray)).delete
 					if measure.is_found then
@@ -90,6 +105,13 @@ feature -- Measuring
 		end
 
 feature {NONE} -- Implementation
+
+	tell (a_fraction: REAL_64)
+		do
+			if attached on_progress as al_action then
+				al_action.call ([a_fraction])
+			end
+		end
 
 	tee_samples (a_tee: READABLE_STRING_32): SPECIAL [REAL_32]
 			-- The 32-bit little-endian float samples of `a_tee'.

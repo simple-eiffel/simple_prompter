@@ -117,7 +117,7 @@ feature -- Rendering
 			Result.extend (a_input.to_string_32)
 			Result.extend ({STRING_32} "-filter_complex_script")
 			Result.extend (a_script_path.to_string_32)
-			across << "-map", "[v]", "-map", "[a]", "-c:v", "h264_nvenc", "-preset", "p5", "-cq", "19", "-c:a", "aac", "-b:a", "192k" >> as ic loop
+			across << "-map", "[v]", "-map", "[a]", "-c:v", "h264_nvenc", "-preset", "p5", "-cq", "19", "-c:a", "aac", "-b:a", "192k", "-stats" >> as ic loop
 				Result.extend (ic.to_string_32)
 			end
 			Result.extend (a_output.to_string_32)

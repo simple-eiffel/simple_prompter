@@ -69,6 +69,18 @@ feature -- Access
 			on_stage := a_action
 		end
 
+	on_progress: detachable PROCEDURE [REAL_64]
+			-- Told how far the job has got (0..1; 0.6.0, the Publish button's progress bar):
+			-- the sound 0-5%, whisper 5-30%, the words 30-40%, final.mp4 40-80% and reel.mp4
+			-- 80-100%, the two encodes by ffmpeg's time readings.
+
+	set_on_progress (a_action: PROCEDURE [REAL_64])
+		do
+			on_progress := a_action
+		ensure
+			set: on_progress = a_action
+		end
+
 feature -- Basic operations
 
 	run (a_root, a_link, a_hashtags, a_ollama_url, a_ollama_model: READABLE_STRING_32; a_use_ollama: BOOLEAN)
@@ -92,10 +104,13 @@ feature -- Basic operations
 			else
 				l_samples := l_out + {STRING_32} "\publish.f32"
 				tell ({STRING_32} "publishing: reading the video's sound")
-				if run_ffmpeg ((create {PT_FINISH_PLAN}.make (0, 1, 2)).extract_arguments (l_source, l_samples)) then
+				tell_progress (0.0)
+				if run_ffmpeg ((create {PT_FINISH_PLAN}.make (0, 1, 2)).extract_arguments (l_source, l_samples), 0, 0, 0.05) then
 					l_duration := file (l_samples).size / 4 / Rate
 					tell ({STRING_32} "publishing: listening to the video (whisper)")
+					tell_progress (0.05)
 					transcriber.transcribe (l_samples, l_duration)
+					tell_progress (0.30)
 					if transcriber.is_success and then attached transcriber.last_map as al_map and then attached transcriber.last_heard as al_heard then
 						if al_map.span_count = 0 then
 							summary := {STRING_32} "publish stopped: no speech heard in final.mp4"
@@ -179,10 +194,11 @@ feature {NONE} -- Steps
 				l_ok := file (a_out + {STRING_32} "\facebook.txt").set_content (l_copy.facebook_text)
 				l_ok := file (a_out + {STRING_32} "\x.txt").set_content (l_copy.x_text)
 				l_ok := file (a_out + {STRING_32} "\transcript.txt").set_content (l_script.transcript)
+				tell_progress (0.40)
 				l_thumbnail := thumbnail_in (a_out)
 				tell ({STRING_32} "publishing: finishing the video")
 				l_ok := file (a_working).delete
-				if run_ffmpeg (l_plan.arguments (a_source, a_working, l_thumbnail)) and then file (a_working).exists then
+				if run_ffmpeg (l_plan.arguments (a_source, a_working, l_thumbnail), l_plan.length, 0.40, 0.80) and then file (a_working).exists then
 					l_ok := file (a_final).delete
 					l_ok := file (a_working).move_to (a_final)
 					succeeded := file (a_final).exists
@@ -224,7 +240,7 @@ feature {NONE} -- Steps
 			end
 			l_ok := file (l_ass).set_content (l_plan.ass_text (a_cues))
 				and then file (l_filter).set_content (l_plan.filter_script (l_ass, l_cover /= Void))
-			if l_ok and then run_ffmpeg (l_plan.arguments (a_final, l_cover, l_filter, l_working)) and then file (l_working).exists then
+			if l_ok and then run_ffmpeg (l_plan.arguments (a_final, l_cover, l_filter, l_working), a_length, 0.80, 1.0) and then file (l_working).exists then
 				l_ok := file (l_reel).delete
 				Result := file (l_working).move_to (l_reel) and file (l_reel).exists
 			end
@@ -315,9 +331,13 @@ feature {NONE} -- ffmpeg
 			create Result.make_empty
 		end
 
-	run_ffmpeg (a_arguments: LIST [STRING_32]): BOOLEAN
-			-- Run ffmpeg with `a_arguments' to the end; did it succeed?
+	run_ffmpeg (a_arguments: LIST [STRING_32]; a_length, a_from, a_to: REAL_64): BOOLEAN
+			-- Run ffmpeg with `a_arguments' to the end; did it succeed? While it runs, progress goes
+			-- from `a_from' to `a_to' by its time readings against `a_length' seconds (0: no readings).
+		require
+			ordered: 0 <= a_from and a_from <= a_to and a_to <= 1
 		local
+			l_fraction: REAL_64
 			l_process: SIMPLE_ASYNC_PROCESS
 			l_line, l_all: STRING_32
 			l_waited: INTEGER
@@ -340,6 +360,15 @@ feature {NONE} -- ffmpeg
 				from until not l_process.is_running or l_waited > Max_run_ms loop
 					if attached l_process.read_available_output as al_t then
 						l_all.append (al_t)
+						if a_length > 0 then
+							l_fraction := (create {PT_FFMPEG_PROGRESS}.make).fraction (al_t, a_length)
+							if l_fraction >= 0 then
+								tell_progress (a_from + (a_to - a_from) * l_fraction)
+							end
+						end
+						if l_all.count > 20_000 then
+							l_all.remove_head (l_all.count - 4_000)
+						end
 					end
 					l_process.accumulated_output.wipe_out
 					l_env.sleep (100_000_000)
@@ -352,6 +381,9 @@ feature {NONE} -- ffmpeg
 					l_all.append (al_t)
 				end
 				Result := not l_process.is_running and then l_process.exit_code = 0
+				if Result then
+					tell_progress (a_to)
+				end
 				last_output := {STRING_32} ""
 				if not Result and not l_all.is_empty then
 					last_output := {STRING_32} ": " + l_all.substring ((l_all.count - 200).max (1), l_all.count)
@@ -404,6 +436,13 @@ feature {NONE} -- Implementation
 		do
 			if attached on_stage as al_action then
 				al_action.call ([a_stage])
+			end
+		end
+
+	tell_progress (a_fraction: REAL_64)
+		do
+			if attached on_progress as al_action then
+				al_action.call ([a_fraction.max (0).min (1)])
 			end
 		end
 

@@ -131,6 +131,9 @@ feature -- Access
 
 	publish_succeeded: BOOLEAN
 
+	publish_progress: REAL_64
+			-- How far the publish job has got (0..1; 0.6.0).
+
 	publish_uses_ai: BOOLEAN
 			-- May the publish ask the local AI (Ollama) for its words?
 
@@ -277,6 +280,14 @@ feature -- Worker side
 			finished: analysis_finished and not analysis_requested
 		end
 
+	put_publish_progress (a_fraction: REAL_64)
+			-- The publish job has got this far.
+		do
+			publish_progress := a_fraction.max (0).min (1)
+		ensure
+			in_range: publish_progress >= 0 and publish_progress <= 1
+		end
+
 	put_publish_finished (a_succeeded: BOOLEAN; a_summary: separate READABLE_STRING_32)
 			-- The publish is over.
 		do
@@ -413,6 +424,7 @@ feature -- Window side
 			create publish_ai_model.make_from_separate (a_ai_model)
 			publish_uses_ai := a_uses_ai
 			publish_finished := False
+			publish_progress := 0
 			publish_requested := True
 		ensure
 			requested: publish_requested and not publish_finished

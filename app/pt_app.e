@@ -98,7 +98,7 @@ feature {NONE} -- Initialization
 
 feature -- Constants
 
-	Version: STRING_32 = "0.5.9"
+	Version: STRING_32 = "0.6.0"
 			-- Shown in the control window; keep in step with installer/simple_prompter.iss.
 
 	Tick_ms: INTEGER = 16
@@ -786,6 +786,9 @@ feature {NONE} -- Callouts (0.4.0)
 				l_follow := {PT_PILL_RAILS}.Light_off
 			elseif speech_state = {PT_SPEECH_SLOT}.Failed then
 				l_follow := {PT_PILL_RAILS}.Light_problem
+			elseif speech_state = {PT_SPEECH_SLOT}.Publishing then
+					-- The speech worker is publishing: voice following waits until it is done.
+				l_follow := {PT_PILL_RAILS}.Light_check
 			elseif not mode_note.is_empty or badge.has_substring ({STRING_32} "OFF SCRIPT") then
 				l_follow := {PT_PILL_RAILS}.Light_check
 			else
@@ -1587,6 +1590,8 @@ feature {NONE} -- Take Studio (plan Step 4a)
 	publish_pending: BOOLEAN
 			-- Has a publish been asked for and not yet finished?
 	publish_finished: BOOLEAN
+	publish_progress: REAL_64
+			-- How far the speech worker's publish has got (0..1).
 	publish_summary: STRING_32
 		attribute
 			create Result.make_empty
@@ -1672,6 +1677,7 @@ feature {NONE} -- Take Studio (plan Step 4a)
 				elseif speech_state = {PT_SPEECH_SLOT}.Publishing then
 					edit_floor.set_publish_status (speech_status, True)
 				end
+				edit_floor.set_publish_progress (publish_progress)
 			end
 		end
 
@@ -1832,6 +1838,7 @@ feature {NONE} -- Speech: separate calls (each locks the slot for one short call
 				create publish_summary.make_from_separate (a_slot.publish_summary)
 				a_slot.acknowledge_publish
 			end
+			publish_progress := a_slot.publish_progress
 			if not a_slot.records.is_empty then
 				incoming.append (create {STRING_8}.make_from_separate (a_slot.records))
 				a_slot.clear_records
