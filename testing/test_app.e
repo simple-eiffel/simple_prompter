@@ -490,6 +490,9 @@ feature {NONE} -- Test sets
 			run_test (agent t.test_reel_title_and_captions, "reel_title_and_captions")
 			run_test (agent t.test_reel_ffmpeg_graph_and_arguments, "reel_ffmpeg_graph_and_arguments")
 			run_test (agent t.test_transcript_is_the_script_text, "transcript_is_the_script_text")
+			run_test (agent t.test_ffmpeg_progress_readings, "ffmpeg_progress_readings")
+			run_test (agent t.test_floor_rules_table, "floor_rules_table")
+			run_test (agent t.test_measure_slot, "measure_slot")
 			run_test (agent t.test_publish_settings_round_trip, "publish_settings_round_trip")
 		end
 

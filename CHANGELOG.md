@@ -7,6 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-10-11
+
+### Added
+- Last take panel: Render, Publish and Measure show a progress bar along the bottom of their
+  buttons. Render and Publish read ffmpeg's time readings (PT_FFMPEG_PROGRESS; -stats added
+  so they print at -v error); Publish weighs its stages (sound 5%, whisper 25%, words 10%,
+  final.mp4 40%, reel.mp4 20%) and reports through the speech worker's slot.
+- PT_FLOOR_RULES, the table Larry approved: what may be clicked while Render, Publish or
+  Measure runs. A button that cannot be used is grey, its tooltip says why, and a click on
+  it explains instead of acting.
+- While the speech worker publishes, the pill's Following light shows "check".
+
+### Changed
+- Measure runs on its own SCOOP processor (PT_MEASURE_WORKER, PT_MEASURE_SLOT); the window
+  no longer freezes while it searches for claps.
+- Play final opens final.mp4 in Windows' own video player (play, pause, seek, stop).
+
+### Fixed
+- Play final and the cut, check and sync previews played the sound only: ffplay's window
+  was started hidden. Previews now show their picture.
+
 ## [0.5.9] - 2026-10-11
 
 ### Added

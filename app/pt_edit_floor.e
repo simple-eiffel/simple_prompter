@@ -9,6 +9,10 @@ note
 		Sync (0.3.6): the take's picture-to-sound sync (PT_TAKE_SYNC), nudged in 10 ms
 		steps, previewed, or measured from claps (PT_SYNC_MEASURER); previews and the
 		render use it, and each change becomes the starting value for the next take.
+		Since 0.6.0: Render, Publish and Measure show a progress bar along the bottom of their
+		buttons; Measure runs on its own processor (PT_MEASURE_WORKER); what may be clicked
+		while one of them runs is PT_FLOOR_RULES (a greyed button's tooltip says why); Play
+		final opens final.mp4 in Windows' own player; previews show ffplay's window.
 	]"
 	author: "Larry Rix"
 
@@ -29,7 +33,6 @@ feature {NONE} -- Initialization
 			create status_note.make_empty
 			create preview.make
 			create rows.make (16)
-			create measurer.make (a_ffmpeg)
 			create sync_note.make_empty
 		ensure
 			empty: not has_take
@@ -53,7 +56,14 @@ feature -- Access
 	sync: detachable PT_TAKE_SYNC
 			-- The shown take's sync.
 
-	measurer: PT_SYNC_MEASURER
+	is_measuring: BOOLEAN
+			-- Is a Measure running (on its own processor)?
+
+	measure_progress: REAL_64
+			-- How far it has got (0..1).
+
+	measure_slot: detachable separate PT_MEASURE_SLOT
+			-- Where the running Measure reports.
 
 	sync_note: STRING_32
 			-- What Measure found (empty until it runs on this take).
@@ -97,6 +107,51 @@ feature -- Access
 			busy_set: is_publishing = a_busy
 		end
 
+	publish_progress: REAL_64
+			-- How far Publish has got (0..1; the speech worker reports it).
+
+	set_publish_progress (a_fraction: REAL_64)
+		do
+			publish_progress := a_fraction.max (0).min (1)
+		ensure
+			in_range: publish_progress >= 0 and publish_progress <= 1
+		end
+
+	rules: PT_FLOOR_RULES
+			-- What may be clicked now.
+		local
+			l_final, l_render: BOOLEAN
+		do
+			if attached take as al_take and then attached al_take.folder as al_folder then
+				l_final := (create {SIMPLE_FILE}.make (al_folder.out_dir + {STRING_32} "\final.mp4")).exists
+				l_render := l_final or (create {SIMPLE_FILE}.make (al_folder.out_dir + {STRING_32} "\final (before cleanup).mp4")).exists
+			end
+			create Result.make (renderer.is_rendering, is_publishing, is_measuring, l_final, l_render)
+		end
+
+	rule_of (a_action: INTEGER): INTEGER
+			-- The PT_FLOOR_RULES button for panel action `a_action'.
+		do
+			inspect a_action
+			when Action_render then
+				Result := {PT_FLOOR_RULES}.Render
+			when Action_play_final then
+				Result := {PT_FLOOR_RULES}.Play_final
+			when Action_open_folder then
+				Result := {PT_FLOOR_RULES}.Open_folder
+			when Action_publish then
+				Result := {PT_FLOOR_RULES}.Publish
+			when Action_sync_down, Action_sync_up then
+				Result := {PT_FLOOR_RULES}.Sync_step
+			when Action_measure then
+				Result := {PT_FLOOR_RULES}.Measure
+			else
+				Result := {PT_FLOOR_RULES}.Preview
+			end
+		ensure
+			known: Result >= {PT_FLOOR_RULES}.Render and Result <= {PT_FLOOR_RULES}.Measure
+		end
+
 	take_root: detachable STRING_32
 			-- The shown take's session folder.
 		do
@@ -115,15 +170,18 @@ feature -- Access
 		end
 
 	row_tip (a_action, a_index: INTEGER): STRING_32
-			-- What clicking a row or button does.
+			-- What clicking a row or button does (and why not, when it cannot be used now).
+		local
+			l_why: STRING_32
 		do
+			l_why := rules.reason (rule_of (a_action))
 			inspect a_action
 			when Action_render then
 				Result := {STRING_32} "Render final.mp4 with captions and chapters, using this take's sync"
 			when Action_publish then
 				Result := {STRING_32} "Publish: finish final.mp4 (opens on the thumbnail in out, fades to black, YouTube loudness), captions as spoken (captions.en_US.SRT), chapters, youtube.txt, facebook.txt, x.txt, transcript.txt, and reel.mp4: the vertical Facebook Reel with the title and captions drawn in, opening on cover.jpg when out has one"
 			when Action_play_final then
-				Result := {STRING_32} "Play final.mp4"
+				Result := {STRING_32} "Play final.mp4 in Windows' video player"
 			when Action_open_folder then
 				Result := {STRING_32} "Open this take's folder"
 			when Action_preview_cut then
@@ -140,6 +198,9 @@ feature -- Access
 				Result := {STRING_32} "Find the sync from claps: clap 2 or 3 times, hands in the picture"
 			else
 				Result := {STRING_32} ""
+			end
+			if not l_why.is_empty then
+				Result := {STRING_32} "(" + l_why + {STRING_32} ")  " + Result
 			end
 		end
 
@@ -178,9 +239,12 @@ feature -- Commands
 		end
 
 	tick
-			-- Each tick: follow a render in progress.
+			-- Each tick: follow a render, and a Measure, in progress.
 		do
 			renderer.poll
+			if is_measuring and then attached measure_slot as al_slot then
+				poll_measure (al_slot)
+			end
 		end
 
 	close
@@ -201,7 +265,9 @@ feature -- Display
 		local
 			l_y, l_top: REAL_64
 			l_flag: PT_FLAG
+			l_rules: PT_FLOOR_RULES
 		do
+			l_rules := rules
 			rows.wipe_out
 			l_y := a_y + 30 * k
 			p.font (p.Role_ui, 16, True)
@@ -214,22 +280,25 @@ feature -- Display
 				l_y := wrapped (p, a_x, l_y + 22 * k, a_w, folder_name (al_folder.root), 20 * k)
 				l_y := wrapped (p, a_x, l_y, a_w, {STRING_32} "final " + clock (al_analysis.cuts.output_duration) + {STRING_32} " in "
 					+ al_analysis.cuts.count.out + {STRING_32} " cuts  -  " + al_analysis.flags.count.out + {STRING_32} " things to check", 20 * k) + 10 * k
-				button (p, a_x, l_y - 18 * k, 92 * k, 26 * k, (if renderer.is_rendering then {STRING_32} "Rendering" else {STRING_32} "Render" end), Action_render, k)
-				button (p, a_x + 100 * k, l_y - 18 * k, 92 * k, 26 * k, {STRING_32} "Play final", Action_play_final, k)
-				button (p, a_x + 200 * k, l_y - 18 * k, 104 * k, 26 * k, {STRING_32} "Open folder", Action_open_folder, k)
-				button (p, a_x + 312 * k, l_y - 18 * k, 96 * k, 26 * k, (if is_publishing then {STRING_32} "Publishing" else {STRING_32} "Publish" end), Action_publish, k)
+				button (p, a_x, l_y - 18 * k, 92 * k, 26 * k, (if renderer.is_rendering then {STRING_32} "Rendering" else {STRING_32} "Render" end), Action_render, k,
+					l_rules, renderer.progress)
+				button (p, a_x + 100 * k, l_y - 18 * k, 92 * k, 26 * k, {STRING_32} "Play final", Action_play_final, k, l_rules, 0)
+				button (p, a_x + 200 * k, l_y - 18 * k, 104 * k, 26 * k, {STRING_32} "Open folder", Action_open_folder, k, l_rules, 0)
+				button (p, a_x + 312 * k, l_y - 18 * k, 96 * k, 26 * k, (if is_publishing then {STRING_32} "Publishing" else {STRING_32} "Publish" end), Action_publish, k,
+					l_rules, publish_progress)
 				l_y := l_y + 24 * k
 				if attached sync as al_sync then
 					p.font (p.Role_ui, 12, True)
 					p.set_color (Ink)
 					p.text (a_x, l_y + 8 * k, {STRING_32} "Sync")
-					button (p, a_x + 42 * k, l_y - 10 * k, 26 * k, 26 * k, {STRING_32} "-", Action_sync_down, k)
+					button (p, a_x + 42 * k, l_y - 10 * k, 26 * k, 26 * k, {STRING_32} "-", Action_sync_down, k, l_rules, 0)
 					p.font (p.Role_ui, 12, True)
 					p.set_color (Ink)
 					p.text (a_x + 76 * k, l_y + 8 * k, al_sync.text)
-					button (p, a_x + 140 * k, l_y - 10 * k, 26 * k, 26 * k, {STRING_32} "+", Action_sync_up, k)
-					button (p, a_x + 176 * k, l_y - 10 * k, 108 * k, 26 * k, {STRING_32} "Preview sync", Action_sync_preview, k)
-					button (p, a_x + 292 * k, l_y - 10 * k, 80 * k, 26 * k, {STRING_32} "Measure", Action_measure, k)
+					button (p, a_x + 140 * k, l_y - 10 * k, 26 * k, 26 * k, {STRING_32} "+", Action_sync_up, k, l_rules, 0)
+					button (p, a_x + 176 * k, l_y - 10 * k, 108 * k, 26 * k, {STRING_32} "Preview sync", Action_sync_preview, k, l_rules, 0)
+					button (p, a_x + 292 * k, l_y - 10 * k, 80 * k, 26 * k, (if is_measuring then {STRING_32} "Measuring" else {STRING_32} "Measure" end),
+						Action_measure, k, l_rules, measure_progress)
 					l_y := l_y + 38 * k
 					p.font (p.Role_ui, 12, False)
 					p.set_color (Muted)
@@ -322,8 +391,13 @@ feature {NONE} -- Actions
 	Action_publish: INTEGER = 10
 
 	act (a_action, a_index: INTEGER)
+		local
+			l_why: STRING_32
 		do
-			if attached take as al_take and then attached al_take.folder as al_folder and then attached al_take.analysis as al_analysis
+			l_why := rules.reason (rule_of (a_action))
+			if not l_why.is_empty then
+				status_note := l_why
+			elseif attached take as al_take and then attached al_take.folder as al_folder and then attached al_take.analysis as al_analysis
 				and then attached al_take.history as al_history and then attached al_take.journal as al_journal then
 				inspect a_action
 				when Action_render then
@@ -344,11 +418,9 @@ feature {NONE} -- Actions
 						status_note := {STRING_32} "render first: there is no final.mp4 yet"
 					end
 				when Action_play_final then
-					if (create {SIMPLE_FILE}.make (al_folder.out_dir + {STRING_32} "\final.mp4")).exists then
-						play (al_folder.out_dir + {STRING_32} "\final.mp4", 0.0, 0.0, {STRING_32} "final", 0)
-					else
-						status_note := {STRING_32} "render first: there is no final.mp4 yet"
-					end
+						-- Windows' own player, with its play, pause, seek and stop (Larry, 2026-10-11).
+					run ({STRING_32} "explorer.exe " + quoted (al_folder.out_dir + {STRING_32} "\final.mp4"))
+					status_note := {STRING_32} ""
 				when Action_open_folder then
 					run ({STRING_32} "explorer.exe " + quoted (al_folder.root))
 				when Action_preview_cut then
@@ -374,15 +446,7 @@ feature {NONE} -- Actions
 						play (al_folder.raw_path, al_analysis.cuts.cut (1).span.t0, 8.0, {STRING_32} "sync " + sync_ms.out + {STRING_32} " ms", sync_ms)
 					end
 				when Action_measure then
-					measurer.run (al_folder.raw_path, al_folder.tee_path, al_folder.out_dir)
-					sync_note := measurer.summary.twin
-					if measurer.measure.is_found and attached sync as al_sync then
-						al_sync.set_measured (measurer.measure.delay_ms.max ({PT_TAKE_SYNC}.Min_ms).min ({PT_TAKE_SYNC}.Max_ms))
-						if not measurer.measure.claps.is_empty then
-							sync_preview_from := (measurer.measure.claps.first - 1.0).max (0.0)
-						end
-						tell_sync (al_sync.delay_ms)
-					end
+					start_measure (al_folder.raw_path, al_folder.tee_path, al_folder.out_dir)
 				else
 				end
 			end
@@ -413,6 +477,8 @@ feature {NONE} -- Actions
 			l_line.append ({STRING_32} " " + quoted (a_file))
 			create preview.make
 			preview.set_ends_with_owner (True)
+				-- ffplay's picture is a window: hidden, a preview played the sound only (0.6.0).
+			preview.set_show_window (True)
 			preview.start (l_line)
 			if attached preview.last_error as al_e then
 				status_note := {STRING_32} "could not start ffplay: " + al_e
@@ -428,6 +494,47 @@ feature {NONE} -- Actions
 			create l_process.make
 			l_process.set_show_window (True)
 			l_process.start (a_line)
+		end
+
+feature {NONE} -- Measure (on its own processor)
+
+	start_measure (a_raw, a_tee, a_work_dir: STRING_32)
+			-- Start Measure on a new processor reporting to a fresh slot; the window goes on.
+		local
+			l_slot: separate PT_MEASURE_SLOT
+			l_worker: separate PT_MEASURE_WORKER
+		do
+			create l_slot.make
+			measure_slot := l_slot
+			create l_worker.make (renderer.ffmpeg, a_raw, a_tee, a_work_dir, l_slot)
+			is_measuring := True
+			measure_progress := 0
+			sync_note := {STRING_32} "measuring the sync from claps..."
+			launch_measure (l_worker)
+		ensure
+			measuring: is_measuring
+		end
+
+	launch_measure (a_worker: separate PT_MEASURE_WORKER)
+		do
+			a_worker.run
+		end
+
+	poll_measure (a_slot: separate PT_MEASURE_SLOT)
+			-- Take the running Measure's progress, and its result once done.
+		do
+			measure_progress := a_slot.progress
+			if a_slot.is_done then
+				is_measuring := False
+				create sync_note.make_from_separate (a_slot.summary)
+				if a_slot.is_found and attached sync as al_sync then
+					al_sync.set_measured (a_slot.delay_ms.max ({PT_TAKE_SYNC}.Min_ms).min ({PT_TAKE_SYNC}.Max_ms))
+					if a_slot.first_clap >= 0 then
+						sync_preview_from := (a_slot.first_clap - 1.0).max (0.0)
+					end
+					tell_sync (al_sync.delay_ms)
+				end
+			end
 		end
 
 feature {NONE} -- Sync
@@ -476,6 +583,13 @@ feature {NONE} -- Implementation
 	Danger: NATURAL_32 = 0xF87171
 	Flag_ink: NATURAL_32 = 0xFBBF24
 	Button_fill: NATURAL_32 = 0x3B82F6
+	Button_ink: NATURAL_32 = 0x0F1115
+	Button_off: NATURAL_32 = 0x3A3F4B
+	Button_off_ink: NATURAL_32 = 0x8A909C
+			-- A button that cannot be used now.
+	Bar_track: NATURAL_32 = 0x1E3A8A
+	Bar_fill: NATURAL_32 = 0xF5F6F8
+			-- The progress bar along a busy button's bottom.
 
 	wrapped (p: SW_PAINTER; a_x, a_y, a_w: REAL_64; a_text: READABLE_STRING_32; a_step: REAL_64): REAL_64
 			-- Draw `a_text' from (`a_x', `a_y') wrapped to `a_w'; answer the y below it.
@@ -492,13 +606,28 @@ feature {NONE} -- Implementation
 			moved_down: Result > a_y
 		end
 
-	button (p: SW_PAINTER; a_x, a_y, a_w, a_h: REAL_64; a_label: STRING_32; a_action: INTEGER; k: REAL_64)
+	button (p: SW_PAINTER; a_x, a_y, a_w, a_h: REAL_64; a_label: STRING_32; a_action: INTEGER; k: REAL_64;
+			a_rules: PT_FLOOR_RULES; a_progress: REAL_64)
+			-- A button for `a_action': blue when it can be used, grey when not (its tooltip says
+			-- why), and while its own job runs a progress bar `a_progress' along its bottom.
+		local
+			l_rule: INTEGER
+			l_busy, l_enabled: BOOLEAN
 		do
-			p.set_color (Button_fill)
+			l_rule := rule_of (a_action)
+			l_busy := a_rules.is_busy (l_rule)
+			l_enabled := a_rules.is_enabled (l_rule)
+			p.set_color (if l_enabled or l_busy then Button_fill else Button_off end)
 			p.rrect_fill (a_x, a_y, a_w, a_h, 6 * k)
+			if l_busy then
+				p.set_color (Bar_track)
+				p.rrect_fill (a_x + 4 * k, a_y + a_h - 7 * k, a_w - 8 * k, 4 * k, 2 * k)
+				p.set_color (Bar_fill)
+				p.rrect_fill (a_x + 4 * k, a_y + a_h - 7 * k, ((a_w - 8 * k) * a_progress.max (0).min (1)).max (4 * k), 4 * k, 2 * k)
+			end
 			p.font (p.Role_ui, 12, True)
-			p.set_color (0x0F1115)
-			p.text (a_x + 10 * k, a_y + 18 * k, a_label)
+			p.set_color (if l_enabled or l_busy then Button_ink else Button_off_ink end)
+			p.text (a_x + 10 * k, a_y + 17 * k, a_label)
 			rows.extend ([a_x, a_y, a_w, a_h, a_action, 0])
 		end
 

@@ -109,7 +109,7 @@ feature -- Access
 			Result.extend ({STRING_32} "-filter_complex")
 			Result.extend (filter (a_thumbnail /= Void))
 			add (Result, <<"-map", "[vo]", "-map", "[ao]", "-c:v", "libx264", "-preset", "medium", "-crf", "17",
-				"-pix_fmt", "yuv420p", "-r", "60", "-c:a", "aac", "-b:a", "192k", "-movflags", "+faststart", "-shortest">>)
+				"-pix_fmt", "yuv420p", "-r", "60", "-c:a", "aac", "-b:a", "192k", "-movflags", "+faststart", "-shortest", "-stats">>)
 			Result.extend (a_output.to_string_32.twin)
 		ensure
 			output_last: Result.last.same_string (a_output)

@@ -128,6 +128,7 @@ feature -- Execution
 						create publish_job.make (create {PT_WHISPER_TRANSCRIBER}.make (l_vad.detector, l_decoder.recognizer), ffmpeg)
 						if attached publish_job as al_publish then
 							al_publish.set_on_stage (agent tell_stage)
+							al_publish.set_on_progress (agent tell_publish_progress)
 						end
 						from
 						until
@@ -324,6 +325,19 @@ feature {NONE} -- Listening
 					report (al_slot, {PT_SPEECH_SLOT}.Ready, {STRING_32} "speech ready")
 				end
 			end
+		end
+
+	tell_publish_progress (a_fraction: REAL_64)
+			-- How far the publish job has got, for the Publish button's progress bar.
+		do
+			if attached slot as al_slot then
+				put_publish_progress (al_slot, a_fraction)
+			end
+		end
+
+	put_publish_progress (a_slot: separate PT_SPEECH_SLOT; a_fraction: REAL_64)
+		do
+			a_slot.put_publish_progress (a_fraction)
 		end
 
 	tell_stage (a_text: STRING_32)

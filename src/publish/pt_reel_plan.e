@@ -216,7 +216,7 @@ feature -- ffmpeg
 			add (Result, <<"-filter_complex_script">>)
 			Result.extend (a_script_path.to_string_32)
 			add (Result, <<"-map", "[v]", "-map", "0:a", "-r", "30", "-c:v", "h264_nvenc", "-preset", "p5", "-cq", "21",
-				"-c:a", "aac", "-b:a", "160k", "-movflags", "+faststart">>)
+				"-c:a", "aac", "-b:a", "160k", "-movflags", "+faststart", "-stats">>)
 			Result.extend (a_output.to_string_32)
 		ensure
 			output_last: Result.last.same_string_general (a_output)
