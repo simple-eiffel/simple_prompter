@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.2] - 2026-10-11
+
+### Changed
+- The text flows; it never skips ahead (Larry: "DO NOT SKIP ahead based on anything at
+  all ... wait for my words to return to the script"). Only words heard since the text last
+  moved can move it again, and the first of them must continue from the reader's place (at
+  most four spoken words on). Off script, or past a skipped passage, the text waits for the
+  reader to come back to it. The wide search that chased a skipped paragraph is removed.
+
+### Fixed
+- The text jumped two lines on Reel 2 "Devil's Half Right" (2026-10-11, 4.9 s): the next
+  decode window re-heard "the devil got it half right" with nothing new, and the aligner
+  moved those already-used words on to the echo "he got it exactly half right" 23 words
+  later. Found with the 0.5.1 follow trace; the same cause fits the 2026-10-10 Reel 2 jump
+  ("Christ will be exalted" matched "Christ would be exalted" 25 words on).
+- Follow trace "heard" lines carry `new` (words since the last move), `fresh` (their
+  anchors) and `gap` (spoken words before the first new match) in place of `wide`.
+
 ## [0.5.1] - 2026-10-10
 
 ### Added

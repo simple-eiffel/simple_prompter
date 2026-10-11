@@ -68,6 +68,29 @@ feature -- Tests
 			assert_integers_equal ("at the end", 7, a.position)
 		end
 
+	test_reheard_words_never_move_twice
+			-- Reel 2 "Devil's Half Right" (2026-10-11, 4.9 s): the next window re-heard "the devil
+			-- got it half right" with nothing new, and the aligner moved those used words on to the
+			-- echo "he got it exactly half right" 23 words later, two lines down.
+		local
+			a: PT_ALIGNER
+			r: PT_SCRIPT_REVISION
+			l_first: INTEGER
+		do
+			r := parsed ({STRING_32} "The Devil got it half right. What do I mean? Simply that the devil quoted the Bible to Jesus, word for word. And he got it exactly half right.")
+			l_first := script_index (r, {STRING_32} "right")
+			create a.make (r, create {PT_WORD_MATCHER})
+			a.update (timed_window (24_000, <<[{STRING_32} "well", 0.1], [{STRING_32} "the", 0.4], [{STRING_32} "devil", 0.7],
+				[{STRING_32} "got", 1.3], [{STRING_32} "it", 1.6], [{STRING_32} "half", 2.0], [{STRING_32} "right", 2.4]>>))
+			assert_integers_equal ("on the first 'right'", l_first, a.position)
+			a.update (timed_window (28_000, <<[{STRING_32} "well", 0.0], [{STRING_32} "devil", 0.45],
+				[{STRING_32} "got", 1.05], [{STRING_32} "it", 1.35], [{STRING_32} "half", 1.75], [{STRING_32} "right", 2.15]>>))
+			assert_integers_equal ("re-heard words stay put", l_first, a.position)
+			a.update (timed_window (36_000, <<[{STRING_32} "half", 1.25], [{STRING_32} "right", 1.65], [{STRING_32} "what", 2.1],
+				[{STRING_32} "do", 2.3], [{STRING_32} "i", 2.45], [{STRING_32} "mean", 2.6]>>))
+			assert_integers_equal ("follows the new words", script_index (r, {STRING_32} "mean"), a.position)
+		end
+
 	test_column_width_relays_out_in_place
 			-- Sizing the pill narrower lays the script out on more lines and keeps the reader's place.
 		local

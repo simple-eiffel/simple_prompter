@@ -95,8 +95,8 @@ feature -- Live aligner and followers
 			assert_true ("stamped", a.reanchored_at = 1_600 and a.position = 5 and a.last_alignment.word_index = 5)
 			a.update (heard (0, <<{STRING_32} "moody", {STRING_32} "is", {STRING_32} "a", {STRING_32} "notch", {STRING_32} "teleprompter">>))
 			assert_integers_equal ("stale window ignored", 5, a.position)
-			assert_true ("search windows ordered", a.Normal_ahead < a.Window_ahead and a.Window_back >= 0)
-			assert_true ("lost after some misses", a.Lost_after >= 1 and a.Recent_heard >= 6)
+			assert_true ("search window sane", a.Normal_ahead >= 1 and a.Window_back >= 0)
+			assert_true ("enough heard words", a.Recent_heard >= 6)
 			assert_true ("backward needs evidence", a.Backward_evidence >= 2)
 			assert_refused ("jump 0 refused", agent a.required_anchors (0))
 		end

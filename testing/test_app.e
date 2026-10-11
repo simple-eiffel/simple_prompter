@@ -270,7 +270,7 @@ feature {NONE} -- Test sets
 			create t
 			run_test (agent t.test_tracking_follows_larry_within_a_line, "tracking_follows_larry_within_a_line")
 			run_test (agent t.test_tracking_holds_during_the_ad_lib, "tracking_holds_during_the_ad_lib")
-			run_test (agent t.test_tracking_jumps_the_skipped_paragraph, "tracking_jumps_the_skipped_paragraph")
+			run_test (agent t.test_tracking_waits_at_the_skipped_paragraph, "tracking_waits_at_the_skipped_paragraph")
 			run_test (agent t.test_tracking_never_moves_backward, "tracking_never_moves_backward")
 			run_test (agent t.test_aligner_meets_frame_budget, "aligner_meets_frame_budget")
 			run_test (agent t.test_misreads_on_larry_read_01, "misreads_on_larry_read_01")
@@ -440,6 +440,7 @@ feature {NONE} -- Test sets
 			run_test (agent t.test_cue_is_not_a_jump, "cue_is_not_a_jump")
 			run_test (agent t.test_close_words_of_one_window_all_count, "close_words_of_one_window_all_count")
 			run_test (agent t.test_restamped_words_are_not_buffered_twice, "restamped_words_are_not_buffered_twice")
+			run_test (agent t.test_reheard_words_never_move_twice, "reheard_words_never_move_twice")
 			run_test (agent t.test_column_width_relays_out_in_place, "column_width_relays_out_in_place")
 		end
 

@@ -3,7 +3,8 @@ note
 		The follow trace (0.5.1): what voice following did while a take was recorded, as
 		journal lines the take analyzer skips. A "heard" line per decode: the words heard,
 		the aligner's position before and after, the move its best match proposed, the
-		anchors found and needed, whether the wide search won, and the follower's target.
+		anchors found and needed, the words new since the last move and their anchors, the
+		gap before the first new match (0.5.2), and the follower's target.
 		A "frame" line at most every `Frame_interval' seconds, and whenever the line on
 		the reading row changes or the follower snaps: the follower's target, velocity and
 		steering goal, the displayed position, its line and the target's line. Together
@@ -90,7 +91,9 @@ feature -- Lines
 			o := o.put_integer (a_aligner.last_proposed, "prop")
 			o := o.put_integer (a_aligner.last_alignment.anchor_count, "anch")
 			o := o.put_integer (a_aligner.last_needed, "need")
-			o := o.put_boolean (a_aligner.last_wide, "wide")
+			o := o.put_integer (a_aligner.last_new_words, "new")
+			o := o.put_integer (a_aligner.last_fresh_anchors, "fresh")
+			o := o.put_integer (a_aligner.last_gap, "gap")
 			o := o.put_real (rounded (a_aligner.confidence), "conf")
 			o := o.put_string (script_word (a_aligner.revision, a_aligner.position), "at")
 			o := o.put_string (script_word (a_aligner.revision, a_aligner.last_proposed), "prop_at")
