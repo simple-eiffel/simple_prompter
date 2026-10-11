@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.1] - 2026-10-11
+
+### Fixed
+- The program closed during Publish (take "2026-10-11 175521 - Reel 2 - Weak Jesus", 6:01 PM):
+  while Publish drew the contact sheet's numbers on its worker, the window's own text
+  drawing failed (CAIRO_CONTEXT.text_extents, precondition `valid`). cairo's Windows font
+  backend shares one device context across threads with no lock; simple_cairo 1.5.0 locks
+  every font use process-wide.
+- The window froze for 5 seconds while the cutout model loaded and 10 while it ran (a
+  collection waited for the ONNX Runtime call). simple_onnx 1.1.0 marks those calls
+  `C blocking`; measured stall 12,785 ms before, under 650 ms after.
+
 ## [0.7.0] - 2026-10-11
 
 ### Added
