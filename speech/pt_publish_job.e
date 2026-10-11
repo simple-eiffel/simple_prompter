@@ -14,7 +14,11 @@ note
 		6. The finished final.mp4 (PT_FINISH_PLAN): the opening silence trimmed, the thumbnail
 		   dissolving into the picture when out\ has one (thumbnail.jpg or .png, else the first
 		   thumbnail_A*), a fade to black after the last word, YouTube's loudness.
-		Thumbnails themselves are made outside the program (by Claude, on request).
+		7. transcript.txt (0.5.9): the script's spoken paragraphs, for Facebook's text transcript.
+		8. reel.mp4 (0.5.9, PT_REEL_PLAN): the vertical Facebook Reel, 1080x1920, the title in the
+		   top band and the captions burned in below the picture, opening on cover.jpg when
+		   out\ has one.
+		Thumbnails and the reel cover are made outside the program (by Claude, on request).
 	]"
 	author: "Larry Rix"
 
@@ -42,6 +46,9 @@ feature -- Constants
 	Source_name: STRING_32 = "final (before cleanup).mp4"
 	Final_name: STRING_32 = "final.mp4"
 	Captions_name: STRING_32 = "captions.en_US.SRT"
+	Reel_name: STRING_32 = "reel.mp4"
+	Cover_name: STRING_32 = "cover.jpg"
+			-- The vertical reel and the cover it opens on (0.5.9).
 	Rate: INTEGER = 16_000
 	Max_run_ms: INTEGER = 1_200_000
 			-- Longest an ffmpeg run may take (20 minutes).
@@ -171,6 +178,7 @@ feature {NONE} -- Steps
 				l_ok := file (a_out + {STRING_32} "\youtube.txt").set_content (l_copy.youtube_text)
 				l_ok := file (a_out + {STRING_32} "\facebook.txt").set_content (l_copy.facebook_text)
 				l_ok := file (a_out + {STRING_32} "\x.txt").set_content (l_copy.x_text)
+				l_ok := file (a_out + {STRING_32} "\transcript.txt").set_content (l_script.transcript)
 				l_thumbnail := thumbnail_in (a_out)
 				tell ({STRING_32} "publishing: finishing the video")
 				l_ok := file (a_working).delete
@@ -180,13 +188,60 @@ feature {NONE} -- Steps
 					succeeded := file (a_final).exists
 				end
 				if succeeded then
+					tell ({STRING_32} "publishing: making the vertical reel")
 					summary := {STRING_32} "published: final.mp4 (" + clock (l_plan.length)
 						+ (if l_thumbnail /= Void then {STRING_32} ", opens on the thumbnail" else {STRING_32} ", no thumbnail yet" end)
-						+ {STRING_32} "), " + Captions_name + {STRING_32} " (" + l_captions.last_cues.count.out + {STRING_32} " captions), "
-						+ l_chapters.chapters.count.out + {STRING_32} " chapters, youtube.txt, facebook.txt, x.txt; " + l_ai
+						+ {STRING_32} "), " + reel_note (make_reel (a_out, a_final, l_script.title, l_plan.length, l_captions.last_cues), a_out)
+						+ {STRING_32} ", " + Captions_name + {STRING_32} " (" + l_captions.last_cues.count.out + {STRING_32} " captions), "
+						+ l_chapters.chapters.count.out + {STRING_32} " chapters, youtube.txt, facebook.txt, x.txt, transcript.txt; " + l_ai
 				else
 					summary := {STRING_32} "publish: the words are written, but the video did not finish" + last_output
 				end
+			end
+		end
+
+	make_reel (a_out, a_final, a_title: STRING_32; a_length: REAL_64; a_cues: LIST [PT_CAPTION_CUE]): BOOLEAN
+			-- Make out\reel.mp4 from the finished `a_final' (PT_REEL_PLAN); did it succeed?
+		require
+			length_positive: a_length > 0
+		local
+			l_plan: PT_REEL_PLAN
+			l_ass, l_filter, l_reel, l_working, l_cover_path: STRING_32
+			l_cover: detachable STRING_32
+			l_ok: BOOLEAN
+		do
+			create l_plan.make (a_title, a_length)
+			l_ass := a_out + {STRING_32} "\reel.ass"
+			l_filter := a_out + {STRING_32} "\reel.filter"
+			l_reel := a_out + {STRING_32} "\" + Reel_name
+			l_working := a_out + {STRING_32} "\reel.publishing.mp4"
+			l_cover_path := a_out + {STRING_32} "\" + Cover_name
+			if file (l_cover_path).exists then
+				l_cover := l_cover_path
+			end
+			if file (l_working).exists then
+				l_ok := file (l_working).delete
+			end
+			l_ok := file (l_ass).set_content (l_plan.ass_text (a_cues))
+				and then file (l_filter).set_content (l_plan.filter_script (l_ass, l_cover /= Void))
+			if l_ok and then run_ffmpeg (l_plan.arguments (a_final, l_cover, l_filter, l_working)) and then file (l_working).exists then
+				l_ok := file (l_reel).delete
+				Result := file (l_working).move_to (l_reel) and file (l_reel).exists
+			end
+			if Result then
+				l_ok := file (l_ass).delete and file (l_filter).delete
+			end
+		end
+
+	reel_note (a_made: BOOLEAN; a_out: STRING_32): STRING_32
+			-- What the summary says of the reel.
+		do
+			if not a_made then
+				Result := {STRING_32} "the vertical reel did not finish" + last_output
+			elseif file (a_out + {STRING_32} "\" + Cover_name).exists then
+				Result := Reel_name + {STRING_32} " (vertical, opens on " + Cover_name + {STRING_32} ")"
+			else
+				Result := Reel_name + {STRING_32} " (vertical, no " + Cover_name + {STRING_32} " yet)"
 			end
 		end
 

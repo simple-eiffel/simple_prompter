@@ -63,6 +63,26 @@ feature -- Access
 			end
 		end
 
+	transcript: STRING_32
+			-- The title and the spoken paragraphs, a blank line between: Facebook's text transcript
+			-- (0.5.9), the words as written, without the recognizer's slips.
+		do
+			create Result.make (2048)
+			if not title.is_empty then
+				Result.append (title)
+				Result.append ({STRING_32} "%N%N")
+			end
+			across paragraphs as ic loop
+				Result.append (ic)
+				Result.append ({STRING_32} "%N%N")
+			end
+			Result.right_adjust
+			Result.append_character ('%N')
+		ensure
+			ends_with_new_line: Result.ends_with ({STRING_32} "%N")
+			every_paragraph: across paragraphs as ic all Result.has_substring (ic) end
+		end
+
 feature -- Text
 
 	sentences_of (a_text: READABLE_STRING_32): ARRAYED_LIST [STRING_32]

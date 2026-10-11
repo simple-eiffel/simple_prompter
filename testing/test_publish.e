@@ -185,6 +185,69 @@ feature -- Settings
 			l_ok := (create {SIMPLE_FILE}.make (l_path)).delete
 		end
 
+feature -- Vertical reel (0.5.9)
+
+	test_reel_title_and_captions
+			-- The title in the top band on two lines; each caption burned in, the spoken
+			-- "quote," shown as an opening quotation mark.
+		local
+			p: PT_REEL_PLAN
+			l_cues: ARRAYED_LIST [PT_CAPTION_CUE]
+			l_ass: STRING_32
+		do
+			create p.make ({STRING_32} "Dumb Jesus?", 183.383)
+			assert_integers_equal ("two title lines", 2, p.title_lines.count)
+			assert_strings_equal ("first line", "DUMB", p.title_lines.first)
+			assert_strings_equal ("second line", "JESUS?", p.title_lines.last)
+			assert_integers_equal ("one word, one line", 1, (create {PT_REEL_PLAN}.make ({STRING_32} "Weak", 10.0)).title_lines.count)
+			create l_cues.make (2)
+			l_cues.extend (cue (0.13, 0.8, {STRING_32} "Dumb Jesus?"))
+			l_cues.extend (cue (54.624, 60.694, {STRING_32} "Quote, my son, do not forget%Nmy teaching."))
+			l_ass := p.ass_text (l_cues)
+			assert_true ("sized for the reel", l_ass.has_substring ({STRING_32} "PlayResX: 1080") and l_ass.has_substring ({STRING_32} "PlayResY: 1920"))
+			assert_true ("title for the whole reel", l_ass.has_substring ({STRING_32} "Dialogue: 0,0:00:00.00,0:03:03.38,Title,,0,0,0,,DUMB\NJESUS?"))
+			assert_true ("first caption", l_ass.has_substring ({STRING_32} "Dialogue: 1,0:00:00.13,0:00:00.80,Cap,,0,0,0,,Dumb Jesus?"))
+			assert_true ("quote shown as a quotation mark, line break kept",
+				l_ass.has_substring ({STRING_32} "0:00:54.62,0:01:00.69,Cap,,0,0,0,,%/8220/My son, do not forget\Nmy teaching."))
+			assert_strings_equal ("quote mid-line", {STRING_32} "He said, %/8220/I will.", p.on_screen ({STRING_32} "He said, quote, I will."))
+			assert_strings_equal ("a word ending in quote is left alone", {STRING_32} "a misquote, really", p.on_screen ({STRING_32} "a misquote, really"))
+			assert_strings_equal ("hours, minutes, centiseconds", {STRING_32} "1:02:03.46", p.ass_time (3723.456))
+		end
+
+	test_reel_ffmpeg_graph_and_arguments
+			-- The picture cropped to the speaker and icon; the cover only when there is one; paths
+			-- escaped for ffmpeg, an apostrophe in a folder name included.
+		local
+			p: PT_REEL_PLAN
+			l_graph: STRING_32
+			l_args: ARRAYED_LIST [STRING_32]
+		do
+			create p.make ({STRING_32} "Dumb Jesus?", 183.383)
+			assert_strings_equal ("drive colon escaped, forward slashes, apostrophe closed out of the quotes",
+				{STRING_32} "'C\:/Users/L/Videos/Devil\'\''s Half Right/out/reel.ass'",
+				p.filter_path ({STRING_32} "C:\Users\L\Videos\Devil's Half Right\out\reel.ass"))
+			l_graph := p.filter_script ({STRING_32} "C:\x\reel.ass", True)
+			assert_true ("speaker and icon kept", l_graph.has_substring ({STRING_32} "crop=1450:1080:450:0,scale=1080:804"))
+			assert_true ("subtitles and fonts", l_graph.has_substring ({STRING_32} "ass=filename='C\:/x/reel.ass':fontsdir='C\:/Windows/Fonts'"))
+			assert_true ("cover dissolves", l_graph.has_substring ({STRING_32} "[1:v]scale=1080:1920,format=rgba,fade=t=out:st=0.250:d=0.800:alpha=1"))
+			assert_false ("no cover input without a cover", p.filter_script ({STRING_32} "C:\x\reel.ass", False).has_substring ({STRING_32} "[1:v]"))
+			l_args := p.arguments ({STRING_32} "C:\o\final.mp4", {STRING_32} "C:\o\cover.jpg", {STRING_32} "C:\o\reel.filter", {STRING_32} "C:\o\reel.mp4")
+			assert_true ("cover looped as a second input", across l_args as ic some ic.same_string ({STRING_32} "C:\o\cover.jpg") end
+				and across l_args as ic some ic.same_string ({STRING_32} "-loop") end)
+			assert_strings_equal ("output last", {STRING_32} "C:\o\reel.mp4", l_args.last)
+			l_args := p.arguments ({STRING_32} "C:\o\final.mp4", Void, {STRING_32} "C:\o\reel.filter", {STRING_32} "C:\o\reel.mp4")
+			assert_false ("no cover, no loop", across l_args as ic some ic.same_string ({STRING_32} "-loop") end)
+		end
+
+	test_transcript_is_the_script_text
+			-- transcript.txt: the title and the spoken paragraphs, cues and headings left out.
+		local
+			s: PT_SCRIPT_TEXT
+		do
+			create s.make ({STRING_32} "# Dumb Jesus?%N%N[CUE: straight into the lens]%N%NDumb Jesus? Did he learn?%N%N## A heading%N%NJesus grew.%N")
+			assert_strings_equal ("title, paragraphs, blank lines", {STRING_32} "Dumb Jesus?%N%NDumb Jesus? Did he learn?%N%NJesus grew.%N", s.transcript)
+		end
+
 feature -- Opening line (snapper, 0.5.0)
 
 	test_snapper_keeps_an_unmatched_opening_line

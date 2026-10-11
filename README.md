@@ -15,7 +15,7 @@ Part of the [Simple Eiffel](https://github.com/simple-eiffel) ecosystem.
 
 ## Status
 
-**0.5.8, in use on Windows 11** (per-user installer: `installer/simple_prompter.iss`)
+**0.5.9, in use on Windows 11** (per-user installer: `installer/simple_prompter.iss`)
 - The pill is the whole program: a text pill under the webcam, hidden from screen captures,
   with Status lights, Script, Settings and Last take callouts beside it, a slide handle under
   it, tooltips on everything (and a switch to turn them off), and an icon in the notification
@@ -24,7 +24,7 @@ Part of the [Simple Eiffel](https://github.com/simple-eiffel) ecosystem.
 - Recording from a camera and microphone (OBS Virtual Camera works) with ffmpeg on one
   clock; the take studio analyzes the take, renders final.mp4, and keeps a per-take
   picture-to-sound sync that Measure can set from a clap.
-- 266 tests pass in the contract-checked build. While recording, a problem with the take
+- 269 tests pass in the contract-checked build. While recording, a problem with the take
   itself (garbled or silent sound, a stopped camera) turns the script red under a banner. The follower is verified against real
   recordings: it stays within a line of the reader, holds still during an ad-lib, never
   jumps to an echo of a phrase, and never scrolls backward.
@@ -103,7 +103,9 @@ end
 - **Publish (Last take panel):** after Render, finishes the take for posting: final.mp4
   opening on the thumbnail in `out\` and fading to black at YouTube's loudness,
   `captions.en_US.SRT` (what was said), chapters, and `youtube.txt`, `facebook.txt`,
-  `x.txt`. The local AI (Ollama) writes titles and chapter names when it is running.
+  `x.txt`, `transcript.txt`, and `reel.mp4`, the vertical Facebook Reel with the title and
+  captions drawn in, opening on `cover.jpg` when there is one. The local AI (Ollama) writes
+  titles and chapter names when it is running.
 
 ## Building
 
