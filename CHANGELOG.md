@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.6] - 2026-10-11
+
+### Fixed
+- The rendered video could end before the last word. On Reel 2 (10:08 take) the analyzer
+  put the final "is." inside the phrase before it, though Larry said it after a short pause
+  (139.36-140.03 s), and the video ended at 139.15 s. The closing now reaches on to speech
+  that starts within 0.8 s after the last matched word and ends within 2 s of it, as the
+  opening already reached back to an unmatched opening line (0.5.0); a remark said later
+  stays out.
+
 ## [0.5.5] - 2026-10-11
 
 ### Changed

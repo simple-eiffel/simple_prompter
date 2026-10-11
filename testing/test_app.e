@@ -482,6 +482,8 @@ feature {NONE} -- Test sets
 			run_test (agent t.test_copy_without_the_ai, "copy_without_the_ai")
 			run_test (agent t.test_snapper_keeps_an_unmatched_opening_line, "snapper_keeps_an_unmatched_opening_line")
 			run_test (agent t.test_snapper_leaves_far_speech_out, "snapper_leaves_far_speech_out")
+			run_test (agent t.test_snapper_keeps_a_trailing_last_word, "snapper_keeps_a_trailing_last_word")
+			run_test (agent t.test_snapper_leaves_late_speech_out, "snapper_leaves_late_speech_out")
 			run_test (agent t.test_publish_settings_round_trip, "publish_settings_round_trip")
 		end
 

@@ -3,6 +3,8 @@ note
 		Moves each cut's edges into the silence around it (midpoint of the gap
 		before the first word and after the last), or pads by head/tail margins
 		and marks the cut tight when there is no gap. Never clips a heard word.
+		The video's opening reaches back to speech just before the first matched word
+		(0.5.0), and its closing on to speech just after the last (0.5.6).
 	]"
 	author: "Larry Rix"
 
@@ -83,6 +85,11 @@ feature -- Basic operations
 						-- servant!" this way), not noise.
 					l_t0 := opening_start (a_map, l_t0, l_start)
 				end
+				if l_i = a_cuts.count then
+						-- The video's closing: speech just after the last matched word is its last
+						-- word, said after a short pause (0.5.6: Reel 2 lost its final "is." this way).
+					l_end := closing_end (a_map, l_end).min (a_map.duration)
+				end
 					-- End edge: middle of the nearest silence after the last word, at most Max_tail later
 					-- (VAD speech often runs past whisper's last word end; Phase 5, review of T16).
 				l_t1 := -1.0
@@ -151,6 +158,10 @@ feature -- Constants
 			-- How far before the first matched word the video's opening may reach.
 	Max_gap: REAL_64 = 1.0
 			-- Speech followed by a longer silence than this is not part of the opening.
+	Close_gap: REAL_64 = 0.8
+			-- Longest pause before trailing speech that still belongs to the closing.
+	Close_reach: REAL_64 = 2.0
+			-- How far after the last matched word the closing may reach.
 
 feature -- Opening
 
@@ -182,6 +193,32 @@ feature -- Opening
 		ensure
 			never_later: Result <= a_t0
 			within_reach: Result >= (a_first - Max_reach - head_pad).max (0).min (a_t0)
+		end
+
+	closing_end (a_map: PT_SPEECH_MAP; a_last: REAL_64): REAL_64
+			-- The last cut's end before snapping: `a_last' (the last matched word's end), or later
+			-- when speech starts again after it: spans that begin after the kept speech's end, within
+			-- `Close_gap', and end within `Close_reach' of `a_last' (the take analyzer squeezed a final word
+			-- said after a pause into the phrase before it, and the cut ended before the word).
+		local
+			j: INTEGER
+			l_moved: BOOLEAN
+		do
+			Result := a_last
+			from l_moved := True until not l_moved loop
+				l_moved := False
+				from j := 1 until j > a_map.span_count loop
+					if a_map.span (j).t0 > Result and then a_map.span (j).t0 <= Result + Close_gap
+						and then a_map.span (j).t1 <= a_last + Close_reach then
+						Result := a_map.span (j).t1
+						l_moved := True
+					end
+					j := j + 1
+				end
+			end
+		ensure
+			never_earlier: Result >= a_last
+			within_reach: Result <= a_last + Close_reach
 		end
 
 feature -- Silence search
