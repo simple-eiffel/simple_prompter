@@ -462,6 +462,8 @@ feature {NONE} -- Test sets
 			create t
 			run_test (agent t.test_session_on_disk, "session_on_disk")
 			run_test (agent t.test_recording_clock_restarts, "recording_clock_restarts")
+			run_test (agent t.test_sound_guard_finds_garbled_sound, "sound_guard_finds_garbled_sound")
+			run_test (agent t.test_garbled_sound_raises_the_take_alarm, "garbled_sound_raises_the_take_alarm")
 			run_test (agent t.test_raw_recording_has_small_clusters, "raw_recording_has_small_clusters")
 			run_test (agent t.test_loader_reads_a_session_back, "loader_reads_a_session_back")
 		end

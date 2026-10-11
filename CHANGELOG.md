@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.7] - 2026-10-11
+
+### Added
+- The take alarm: while recording, when something is wrong with the take itself, every
+  word on the pill turns red and a red banner across the script says what: "RECORDING
+  SOUND IS GARBLED - stop (Ctrl+Alt+End) and check <microphone>", "CAMERA STOPPED",
+  "RECORDING SOUND STOPPED". The microphone light turns red too. Larry, reading, took a
+  ruined recording for the prompter lagging (Reel 4 "Dumb Jesus": NVIDIA Broadcast sent
+  speech-gated noise at about -7 dB; the whole take was lost).
+- PT_SOUND_GUARD finds garbled sound: two seconds of 32 ms frames at 0.35 RMS or louder
+  within ten seconds. Seven healthy takes never had a frame above 0.28; the garbled take sat
+  near 0.45. It costs about 1.2 microseconds a frame. An "alarm" trace line records when.
+
 ## [0.5.6] - 2026-10-11
 
 ### Fixed

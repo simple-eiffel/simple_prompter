@@ -44,6 +44,10 @@ feature -- Colours
 	Tooltip_slab: NATURAL_32 = 0x262A33
 	Good_green: NATURAL_32 = 0x22C55E
 	Quit_ink: NATURAL_32 = 0x8A909C
+	Alarm_ink: NATURAL_32 = 0xFF4D4D
+			-- The script's colour while something is wrong with the take.
+	Alarm_slab: NATURAL_32 = 0xB91C1C
+			-- The alarm banner.
 
 	Teeth_x: ARRAY [REAL_64]
 			-- The gear's six teeth, every 60 degrees (cosines).
@@ -76,6 +80,22 @@ feature -- Access
 			handle_tip := a_tip.to_string_32
 		ensure
 			set: handle_tip.same_string (a_tip)
+		end
+
+	alarm: STRING_32
+			-- What is wrong with the take being recorded (empty: nothing). While set, the script
+			-- turns red and the alarm is laid across it (0.5.7; Larry, 2026-10-11: "turn the text
+			-- red which will indicate to me an issue with either video/audio/other", "a pop-up
+			-- over the text I am reading").
+		attribute
+			create Result.make_empty
+		end
+
+	set_alarm (a_alarm: READABLE_STRING_32)
+		do
+			alarm := a_alarm.to_string_32
+		ensure
+			set: alarm.same_string (a_alarm)
 		end
 
 feature -- Settings
@@ -188,6 +208,9 @@ feature {NONE} -- Painting
 						else
 							p.set_color (Upcoming_ink)
 						end
+						if not alarm.is_empty then
+							p.set_color (Alarm_ink)
+						end
 						p.text (a_geometry.word_x (i), l_baseline, l_revision.word (i).text)
 						i := i + 1
 					end
@@ -198,6 +221,9 @@ feature {NONE} -- Painting
 				-- Soft edges: a line scrolling past never shows as cut-off glyph fragments.
 			fade (p, 0, a_geometry.padding + l_layout.line_height * 0.35, True, l_text_width)
 			fade (p, l_text_bottom - a_geometry.padding - l_layout.line_height * 0.35, l_text_bottom, False, l_text_width)
+			if not alarm.is_empty then
+				alarm_banner (p, l_text_width, l_text_bottom, k)
+			end
 				-- The badge, top right of the text.
 			if not a_badge.is_empty then
 				p.font (p.Role_ui, (font_size * 0.45).max (11.0), True)
@@ -221,6 +247,27 @@ feature {NONE} -- Painting
 			if not handle_tip.is_empty then
 				centred_tip (p, handle_tip, a_width / 2, a_height - 6 * k, a_width, k)
 			end
+		end
+
+	alarm_banner (p: SW_PAINTER; a_width: INTEGER; a_text_bottom, k: REAL_64)
+			-- `alarm' on a red banner across the middle of the script text, shrunk to fit.
+		local
+			l_size, l_w, l_h, l_y, l_pad: REAL_64
+		do
+			l_pad := 14 * k
+			l_size := (font_size * 0.55).max (13.0)
+			p.font (p.Role_ui, l_size, True)
+			from until p.advance (alarm) + 2 * l_pad <= a_width - 8 * k or l_size <= 10.0 loop
+				l_size := l_size - 1.0
+				p.font (p.Role_ui, l_size, True)
+			end
+			l_w := (p.advance (alarm) + 2 * l_pad).min (a_width - 8 * k)
+			l_h := p.font_ascent + p.font_descent + l_pad
+			l_y := ((a_text_bottom - l_h) / 2).max (2 * k)
+			p.set_color (Alarm_slab)
+			p.rrect_fill ((a_width - l_w) / 2, l_y, l_w, l_h, 8 * k)
+			p.set_color (0xFFFFFF)
+			p.text ((a_width - l_w) / 2 + l_pad, l_y + l_pad / 2 + p.font_ascent, alarm)
 		end
 
 	centred_tip (p: SW_PAINTER; a_text: STRING_32; a_centre, a_bottom: REAL_64; a_width: INTEGER; k: REAL_64)

@@ -43,6 +43,75 @@ feature -- Tests
 			assert_true ("count-in still kept", p.controller.count_in_seconds = 1.5)
 		end
 
+	test_sound_guard_finds_garbled_sound
+			-- Reel 4 (2026-10-11) recorded garbled noise near 0.45 RMS; healthy takes never
+			-- reached 0.28 in a frame. Two seconds of garbled frames trip the guard; a loud but
+			-- healthy read never does.
+		local
+			g: PT_SOUND_GUARD
+			i: INTEGER
+		do
+			create g.make
+			from i := 0 until i >= 313 loop
+				g.observe (frame_at (i, (if i \\ 3 = 0 then 0.27 else 0.05 end)))
+				i := i + 1
+			end
+			assert_false ("ten seconds of a loud healthy read", g.is_garbled)
+			from i := 313 until i >= 313 + 47 loop
+				g.observe (frame_at (i, 0.45))
+				i := i + 1
+			end
+			assert_false ("1.5 s garbled: not yet", g.is_garbled)
+			from until i >= 313 + 64 loop
+				g.observe (frame_at (i, 0.45))
+				i := i + 1
+			end
+			assert_true ("2 s garbled: found", g.is_garbled and g.garbled_at > 10.0)
+			g.observe (frame_at (i, 0.01))
+			assert_true ("stays found", g.is_garbled)
+			g.reset
+			assert_true ("a new take starts clear", not g.is_garbled and g.loud_seconds = 0)
+			from i := 3000 until i >= 3000 + 40 loop
+				g.observe (frame_at (i, 0.45))
+				i := i + 1
+			end
+			g.observe (frame_at (0, 0.45))
+			assert_true ("a restarted capture forgets the old clock", g.loud_seconds < 0.1 and not g.is_garbled)
+		end
+
+	test_garbled_sound_raises_the_take_alarm
+			-- Larry, 2026-10-11: the prompter did not follow and he took it for the prompter lagging,
+			-- not the recording failing. While recording, garbled sound must be found.
+		local
+			p: SIMPLE_PROMPTER
+			i: INTEGER
+		do
+			create p.make_with_settings (create {PT_SETTINGS}.make_in_memory)
+			p.load_script_text ({STRING_32} "t", {STRING_32} "One two three. Four five six.")
+			p.perform ({PT_ACTION}.Play)
+			p.perform ({PT_ACTION}.Count_in_done)
+			from i := 0 until i >= 100 loop
+				p.feed_voice (frame_at (i, 0.45))
+				i := i + 1
+			end
+			assert_false ("practice is not watched", p.sound_guard.is_garbled)
+			p.perform ({PT_ACTION}.Stop)
+			p.perform ({PT_ACTION}.Record)
+			p.perform ({PT_ACTION}.Count_in_done)
+			assert_true ("recording", p.controller.is_recording)
+			from i := 0 until i >= 100 loop
+				p.feed_voice (frame_at (i, 0.45))
+				i := i + 1
+			end
+			assert_true ("garbled sound found while recording", p.sound_guard.is_garbled)
+		end
+
+	frame_at (a_index: INTEGER; a_level: REAL_64): PT_VOICE_FRAME
+			-- VAD frame `a_index' (512 samples each) at `a_level', taken for speech.
+		do
+			create Result.make (a_index.to_integer_64 * 512, a_level, 0.9, True)
+		end
+
 	test_recording_clock_restarts
 		local
 			c: PT_RECORDING_CLOCK
