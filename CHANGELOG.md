@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.5] - 2026-10-11
+
+### Changed
+- The aligner's heard words: a decode now replaces the words held for its window when it
+  heard at least as many there (a sparser decode, which the stabilizer often passes, only
+  adds its later words), instead of merging windows word by word, which kept about half the
+  words said and doubled others. "New" words are judged by their times.
+- A match that takes in new words beats one made of already-read words only, and without a
+  known page the search reaches 10 words back, so a phrase being read beats its echo.
+- Measured on the 09:47 take replayed with a five-line pill, against the take analyzer's
+  timeline: mean lag 1.58 words (0.5.4: 1.63), 14 of 476 decodes a line behind (0.5.4: 18).
+
 ## [0.5.4] - 2026-10-11
 
 ### Fixed

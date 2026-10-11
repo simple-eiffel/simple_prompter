@@ -274,6 +274,7 @@ feature {NONE} -- Test sets
 			run_test (agent t.test_devils_half_right_never_jumps_to_the_echo, "devils_half_right_never_jumps_to_the_echo")
 			run_test (agent t.test_devils_half_right_follows_to_the_end, "devils_half_right_follows_to_the_end")
 			run_test (agent t.test_devils_half_right_0903_follows_without_the_wheel, "devils_half_right_0903_follows_without_the_wheel")
+			run_test (agent t.test_devils_half_right_0947_keeps_up, "devils_half_right_0947_keeps_up")
 			run_test (agent t.test_tracking_never_moves_backward, "tracking_never_moves_backward")
 			run_test (agent t.test_aligner_meets_frame_budget, "aligner_meets_frame_budget")
 			run_test (agent t.test_misreads_on_larry_read_01, "misreads_on_larry_read_01")
