@@ -98,7 +98,7 @@ feature {NONE} -- Initialization
 
 feature -- Constants
 
-	Version: STRING_32 = "0.5.6"
+	Version: STRING_32 = "0.5.7"
 			-- Shown in the control window; keep in step with installer/simple_prompter.iss.
 
 	Tick_ms: INTEGER = 16
@@ -765,7 +765,8 @@ feature {NONE} -- Callouts (0.4.0)
 		local
 			l_microphone, l_camera, l_follow: INTEGER
 		do
-			if speech_state = {PT_SPEECH_SLOT}.Failed then
+			if speech_state = {PT_SPEECH_SLOT}.Failed
+				or (prompter.controller.is_recording and prompter.sound_guard.is_garbled) then
 				l_microphone := {PT_PILL_RAILS}.Light_problem
 			elseif speech_state = {PT_SPEECH_SLOT}.Listening or speech_state = {PT_SPEECH_SLOT}.Recording then
 				l_microphone := {PT_PILL_RAILS}.Light_good
@@ -791,6 +792,27 @@ feature {NONE} -- Callouts (0.4.0)
 				l_follow := {PT_PILL_RAILS}.Light_good
 			end
 			pill.rails.set_lights (l_microphone, l_camera, l_follow)
+			if not take_alarm.same_string (pill.renderer.alarm) then
+				pill.renderer.set_alarm (take_alarm)
+				last_signature := -1
+			end
+		end
+
+	take_alarm: STRING_32
+			-- What is wrong with the take being recorded, for the pill to show over the script
+			-- in red (0.5.7); empty when nothing is, or when not recording.
+		do
+			if not prompter.controller.is_recording then
+				create Result.make_empty
+			elseif prompter.sound_guard.is_garbled then
+				Result := {STRING_32} "RECORDING SOUND IS GARBLED - stop (Ctrl+Alt+End) and check " + settings.microphone_name
+			elseif video_stalled then
+				Result := {STRING_32} "CAMERA STOPPED - the video is not being recorded"
+			elseif speech_state = {PT_SPEECH_SLOT}.Failed then
+				Result := {STRING_32} "RECORDING SOUND STOPPED - the microphone is not being heard"
+			else
+				create Result.make_empty
+			end
 		end
 
 	paint_status_callout (p: SW_PAINTER; c: PT_CALLOUT)

@@ -152,6 +152,21 @@ feature -- Lines
 			one_line: not Result.has ('%N')
 		end
 
+	alarm_line (a_rt: REAL_64; a_kind: READABLE_STRING_32; a_measure: REAL_64): STRING_32
+			-- The line for an alarm of `a_kind' raised at `a_rt' (0.5.7), with what it measured.
+		local
+			o: SIMPLE_JSON_OBJECT
+		do
+			o := (create {SIMPLE_JSON}).new_object
+			o := o.put_string ({STRING_32} "alarm", "t")
+			o := o.put_real (rounded (a_rt), "rt")
+			o := o.put_string (a_kind, "kind")
+			o := o.put_real (rounded (a_measure), "measure")
+			Result := o.as_json
+		ensure
+			one_line: not Result.has ('%N')
+		end
+
 	wheel_line (a_rt: REAL_64; a_delta, a_lines, a_rest: INTEGER; a_state: READABLE_STRING_32; a_from, a_to: INTEGER): STRING_32
 			-- The line for a wheel turn of `a_delta' at `a_rt' in `a_state' that moved `a_lines'
 			-- lines (down positive), `a_rest' of a notch left over, the place going from `a_from' to `a_to'.

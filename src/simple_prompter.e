@@ -32,6 +32,7 @@ feature {NONE} -- Initialization
 			create policy
 			create recording_clock.make
 			create follow_trace.make
+			create sound_guard.make
 		ensure
 			settings_set: settings = a_settings
 			no_script: not has_script
@@ -371,11 +372,26 @@ feature -- Layout
 feature -- Following
 
 	feed_voice (a_frame: PT_VOICE_FRAME)
+			-- A VAD frame: steer the follower; while recording, let the sound guard hear it and
+			-- trace the moment it finds the sound garbled.
 		require
 			loaded: has_script
+		local
+			l_was: BOOLEAN
 		do
 			follower.on_voice (a_frame)
+			if controller.is_recording then
+				l_was := sound_guard.is_garbled
+				sound_guard.observe (a_frame)
+				if sound_guard.is_garbled and not l_was then
+					controller.journal.trace (follow_trace.alarm_line (controller.current_rt, {STRING_32} "garbled_sound",
+						sound_guard.loud_seconds))
+				end
+			end
 		end
+
+	sound_guard: PT_SOUND_GUARD
+			-- Watches the microphone's sound while recording (0.5.7).
 
 	feed_heard (a_heard: PT_HEARD_WORDS)
 			-- Decode result: align, steer the follower, sample into the controller; while recording,
@@ -596,6 +612,9 @@ feature -- Take Studio
 			controller.perform (a_action)
 			if history.revision_count /= l_revisions then
 				rewire
+			end
+			if a_action = {PT_ACTION}.Record then
+				sound_guard.reset
 			end
 			if a_action = {PT_ACTION}.Count_in_done then
 				aligner.reanchor ((controller.caret - 1).max (0), recording_clock.sample_count)
