@@ -6,7 +6,10 @@ note
 		the aligner's position before and after, the move its best match proposed, the
 		anchors found and needed, the words new since the last move and their anchors
 		(0.5.2), and the follower's target. A "nudge" line when the reader pushes the text
-		on a line (0.5.3).
+		on (or back, 0.5.4) a line (0.5.3), and a "wheel" line for every turn of the mouse
+		wheel over the pill, moving or not: its raw delta (120 a notch, up positive), the
+		lines it moved, the part of a notch left over, the state, and the place before and
+		after (0.5.4).
 		A "frame" line at most every `Frame_interval' seconds, and whenever the line on
 		the reading row changes or the follower snaps: the follower's target, velocity and
 		steering goal, the displayed position, its line and the target's line. Together
@@ -142,6 +145,27 @@ feature -- Lines
 			o := (create {SIMPLE_JSON}).new_object
 			o := o.put_string ({STRING_32} "nudge", "t")
 			o := o.put_real (rounded (a_rt), "rt")
+			o := o.put_integer (a_from, "from")
+			o := o.put_integer (a_to, "to")
+			Result := o.as_json
+		ensure
+			one_line: not Result.has ('%N')
+		end
+
+	wheel_line (a_rt: REAL_64; a_delta, a_lines, a_rest: INTEGER; a_state: READABLE_STRING_32; a_from, a_to: INTEGER): STRING_32
+			-- The line for a wheel turn of `a_delta' at `a_rt' in `a_state' that moved `a_lines'
+			-- lines (down positive), `a_rest' of a notch left over, the place going from `a_from' to `a_to'.
+		local
+			o: SIMPLE_JSON_OBJECT
+		do
+			o := (create {SIMPLE_JSON}).new_object
+			o := o.put_string ({STRING_32} "wheel", "t")
+			o := o.put_real (rounded (a_rt), "rt")
+			o := o.put_integer (a_delta, "delta")
+			o := o.put_real (rounded (a_delta / 120.0), "notches")
+			o := o.put_integer (a_lines, "lines")
+			o := o.put_integer (a_rest, "rest")
+			o := o.put_string (a_state, "state")
 			o := o.put_integer (a_from, "from")
 			o := o.put_integer (a_to, "to")
 			Result := o.as_json

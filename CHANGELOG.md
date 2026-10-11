@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.4] - 2026-10-11
+
+### Fixed
+- 0.5.3 never moved the text by itself (Reel 2, 09:03: Larry turned the wheel 23 times
+  while the aligner knew where he was every time). Two causes, both removed:
+  - The bound "never further than the new words heard (plus four)": the recognizer's
+    buffer keeps about half the words said, so the bound blocked every catch-up.
+  - After a resume or a nudge, whole decode windows that began before it were ignored
+    (about 3 s deaf each time). Now only words said before it are dropped, by their times.
+- The search for the reader's place covers the fully visible lines of the pill, from the
+  top, so a phrase being read beats its echo further down the page; re-heard words still
+  never move the text.
+
+### Added
+- Wheel up while reading moves the text and the follower's place back a line (a notch
+  down moves on a line, as before); a turn of several notches moves as many lines, and
+  touchpad fractions add up.
+- A "wheel" trace line for every wheel turn over the pill, moving or not: raw delta,
+  notches, lines moved, the part of a notch left over, state, place before and after.
+
 ## [0.5.3] - 2026-10-11
 
 ### Fixed

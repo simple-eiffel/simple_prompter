@@ -120,10 +120,10 @@ feature -- Tests
 			r := parsed ({STRING_32} "Alpha bravo charlie delta echo foxtrot golf hotel india juliet kilo lima mike november oscar papa quebec.")
 			create a.make (r, create {PT_WORD_MATCHER})
 			a.reanchor (script_index (r, {STRING_32} "hotel"), 0)
-			a.set_visible_last (script_index (r, {STRING_32} "india"))
+			a.set_visible (1, script_index (r, {STRING_32} "india"))
 			a.update (timed_window (0, <<[{STRING_32} "india", 0.5], [{STRING_32} "juliet", 0.9], [{STRING_32} "kilo", 1.3]>>))
 			assert_true ("no further than the page", a.position <= script_index (r, {STRING_32} "india"))
-			a.set_visible_last (r.word_count)
+			a.set_visible (1, r.word_count)
 			a.update (timed_window (32_000, <<[{STRING_32} "juliet", 0.5], [{STRING_32} "kilo", 0.9], [{STRING_32} "lima", 1.3]>>))
 			assert_integers_equal ("on the page: follows", script_index (r, {STRING_32} "lima"), a.position)
 		end
@@ -149,6 +149,49 @@ feature -- Tests
 			assert_integers_equal ("still reading", {PT_TAKE_STATE}.Reading, p.controller.state)
 			p.nudge_forward
 			assert_integers_equal ("and the one after", p.layout.line (3).first_word - 1, p.aligner.position)
+			p.nudge_back
+			assert_integers_equal ("back a line", p.layout.line (2).first_word - 1, p.aligner.position)
+			assert_true ("text back too", p.follower.target = (p.layout.line (2).first_word - 1).to_double)
+		end
+
+	test_wheel_moves_a_line_per_notch
+			-- Larry, 2026-10-11: the wheel scrolls the text down and up while reading; a notch is
+			-- 120, touchpad fractions add up, and a turn of two notches moves two lines.
+		local
+			p: SIMPLE_PROMPTER
+		do
+			create p.make_with_settings (create {PT_SETTINGS}.make_in_memory)
+			p := p.with_measure (create {PT_FIXED_MEASURE}.make (10.0, 20.0), 200.0)
+			p.load_script_text ({STRING_32} "t", {STRING_32} "One two three four five six seven eight nine ten. Eleven twelve thirteen fourteen fifteen sixteen seventeen eighteen. Nineteen twenty twenty-one twenty-two twenty-three twenty-four.")
+			p.perform ({PT_ACTION}.Play)
+			p.perform ({PT_ACTION}.Count_in_done)
+			p.wheel (-60)
+			assert_integers_equal ("half a notch: no move", 0, p.aligner.position)
+			assert_integers_equal ("half kept", -60, p.wheel_rest)
+			p.wheel (-60)
+			assert_integers_equal ("two halves: a line", p.layout.line (2).first_word - 1, p.aligner.position)
+			assert_integers_equal ("nothing left", 0, p.wheel_rest)
+			p.wheel (-240)
+			assert_integers_equal ("two notches: two lines", p.layout.line (4).first_word - 1, p.aligner.position)
+			p.wheel (120)
+			assert_integers_equal ("a notch up: a line back", p.layout.line (3).first_word - 1, p.aligner.position)
+		end
+
+	test_words_before_a_reanchor_are_dropped_by_time
+			-- 2026-10-11 09:03 take: after the resume and after every nudge the aligner ignored
+			-- whole decode windows that began before it, about 3 s of speech each time. Only words
+			-- said before the reanchor are dropped now; the rest of the window counts at once.
+		local
+			a: PT_ALIGNER
+			r: PT_SCRIPT_REVISION
+		do
+			r := parsed ({STRING_32} "The Devil got it half right. What do I mean? Simply that the devil quoted the Bible to Jesus.")
+			create a.make (r, create {PT_WORD_MATCHER})
+			a.reanchor (0, 16_000)
+			a.update (timed_window (0, <<[{STRING_32} "uh", 0.4], [{STRING_32} "the", 1.1], [{STRING_32} "devil", 1.4],
+				[{STRING_32} "got", 1.8], [{STRING_32} "it", 2.0], [{STRING_32} "half", 2.3], [{STRING_32} "right", 2.7]>>))
+			assert_integers_equal ("followed within the first window", script_index (r, {STRING_32} "right"), a.position)
+			assert_false ("the word before the reanchor dropped", across a.heard_tail as ic some ic.same_string ({STRING_32} "uh") end)
 		end
 
 	test_visible_words_stop_above_the_fade

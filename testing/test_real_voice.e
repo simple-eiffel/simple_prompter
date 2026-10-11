@@ -104,6 +104,30 @@ feature -- Tests
 				and l_steps.last <= index_of_word (l_revision, {STRING_32} "concerning") + 4)
 		end
 
+	test_devils_half_right_0903_follows_without_the_wheel
+			-- Take 2026-10-11 09:03 (0.5.3): the text never moved by itself; Larry turned the
+			-- wheel 23 times. Replayed from the journal's heard lines with their real word times,
+			-- and no wheel, the text follows him: past "further" (said at 41.9 s) by 42.5 s, and
+			-- at the end between "glorify" (58 s) and "jump" (not yet said at the wrap).
+		local
+			l_revision: PT_SCRIPT_REVISION
+			l_steps: ARRAYED_LIST [TUPLE [t: REAL_64; position: INTEGER]]
+			l_at_further: INTEGER
+		do
+			l_revision := devils_script
+			l_steps := replay_timed ("testing/fixtures/devils_half_right_0903.heard.tsv", l_revision)
+			across l_steps as ic loop
+				if ic.t <= 42.5 then
+					l_at_further := ic.position
+				end
+			end
+			assert_true ("near 'further' at 42.5 s: " + l_at_further.out,
+				l_at_further >= index_of_word (l_revision, {STRING_32} "further") - 8)
+			assert_true ("at the end, after 'glorify' and before 'jump': " + l_steps.last.position.out,
+				l_steps.last.position >= index_of_word (l_revision, {STRING_32} "glorify")
+				and l_steps.last.position < index_of_word (l_revision, {STRING_32} "jump"))
+		end
+
 	test_aligner_meets_frame_budget
 			-- NFR-003: one aligner update over the whole replay costs less than a 60 Hz GUI frame
 			-- (16 ms), even in this contract-checked build. Measured 2026-10-05: 2.5 ms here,
@@ -316,6 +340,44 @@ feature {NONE} -- Replay
 					end
 					a.update (create {PT_HEARD_WORDS}.make ((l_w0 * 16_000).truncated_to_integer_64, 48_000, l_words))
 					Result.extend (a.position)
+				end
+			end
+		end
+
+	replay_timed (a_fixture: READABLE_STRING_GENERAL; a_revision: PT_SCRIPT_REVISION): ARRAYED_LIST [TUPLE [t: REAL_64; position: INTEGER]]
+			-- Aligner position after each decode of `a_fixture' (a take's journal "heard" lines
+			-- with word times, 0.5.3 on: window start, window end, words, their start times in
+			-- the window; a first "# resume" line gives the resume time), at each window's end.
+		local
+			a: PT_ALIGNER
+			n: PT_NORMALIZER
+			l_fields, l_texts, l_times: LIST [STRING_32]
+			l_words: ARRAYED_LIST [PT_HEARD_WORD]
+			l_w0, l_t0: REAL_64
+			i: INTEGER
+		do
+			create a.make (a_revision, create {PT_WORD_MATCHER})
+			create n
+			create Result.make (256)
+			across file_text (a_fixture).split ('%N') as ic loop
+				l_fields := ic.split ('%T')
+				if l_fields.count = 2 and then l_fields [1].same_string ({STRING_32} "# resume") and then l_fields [2].is_double then
+					a.reanchor (0, (l_fields [2].to_double * 16_000).truncated_to_integer_64)
+				elseif l_fields.count = 4 and then l_fields [1].is_double and then l_fields [2].is_double then
+					l_w0 := l_fields [1].to_double
+					create l_words.make (8)
+					l_texts := l_fields [3].split (' ')
+					l_times := l_fields [4].split (' ')
+					from i := 1 until i > l_texts.count or i > l_times.count loop
+						if not n.normalized (l_texts [i]).is_empty and then l_times [i].is_double then
+							l_t0 := l_times [i].to_double
+							l_words.extend (create {PT_HEARD_WORD}.make (l_texts [i], n.normalized (l_texts [i]), l_t0, l_t0 + 0.25, 0.9))
+						end
+						i := i + 1
+					end
+					a.update (create {PT_HEARD_WORDS}.make ((l_w0 * 16_000).truncated_to_integer_64,
+						((l_fields [2].to_double - l_w0) * 16_000).truncated_to_integer.max (1), l_words))
+					Result.extend ([l_fields [2].to_double, a.position])
 				end
 			end
 		end

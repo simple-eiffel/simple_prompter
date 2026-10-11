@@ -192,18 +192,24 @@ feature -- Commands
 		end
 
 	on_wheel (a_delta: INTEGER)
-			-- Wheel on the pill: step back (up) or forward (down) while held; down while reading
-			-- pushes the text on a line.
+			-- Wheel on the pill: step back (up) or forward (down) a sentence while held; while
+			-- reading, a line back (up) or on (down) per notch. Every turn is traced while recording.
+		local
+			l_from: INTEGER
 		do
-			if prompter.controller.state = {PT_TAKE_STATE}.Reading then
-				if a_delta < 0 then
-					prompter.nudge_forward
-				end
-			elseif prompter.controller.state = {PT_TAKE_STATE}.Held then
-				if a_delta > 0 then
-					try_action ({PT_ACTION}.Back)
-				elseif a_delta < 0 then
-					try_action ({PT_ACTION}.Forward)
+			if prompter.has_script then
+				if prompter.controller.state = {PT_TAKE_STATE}.Reading then
+					prompter.wheel (a_delta)
+				elseif prompter.controller.state = {PT_TAKE_STATE}.Held then
+					l_from := prompter.controller.caret
+					if a_delta > 0 then
+						try_action ({PT_ACTION}.Back)
+					elseif a_delta < 0 then
+						try_action ({PT_ACTION}.Forward)
+					end
+					prompter.note_wheel (a_delta, {STRING_32} "held", l_from, prompter.controller.caret)
+				else
+					prompter.note_wheel (a_delta, {STRING_32} "idle", prompter.aligner.position, prompter.aligner.position)
 				end
 			end
 		end
