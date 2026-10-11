@@ -131,6 +131,38 @@ feature -- Tests
 			assert_integers_equal ("on the page: follows", script_index (r, {STRING_32} "lima"), a.position)
 		end
 
+	test_held_wheel_scrolls_the_text_back
+			-- Larry, 2026-10-11 (Reel 4, 11:11 take): held, the wheel stepped the caret back ten
+			-- sentences but the text never moved, so he could not see them to restart. Now each
+			-- step brings the text to the caret.
+		local
+			p: SIMPLE_PROMPTER
+			l_held_caret, l_now: INTEGER
+			l_ms: REAL_64
+		do
+			create p.make_with_settings (create {PT_SETTINGS}.make_in_memory)
+			p := p.with_measure (create {PT_FIXED_MEASURE}.make (10.0, 20.0), 200.0)
+			p.load_script_text ({STRING_32} "t", {STRING_32} "One two three. Four five six. Seven eight nine. Ten eleven twelve. Thirteen fourteen fifteen.")
+			p.perform ({PT_ACTION}.Play)
+			p.perform ({PT_ACTION}.Count_in_done)
+			p.wheel (-360)
+			from l_ms := 1000.0 until l_ms > 4000.0 loop
+				p.tick (l_ms)
+				l_ms := l_ms + 16.0
+			end
+			p.perform ({PT_ACTION}.Hold)
+			l_held_caret := p.controller.caret
+			p.perform ({PT_ACTION}.Back)
+			assert_true ("caret stepped back", p.controller.caret < l_held_caret)
+			assert_true ("text goes to the caret", p.follower.target = (p.controller.caret - 1).to_double)
+			p.tick (l_ms)
+			assert_true ("and shows it at once", p.scroll.position = (p.controller.caret - 1).to_double)
+			l_now := p.controller.caret
+			p.perform ({PT_ACTION}.Forward)
+			assert_true ("forward too", p.controller.caret > l_now and p.follower.target = (p.controller.caret - 1).to_double)
+			assert_true ("still held", p.follower.is_held and p.controller.state = {PT_TAKE_STATE}.Held)
+		end
+
 	test_nudge_puts_text_and_pointer_on_the_next_line
 			-- Larry, 2026-10-11: "allow me to force the scroll forward ... and force the pointer in
 			-- the software to where I am reading". While reading, a nudge moves both to the line

@@ -200,12 +200,16 @@ feature -- Commands
 				log (create {PT_TAKE_EVENT}.make_resume (stamp, revision.word (caret).id, revision.number))
 			when {PT_ACTION}.Back then
 				caret := policy.step_back (revision, caret, policy.Unit_passage)
+				show_caret
 			when {PT_ACTION}.Forward then
 				caret := policy.step_forward (revision, caret, policy.Unit_passage)
+				show_caret
 			when {PT_ACTION}.Back_paragraph then
 				caret := policy.step_back (revision, caret, policy.Unit_paragraph)
+				show_caret
 			when {PT_ACTION}.Forward_paragraph then
 				caret := policy.step_forward (revision, caret, policy.Unit_paragraph)
+				show_caret
 			when {PT_ACTION}.Edit_open then
 				edit_first := revision.passage (revision.passage_of (caret)).first_word
 				edit_last := revision.passage (revision.passage_of (caret)).last_word
@@ -246,9 +250,21 @@ feature -- Commands
 			again_caret: a_action = {PT_ACTION}.Again implies (caret = last_again_target and last_again_target >= 1)
 			browse_not_journaled: is_browse (a_action) implies journal.count = old journal.count
 			resumes_at_caret: a_action = {PT_ACTION}.Count_in_done implies follower.target = (caret - 1).to_double
+			browse_shows_caret: is_browse (a_action) implies follower.target = ((caret - 1).min (follower.word_count).max (0)).to_double
 			frozen_unless_reading: (state = {PT_TAKE_STATE}.Count_in or state = {PT_TAKE_STATE}.Held) implies follower.is_held
 			reading_runs: state = {PT_TAKE_STATE}.Reading implies not follower.is_held
 			skip_revises: a_action = {PT_ACTION}.Skip implies history.revision_count = old history.revision_count + 1
+		end
+
+	show_caret
+			-- Bring the text to the caret while held (0.5.8; Larry, 2026-10-11: "I literally could
+			-- not mouse-wheel scroll back to see the sentences before and redo the take"): the
+			-- caret moved, the text stayed, and the sentences stepped back to were out of sight.
+		do
+			follower.set_caret ((caret - 1).min (follower.word_count).max (0))
+		ensure
+			shown: follower.target = ((caret - 1).min (follower.word_count).max (0)).to_double
+			still_held: follower.is_held = old follower.is_held
 		end
 
 	pick_word (a_index: INTEGER)
