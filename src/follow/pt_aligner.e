@@ -6,15 +6,16 @@ note
 		itself across overlapping windows). Only anchored (non-stop) matches may
 		move the position; big jumps need more anchors; moving backward needs
 		strong evidence (DR-016, DR-017).
-		The text never runs ahead of the reader (Larry, 2026-10-11): only words heard since
-		the last move can move it again, and never further than those words (plus
-		`Small_jump' for words the recognizer dropped). 0.5.2 also demanded that the first
-		new word continue from the reader's place; once the reader got ahead that gap only
-		grew, and the text stopped for good (0.5.3 removes it: "I either need this to FOLLOW
-		ME or allow me to force the scroll forward").
 		The reader is always on the words the pill shows, or off script (Larry, 2026-10-11:
-		"Period. Full stop."): when the prompter tells it the last visible word, the
-		forward search ends there.
+		"Period. Full stop."): when the prompter tells it the fully visible words, the
+		search covers exactly them (and never less than `Window_back' words behind the
+		position), so a phrase being read beats its echo further down the page. Only words
+		heard since the last move can move the position again (a re-heard sentence once
+		moved the text to its echo two lines down). 0.5.2 and 0.5.3 also bounded a move by
+		the count of new words heard; the recognizer's buffer keeps about half the words
+		said, so that bound stopped the text for whole takes (0.5.4 removes it). Words
+		spoken before a reanchor (a restart, a nudge) are dropped by their own times, so
+		the rest of that decode window counts at once.
 	]"
 	author: "Larry Rix"
 
@@ -89,8 +90,11 @@ feature -- Access
 	last_needed: INTEGER
 			-- Anchors the last `update''s forward move needed (0 for a move of at most `Small_jump').
 
+	visible_first: INTEGER
+			-- First script word fully shown on the pill (0 = not known).
+
 	visible_last: INTEGER
-			-- Last script word the pill shows (0 = not known: search `Normal_ahead' words on).
+			-- Last script word fully shown on the pill (0 = not known: search `Normal_ahead' words on).
 
 	last_fresh_anchors: INTEGER
 			-- Anchored matches of the last `update''s best match among words heard since the
@@ -156,13 +160,14 @@ feature -- Element change
 			last_proposed := position
 			last_needed := 0
 			last_fresh_anchors := 0
-			if a_heard.window_start >= reanchored_at then
+			if a_heard.window_end > reanchored_at then
 				buffer_heard (a_heard)
 				last_new_words := fresh_words
 				l_heard := recent_tail
 				l_k := l_heard.count
 				l_lo := (position - Window_back + 1).max (1)
 				if visible_last > 0 then
+					l_lo := l_lo.min (visible_first.max (1))
 					l_hi := visible_last.max (position).min (revision.word_count)
 				else
 					l_hi := (position + Normal_ahead).min (revision.word_count)
@@ -187,8 +192,7 @@ feature -- Element change
 								if spoken_distance (position, l_new) > Small_jump then
 									last_needed := required_anchors (spoken_distance (position, l_new))
 								end
-								if spoken_distance (position, l_new) <= fresh_words + Small_jump
-									and l_anchors >= required_anchors (spoken_distance (position, l_new)) then
+								if l_anchors >= required_anchors (spoken_distance (position, l_new)) then
 									move_to (l_new)
 								end
 							else
@@ -220,7 +224,7 @@ feature -- Element change
 			end
 			create last_alignment.make (position, confidence, l_matched, l_anchors, l_rate, a_heard.window_end)
 		ensure
-			stale_ignored: a_heard.window_start < reanchored_at implies (position = old position and confidence = old confidence)
+			stale_ignored: a_heard.window_end <= reanchored_at implies (position = old position and confidence = old confidence)
 			within_script: position >= 0 and position <= revision.word_count
 			window_bound: visible_last = 0 implies position <= old position + Normal_ahead
 			on_the_page: visible_last > 0 implies position <= visible_last.max (old position)
@@ -229,22 +233,23 @@ feature -- Element change
 			jump_evidence: position > old position and then spoken_distance (old position, position) > Small_jump implies
 					last_alignment.anchor_count >= required_anchors (spoken_distance (old position, position))
 			new_words_only: position /= old position implies last_fresh_anchors >= 1
-			never_ahead_of_speech: position > old position implies
-					spoken_distance (old position, position) <= last_new_words + Small_jump
 			moved_consumes: position /= old position implies fresh_words = 0
 			confidence_range: confidence >= 0.0 and confidence <= 1.0
 			alignment_consistent: last_alignment.word_index = position
 			proposed_in_script: last_proposed >= 0 and last_proposed <= revision.word_count
 		end
 
-	set_visible_last (a_word: INTEGER)
-			-- The pill shows script words up to `a_word' (0 = not known).
+	set_visible (a_first, a_last: INTEGER)
+			-- The pill fully shows script words `a_first'..`a_last' (0, 0 = not known).
 		require
-			in_script: a_word >= 0 and a_word <= revision.word_count
+			in_script: a_first >= 0 and a_last >= 0 and a_last <= revision.word_count
+			ordered: a_last > 0 implies (a_first >= 1 and a_first <= a_last)
+			both_or_neither: (a_first = 0) = (a_last = 0)
 		do
-			visible_last := a_word
+			visible_first := a_first
+			visible_last := a_last
 		ensure
-			set: visible_last = a_word
+			set: visible_first = a_first and visible_last = a_last
 		end
 
 	reanchor (a_words_read: INTEGER; a_at_sample: INTEGER_64)
@@ -339,7 +344,8 @@ feature {NONE} -- Alignment
 
 	buffer_heard (a_heard: PT_HEARD_WORDS)
 			-- Add the spoken words of `a_heard' not already buffered (overlapping windows re-decode
-			-- the same words; non-speech tags such as *cough* or [BLANK_AUDIO] are dropped). Words
+			-- the same words; non-speech tags such as *cough* or [BLANK_AUDIO] are dropped, and so
+			-- are words that start before `reanchored_at', said before a restart or nudge). Words
 			-- accumulate across windows so that slow speech still gives enough evidence.
 			-- Live windows re-stamp the same words up to a second apart (a word cut at a window's
 			-- start is stamped at the start), so time alone re-buffered "this is a test of simple"
@@ -358,7 +364,8 @@ feature {NONE} -- Alignment
 			create l_words.make (a_heard.count)
 			create l_starts.make (a_heard.count)
 			from i := 1 until i > a_heard.count loop
-				if not a_heard.word (i).normalized.is_empty and then not is_non_speech (a_heard.word (i).text) then
+				if not a_heard.word (i).normalized.is_empty and then not is_non_speech (a_heard.word (i).text)
+					and then a_heard.window_start / 16_000 + a_heard.word (i).t0 >= reanchored_at / 16_000 then
 					l_words.extend (a_heard.word (i).normalized)
 					l_starts.extend (a_heard.window_start / 16_000 + a_heard.word (i).t0)
 				end

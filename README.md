@@ -15,7 +15,7 @@ Part of the [Simple Eiffel](https://github.com/simple-eiffel) ecosystem.
 
 ## Status
 
-**0.5.3, in use on Windows 11** (per-user installer: `installer/simple_prompter.iss`)
+**0.5.4, in use on Windows 11** (per-user installer: `installer/simple_prompter.iss`)
 - The pill is the whole program: a text pill under the webcam, hidden from screen captures,
   with Status lights, Script, Settings and Last take callouts beside it, a slide handle under
   it, tooltips on everything (and a switch to turn them off), and an icon in the notification
@@ -24,7 +24,7 @@ Part of the [Simple Eiffel](https://github.com/simple-eiffel) ecosystem.
 - Recording from a camera and microphone (OBS Virtual Camera works) with ffmpeg on one
   clock; the take studio analyzes the take, renders final.mp4, and keeps a per-take
   picture-to-sound sync that Measure can set from a clap.
-- 257 tests pass in the contract-checked build. The follower is verified against real
+- 260 tests pass in the contract-checked build. The follower is verified against real
   recordings: it stays within a line of the reader, holds still during an ad-lib, never
   jumps to an echo of a phrase, and never scrolls backward.
 
@@ -32,10 +32,10 @@ Part of the [Simple Eiffel](https://github.com/simple-eiffel) ecosystem.
 
 **Voice following.** A small text pill sits under your webcam. As you read, it scrolls with
 you: voice activity drives the motion, and speech recognition plus a forward-only aligner keep
-it on the word you are reading. The text never runs ahead of you: only new words move it,
-never further than you have spoken, and only within the words fully shown on the pill, so
-during an ad-lib it waits for you to come back to the script. If it ever lags, nudge it a
-line (Ctrl+Alt+Right or the wheel) without stopping. It tolerates the way people really read: homophones
+it on the word you are reading. It looks for you only on the words fully shown on the pill,
+and only new words move it, so it never jumps to an echo of a phrase and during an ad-lib it
+waits for you to come back to the script. If it ever lags or runs ahead, turn the wheel over
+the pill (a line per notch, down or up) or press Ctrl+Alt+Right, without stopping. It tolerates the way people really read: homophones
 ("their/there"), spoken abbreviations ("for example" for "e.g."), numbers read as words,
 split compounds, and the odd garbled word.
 

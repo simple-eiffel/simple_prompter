@@ -386,7 +386,11 @@ feature -- Following
 			l_from: INTEGER
 		do
 			l_from := aligner.position
-			aligner.set_visible_last (visible_last_word)
+			if visible_last_word > 0 then
+				aligner.set_visible (visible_first_word.min (visible_last_word).max (1), visible_last_word)
+			else
+				aligner.set_visible (0, 0)
+			end
 			aligner.update (a_heard)
 			follower.on_alignment (aligner.last_alignment)
 			controller.sample_alignment (aligner.last_alignment)
@@ -428,6 +432,110 @@ feature -- Following
 
 	Fade_lines: REAL_64 = 0.35
 			-- Height of the pill's bottom fade, in lines (PT_PILL_RENDERER).
+
+	visible_first_word: INTEGER
+			-- First script word on a line wholly inside the pill's text area (the line above the
+			-- reading row counts: the reader may be there when the text ran ahead); never after
+			-- the start of the reading row's line; 0 with no layout.
+		local
+			l_lh, l_reading, l_top: REAL_64
+			l_line: INTEGER
+		do
+			if layout.word_count > 0 and layout.line_count > 0 then
+				l_lh := layout.line_height
+				if settings.lines_visible >= 3 then
+					l_reading := l_lh
+				end
+				from l_line := 1 until Result > 0 or l_line > layout.line_count loop
+					l_top := l_reading + l_lh / 2 + layout.line (l_line).y - scroll.y_offset.max (l_lh / 2)
+					if l_top >= -0.5 then
+						Result := layout.line (l_line).first_word
+					end
+					l_line := l_line + 1
+				end
+				Result := Result.max (1).min (layout.line (layout.line_of ((scroll.position.floor + 1).min (layout.word_count).max (1))).first_word)
+					.min (history.current_revision.word_count)
+			end
+		ensure
+			in_script: Result >= 0 and Result <= history.current_revision.word_count
+		end
+
+	Wheel_notch: INTEGER = 120
+			-- Windows' wheel delta for one notch.
+
+	wheel_rest: INTEGER
+			-- Part of a notch turned but not yet acted on (touchpads send fractions).
+
+	wheel (a_delta: INTEGER)
+			-- The mouse wheel turned by `a_delta' over the pill while reading (Larry, 2026-10-11):
+			-- a line on for each notch down, a line back for each notch up (touchpad fractions add
+			-- up), and a "wheel" trace line for every turn, moving or not.
+		require
+			loaded: has_script
+			reading: controller.state = {PT_TAKE_STATE}.Reading
+		local
+			l_total, l_lines, l_from, i: INTEGER
+		do
+			l_from := aligner.position
+			l_total := wheel_rest + a_delta
+			l_lines := l_total.abs // Wheel_notch
+			if l_total < 0 then
+				l_lines := -l_lines
+			end
+			wheel_rest := l_total - l_lines * Wheel_notch
+			from i := 1 until i > l_lines.abs loop
+				if l_lines < 0 then
+					nudge_forward
+				else
+					nudge_back
+				end
+				i := i + 1
+			end
+			if controller.is_recording then
+				controller.journal.trace (follow_trace.wheel_line (controller.current_rt, a_delta, -l_lines, wheel_rest,
+					{STRING_32} "reading", l_from, aligner.position))
+			end
+		ensure
+			rest_below_a_notch: wheel_rest.abs < Wheel_notch
+		end
+
+	note_wheel (a_delta: INTEGER; a_state: READABLE_STRING_32; a_from, a_to: INTEGER)
+			-- Trace a wheel turn of `a_delta' that did not nudge (held, idle, ...), the place
+			-- going from `a_from' to `a_to'.
+		require
+			loaded: has_script
+		do
+			if controller.is_recording then
+				controller.journal.trace (follow_trace.wheel_line (controller.current_rt, a_delta, 0, 0, a_state, a_from, a_to))
+			end
+		end
+
+	nudge_back
+			-- The text ran ahead of the reader (Larry, 2026-10-11: "i also need to be able to
+			-- scroll up if the software scrolls down too far before I am done reading"): put the
+			-- text and the aligner on the line before the reading row, and follow on from there.
+		require
+			loaded: has_script
+			reading: controller.state = {PT_TAKE_STATE}.Reading
+		local
+			l_from, l_to, l_line: INTEGER
+		do
+			l_from := aligner.position
+			if layout.word_count > 0 then
+				l_line := layout.line_of ((follower.target.floor + 1).min (layout.word_count).max (1))
+				if l_line > 1 then
+					l_to := layout.line (l_line - 1).first_word - 1
+				end
+			end
+			l_to := l_to.max (0).min (history.current_revision.word_count)
+			aligner.reanchor (l_to, recording_clock.sample_count)
+			follower.set_caret (l_to)
+			if controller.is_recording then
+				controller.journal.trace (follow_trace.nudge_line (controller.current_rt, l_from, l_to))
+			end
+		ensure
+			follower_placed: follower.target = aligner.position.to_double
+		end
 
 	nudge_forward
 			-- The reader is ahead of the text (Larry, 2026-10-11: "allow me to force the scroll
