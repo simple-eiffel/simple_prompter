@@ -115,7 +115,7 @@ feature -- Tests
 			l_at_further: INTEGER
 		do
 			l_revision := devils_script
-			l_steps := replay_timed ("testing/fixtures/devils_half_right_0903.heard.tsv", l_revision)
+			l_steps := replay_timed ("testing/fixtures/devils_half_right_0903.heard.tsv", l_revision, False)
 			across l_steps as ic loop
 				if ic.t <= 42.5 then
 					l_at_further := ic.position
@@ -126,6 +126,74 @@ feature -- Tests
 			assert_true ("at the end, after 'glorify' and before 'jump': " + l_steps.last.position.out,
 				l_steps.last.position >= index_of_word (l_revision, {STRING_32} "glorify")
 				and l_steps.last.position < index_of_word (l_revision, {STRING_32} "jump"))
+		end
+
+	test_devils_half_right_0947_keeps_up
+			-- Take 2026-10-11 09:47 (0.5.4): the text followed by itself but waited about 3 s
+			-- for each catch-up, 15 times (the merged word list kept about half the words said).
+			-- Replayed with the real word times, against the take analyzer's timeline of when
+			-- each word was said: how far the aligner trails the reader, in spoken words.
+		local
+			l_revision: PT_SCRIPT_REVISION
+			l_steps: ARRAYED_LIST [TUPLE [t: REAL_64; position: INTEGER]]
+			l_said: ARRAYED_LIST [TUPLE [w: INTEGER; t0, t1: REAL_64]]
+			l_fields: LIST [STRING_32]
+			l_truth, l_lag, l_count, l_far, l_ahead: INTEGER
+			l_sum: REAL_64
+		do
+			l_revision := devils_script
+			create l_said.make (400)
+			across file_text ("testing/fixtures/devils_half_right_0947.said.tsv").split ('%N') as ic loop
+				l_fields := ic.split ('%T')
+				if l_fields.count = 3 and then l_fields [1].is_integer and then l_fields [2].is_double then
+					l_said.extend ([l_fields [1].to_integer, l_fields [2].to_double, l_fields [3].to_double])
+				end
+			end
+			l_steps := replay_timed ("testing/fixtures/devils_half_right_0947.heard.tsv", l_revision, True)
+			across l_steps as ic loop
+				l_truth := 0
+				across l_said as s loop
+					if s.t1 <= ic.t - 0.3 then
+						l_truth := l_truth.max (s.w)
+					end
+				end
+				if l_truth > 0 then
+					if l_truth >= ic.position then
+						l_lag := spoken_between (l_revision, ic.position, l_truth)
+					else
+						l_lag := -spoken_between (l_revision, l_truth, ic.position)
+					end
+					l_sum := l_sum + l_lag.max (0)
+					l_count := l_count + 1
+					if l_lag >= 8 then
+						l_far := l_far + 1
+					end
+					l_ahead := l_ahead.max (-l_lag)
+				end
+			end
+			assert_true ("keeps up: mean lag " + (l_sum / l_count.max (1)).out + " words, " + l_far.out + " of "
+				+ l_count.out + " decodes a line (8+) behind, at most " + l_ahead.out + " ahead",
+				l_sum / l_count.max (1) <= Mean_lag_limit and l_far <= Far_limit and l_ahead <= Ahead_limit)
+		end
+
+	Mean_lag_limit: REAL_64 = 1.6
+	Far_limit: INTEGER = 15
+	Ahead_limit: INTEGER = 5
+			-- Measured 2026-10-11 on this replay with a five-line pill: 0.5.4 trailed by 1.63
+			-- words on average with 18 of 476 decodes a line behind; 0.5.5 1.58 and 14, never
+			-- more than 5 words ahead.
+
+	spoken_between (a_revision: PT_SCRIPT_REVISION; a_from, a_to: INTEGER): INTEGER
+			-- Spoken (non-cue) words in `a_from' + 1 .. `a_to'.
+		local
+			i: INTEGER
+		do
+			from i := a_from + 1 until i > a_to loop
+				if not a_revision.word (i).is_cue then
+					Result := Result + 1
+				end
+				i := i + 1
+			end
 		end
 
 	test_aligner_meets_frame_budget
@@ -344,17 +412,19 @@ feature {NONE} -- Replay
 			end
 		end
 
-	replay_timed (a_fixture: READABLE_STRING_GENERAL; a_revision: PT_SCRIPT_REVISION): ARRAYED_LIST [TUPLE [t: REAL_64; position: INTEGER]]
+	replay_timed (a_fixture: READABLE_STRING_GENERAL; a_revision: PT_SCRIPT_REVISION; a_paged: BOOLEAN): ARRAYED_LIST [TUPLE [t: REAL_64; position: INTEGER]]
 			-- Aligner position after each decode of `a_fixture' (a take's journal "heard" lines
 			-- with word times, 0.5.3 on: window start, window end, words, their start times in
 			-- the window; a first "# resume" line gives the resume time), at each window's end.
+			-- `a_paged': show the aligner a five-line pill of `Page_line' words a line, the
+			-- reading row second, as the prompter does.
 		local
 			a: PT_ALIGNER
 			n: PT_NORMALIZER
 			l_fields, l_texts, l_times: LIST [STRING_32]
 			l_words: ARRAYED_LIST [PT_HEARD_WORD]
 			l_w0, l_t0: REAL_64
-			i: INTEGER
+			i, l_line: INTEGER
 		do
 			create a.make (a_revision, create {PT_WORD_MATCHER})
 			create n
@@ -375,12 +445,20 @@ feature {NONE} -- Replay
 						end
 						i := i + 1
 					end
+					if a_paged then
+						l_line := a.position // Page_line
+						a.set_visible (((l_line - 1).max (0) * Page_line + 1).min (a_revision.word_count),
+							((l_line + 3) * Page_line).min (a_revision.word_count))
+					end
 					a.update (create {PT_HEARD_WORDS}.make ((l_w0 * 16_000).truncated_to_integer_64,
 						((l_fields [2].to_double - l_w0) * 16_000).truncated_to_integer.max (1), l_words))
 					Result.extend ([l_fields [2].to_double, a.position])
 				end
 			end
 		end
+
+	Page_line: INTEGER = 8
+			-- Words on a line of the imitated pill.
 
 	heard_words: ARRAYED_LIST [TUPLE [t0, t1: REAL_64; text: STRING_32]]
 			-- The recording's word times.

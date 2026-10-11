@@ -63,7 +63,10 @@ feature -- Tests
 				[{STRING_32} "test", 1.2], [{STRING_32} "of", 1.5], [{STRING_32} "simple", 1.6]>>))
 			a.update (timed_window (4_000, <<[{STRING_32} "this", 0.75], [{STRING_32} "is", 1.2], [{STRING_32} "a", 1.4],
 				[{STRING_32} "test", 1.5], [{STRING_32} "of", 1.65], [{STRING_32} "simple", 1.85], [{STRING_32} "prompter", 2.4]>>))
-			assert_integers_equal ("seven words once each", 7, a.heard_tail.count)
+				-- 0.5.5: the second window speaks for its span (from 0.25 s); only "this" (0.2 s)
+				-- stays from the first, so "is a test of simple" is held once.
+			assert_integers_equal ("'is' once", 1, count_of (a.heard_tail, {STRING_32} "is"))
+			assert_integers_equal ("'simple' once", 1, count_of (a.heard_tail, {STRING_32} "simple"))
 			assert_strings_equal ("newest", "prompter", a.heard_tail.last)
 			assert_integers_equal ("at the end", 7, a.position)
 		end
@@ -253,6 +256,15 @@ feature {NONE} -- Fixtures
 				l_words.extend (create {PT_HEARD_WORD}.make (ic.text, ic.text, ic.t0, ic.t0 + 0.1, 0.9))
 			end
 			create Result.make (a_start, 48_000, l_words)
+		end
+
+	count_of (a_words: LIST [STRING_32]; a_word: READABLE_STRING_32): INTEGER
+		do
+			across a_words as ic loop
+				if ic.same_string (a_word) then
+					Result := Result + 1
+				end
+			end
 		end
 
 	script_index (a_revision: PT_SCRIPT_REVISION; a_normalized: READABLE_STRING_32): INTEGER

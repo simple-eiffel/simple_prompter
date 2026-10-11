@@ -15,7 +15,8 @@ note
 		the count of new words heard; the recognizer's buffer keeps about half the words
 		said, so that bound stopped the text for whole takes (0.5.4 removes it). Words
 		spoken before a reanchor (a restart, a nudge) are dropped by their own times, so
-		the rest of that decode window counts at once.
+		the rest of that decode window counts at once. Since 0.5.5 each decode speaks for
+		its whole window (`buffer_heard'), and "new" is judged by each word's time.
 	]"
 	author: "Larry Rix"
 
@@ -35,7 +36,8 @@ feature {NONE} -- Initialization
 			confidence := 1.0
 			create last_alignment.make (0, 1.0, 0, 0, 0.0, 0)
 			create recent_words.make (Recent_heard * 2)
-			last_buffered_t0 := -1.0
+			create recent_starts.make (Recent_heard * 2)
+			consumed_t := -1.0
 			create match_cache.make (256)
 		ensure
 			revision_set: revision = a_revision
@@ -47,6 +49,9 @@ feature {NONE} -- Initialization
 feature -- Constants
 
 	Window_back: INTEGER = 3
+	Context_back: INTEGER = 10
+			-- Words behind the position searched when the visible words are not known, so that a
+			-- phrase being read is matched whole and beats its echo further on (0.5.5).
 	Normal_ahead: INTEGER = 40
 			-- Forward search. (0.5.2: the wide search for a skipped paragraph is gone; the text
 			-- never skips. Reel 2, 2026-10-11.)
@@ -104,11 +109,16 @@ feature -- Access
 			-- Words heard since the last move, as the last `update' weighed them.
 
 	fresh_words: INTEGER
-			-- Words heard since the position last moved (or the newest words were explained there).
+			-- Buffered words heard since the position last moved (or the newest words were
+			-- explained there): starting more than `Restamp_slack' after `consumed_t'.
 		do
-			Result := heard_total - consumed_total
+			across recent_starts as ic loop
+				if ic > consumed_t + Restamp_slack then
+					Result := Result + 1
+				end
+			end
 		ensure
-			non_negative: Result >= 0
+			bounded: Result >= 0 and Result <= recent_words.count
 		end
 
 	spoken_distance (a_from, a_to: INTEGER): INTEGER
@@ -165,9 +175,9 @@ feature -- Element change
 				last_new_words := fresh_words
 				l_heard := recent_tail
 				l_k := l_heard.count
-				l_lo := (position - Window_back + 1).max (1)
+				l_lo := (position - Context_back + 1).max (1)
 				if visible_last > 0 then
-					l_lo := l_lo.min (visible_first.max (1))
+					l_lo := (position - Window_back + 1).max (1).min (visible_first.max (1))
 					l_hi := visible_last.max (position).min (revision.word_count)
 				else
 					l_hi := (position + Normal_ahead).min (revision.word_count)
@@ -196,7 +206,7 @@ feature -- Element change
 									move_to (l_new)
 								end
 							else
-								consumed_total := heard_total
+								consume
 							end
 						end
 						across l_heard as ic loop
@@ -262,9 +272,8 @@ feature -- Element change
 			confidence := 1.0
 			reanchored_at := a_at_sample
 			recent_words.wipe_out
-			heard_total := 0
-			consumed_total := 0
-			last_buffered_t0 := -1.0
+			recent_starts.wipe_out
+			consumed_t := -1.0
 			last_move_position := a_words_read
 			last_move_sample := a_at_sample
 			create last_alignment.make (a_words_read, 1.0, 0, 0, last_alignment.rate_wps, a_at_sample)
@@ -286,12 +295,23 @@ feature {NONE} -- Alignment
 
 			-- Position and sample of the last rate measurement.
 
-	heard_total: INTEGER
-			-- Words buffered since the last reanchor.
+	consumed_t: REAL_64
+			-- Start time of the newest heard word when the position last moved (or the newest
+			-- words were explained where it stands): words up to it are spent as evidence, and so
+			-- are their re-transcriptions stamped up to `Restamp_slack' later (-1 = none).
 
-	consumed_total: INTEGER
-			-- `heard_total' when the position last moved (or the newest words were explained
-			-- where it stands): words up to there are spent as evidence.
+	Restamp_slack: REAL_64 = 0.25
+			-- How much later an overlapping decode may stamp a word it heard before.
+
+	consume
+			-- Every word heard so far is spent.
+		do
+			across recent_starts as ic loop
+				consumed_t := consumed_t.max (ic)
+			end
+		ensure
+			spent: fresh_words = 0
+		end
 
 	move_to (a_new: INTEGER)
 			-- Move the position to `a_new'; every word heard so far is spent.
@@ -299,7 +319,7 @@ feature {NONE} -- Alignment
 			in_script: a_new >= 0 and a_new <= revision.word_count
 		do
 			position := a_new
-			consumed_total := heard_total
+			consume
 		ensure
 			moved: position = a_new
 			spent: fresh_words = 0
@@ -336,90 +356,78 @@ feature {NONE} -- Alignment
 		end
 
 	recent_words: ARRAYED_LIST [STRING_32]
-			-- Spoken words heard since the last reanchor, newest last (overlapping windows deduplicated
-			-- by word overlap, else by time).
+			-- Spoken words heard since the last reanchor, oldest first.
 
-	last_buffered_t0: REAL_64
-			-- Absolute start time of the newest buffered word (-1 = none).
+	recent_starts: ARRAYED_LIST [REAL_64]
+			-- Start time (seconds) of each of `recent_words'.
 
 	buffer_heard (a_heard: PT_HEARD_WORDS)
-			-- Add the spoken words of `a_heard' not already buffered (overlapping windows re-decode
-			-- the same words; non-speech tags such as *cough* or [BLANK_AUDIO] are dropped, and so
-			-- are words that start before `reanchored_at', said before a restart or nudge). Words
-			-- accumulate across windows so that slow speech still gives enough evidence.
-			-- Live windows re-stamp the same words up to a second apart (a word cut at a window's
-			-- start is stamped at the start), so time alone re-buffered "this is a test of simple"
-			-- again and again (live replay, 2026-10-06). The newest words of the window that repeat
-			-- the end of the buffer, word for word, mark where the new words begin; time decides
-			-- only when no such overlap exists.
+			-- Take the spoken words of `a_heard'. The newest decode speaks for its whole window
+			-- (0.5.5) when it heard at least as many words there: buffered words that start inside
+			-- it give way to its words, and older words stay before them as context. A sparser
+			-- decode only adds its words that start after the newest held word. Non-speech
+			-- tags such as *cough* or [BLANK_AUDIO] are dropped, and so are words that start before
+			-- `reanchored_at' (said before a restart or nudge). Merging overlapping windows word by
+			-- word (0.5.4 and before) kept about half the words said and doubled others ("the the
+			-- the"), so the text waited about 3 s for each catch-up (Reel 2, 09:47 take).
 		local
+			l_from, l_start, l_after: REAL_64
 			l_words: ARRAYED_LIST [STRING_32]
 			l_starts: ARRAYED_LIST [REAL_64]
-			i, l_after: INTEGER
-			l_floor: REAL_64
+			i, l_held: INTEGER
 		do
-				-- Only words buffered from EARLIER windows count as possible duplicates: two words of
-				-- one window may start under Duplicate_gap apart ("I keep", live replay).
-			l_floor := last_buffered_t0 + Duplicate_gap
+			l_from := a_heard.window_start / 16_000
 			create l_words.make (a_heard.count)
 			create l_starts.make (a_heard.count)
 			from i := 1 until i > a_heard.count loop
+				l_start := l_from + a_heard.word (i).t0
 				if not a_heard.word (i).normalized.is_empty and then not is_non_speech (a_heard.word (i).text)
-					and then a_heard.window_start / 16_000 + a_heard.word (i).t0 >= reanchored_at / 16_000 then
+					and then l_start >= reanchored_at / 16_000 then
 					l_words.extend (a_heard.word (i).normalized)
-					l_starts.extend (a_heard.window_start / 16_000 + a_heard.word (i).t0)
+					l_starts.extend (l_start)
 				end
 				i := i + 1
 			end
-			l_after := overlap_end (l_words, l_starts)
-			from i := 1 until i > l_words.count loop
-				if (l_after > 0 and i > l_after) or else (l_after = 0 and l_starts [i] > l_floor) then
-					recent_words.extend (l_words [i])
-					heard_total := heard_total + 1
-					last_buffered_t0 := last_buffered_t0.max (l_starts [i])
+			if not l_words.is_empty then
+				l_held := 0
+				across recent_starts as ic loop
+					if ic >= l_from then
+						l_held := l_held + 1
+					end
 				end
-				i := i + 1
-			end
-			from until recent_words.count <= Recent_heard * 2 loop
-				recent_words.start
-				recent_words.remove
+				if l_words.count >= l_held then
+						-- At least as full a hearing of its span: it replaces what was held there.
+					from until recent_starts.is_empty or else recent_starts.last < l_from loop
+						recent_starts.finish
+						recent_starts.remove
+						recent_words.finish
+						recent_words.remove
+					end
+					l_after := -1.0
+				elseif not recent_starts.is_empty then
+						-- A sparser hearing (the stabilizer passes only agreed words): keep what was
+						-- held and add only its words that start later.
+					l_after := recent_starts.last + Restamp_slack
+				else
+					l_after := -1.0
+				end
+				from i := 1 until i > l_words.count loop
+					if l_starts [i] > l_after then
+						recent_words.extend (l_words [i])
+						recent_starts.extend (l_starts [i])
+					end
+					i := i + 1
+				end
+				from until recent_words.count <= Recent_heard * 2 loop
+					recent_words.start
+					recent_words.remove
+					recent_starts.start
+					recent_starts.remove
+				end
 			end
 		ensure
 			bounded: recent_words.count <= Recent_heard * 2
-			counted: heard_total >= old heard_total
-			never_older: last_buffered_t0 >= old last_buffered_t0
-		end
-
-	Overlap_slack: REAL_64 = 0.6
-			-- A window word can repeat a buffered word only if it starts no later than this after
-			-- the newest buffered word (later words are new speech, e.g. a restarted sentence).
-
-	overlap_end (a_words: ARRAYED_LIST [STRING_32]; a_starts: ARRAYED_LIST [REAL_64]): INTEGER
-			-- Index of the newest word in `a_words' that ends a run repeating the end of the buffer
-			-- (two or more words, or one content word); 0 when there is none.
-		require
-			parallel: a_words.count = a_starts.count
-		local
-			j, m: INTEGER
-		do
-			from j := 1 until j > a_words.count loop
-				if a_starts [j] <= last_buffered_t0 + Overlap_slack then
-					from
-						m := 0
-					until
-						m >= j or m >= recent_words.count
-							or else not a_words [j - m].same_string (recent_words [recent_words.count - m])
-					loop
-						m := m + 1
-					end
-					if m >= 2 or (m = 1 and not matcher_stop (recent_words.last)) then
-						Result := j
-					end
-				end
-				j := j + 1
-			end
-		ensure
-			in_range: Result >= 0 and Result <= a_words.count
+			parallel: recent_starts.count = recent_words.count
 		end
 
 	recent_tail: ARRAYED_LIST [STRING_32]
@@ -436,10 +444,6 @@ feature {NONE} -- Alignment
 			sized: Result.count = recent_words.count.min (Recent_heard)
 			newest_last: not Result.is_empty implies Result.last = recent_words.last
 		end
-
-	Duplicate_gap: REAL_64 = 0.12
-			-- A word starting within this many seconds of the newest buffered word is the same word
-			-- re-decoded by an overlapping window.
 
 	is_non_speech (a_text: READABLE_STRING_32): BOOLEAN
 		do
@@ -472,7 +476,7 @@ feature {NONE} -- Alignment
 		require
 			fresh_row_valid: a_fresh_row >= 1
 		local
-			l_k, l_m, i, j, s, l_cand, l_best: INTEGER
+			l_k, l_m, i, j, s, l_cand, l_best, l_pass: INTEGER
 			l_score, l_anch, l_match, l_fresh: ARRAY2 [INTEGER]
 			l_last_match: ARRAY2 [BOOLEAN]
 			l_pair, l_joined: STRING_32
@@ -537,17 +541,24 @@ feature {NONE} -- Alignment
 			best_explains_tail := False
 			best_fresh := 0
 			l_best := 0
-			from j := 1 until j > l_m loop
-				l_cand := l_score [l_k + 1, j + 1]
-				if l_cand > l_best or else (l_cand = l_best and l_cand > 0 and l_anch [l_k + 1, j + 1] > best_anchors) then
-					l_best := l_cand
-					best_end := a_lo + j - 1
-					best_anchors := l_anch [l_k + 1, j + 1]
-					best_matched := l_match [l_k + 1, j + 1]
-					best_explains_tail := l_last_match [l_k + 1, j + 1]
-					best_fresh := l_fresh [l_k + 1, j + 1]
+				-- A match that takes in new words beats one made of old words only (0.5.5): with the
+				-- whole page searched, already-read words would otherwise end the best match behind
+				-- the reader whenever the newest word was garbled.
+			from l_pass := 1 until l_pass > 2 or best_end > 0 loop
+				from j := 1 until j > l_m loop
+					l_cand := l_score [l_k + 1, j + 1]
+					if (l_pass = 2 or l_fresh [l_k + 1, j + 1] > 0) and then (l_cand > l_best
+						or else (l_cand = l_best and l_cand > 0 and l_anch [l_k + 1, j + 1] > best_anchors)) then
+						l_best := l_cand
+						best_end := a_lo + j - 1
+						best_anchors := l_anch [l_k + 1, j + 1]
+						best_matched := l_match [l_k + 1, j + 1]
+						best_explains_tail := l_last_match [l_k + 1, j + 1]
+						best_fresh := l_fresh [l_k + 1, j + 1]
+					end
+					j := j + 1
 				end
-				j := j + 1
+				l_pass := l_pass + 1
 			end
 		end
 
@@ -611,6 +622,6 @@ invariant
 	confidence_range: confidence >= 0.0 and confidence <= 1.0
 	reanchor_non_negative: reanchored_at >= 0
 	constants_sane: Window_back >= 0 and Normal_ahead >= 1 and Backward_evidence >= 2
-	consumed_bounded: consumed_total >= 0 and consumed_total <= heard_total
+	buffer_parallel: recent_starts.count = recent_words.count
 
 end

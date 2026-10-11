@@ -15,7 +15,7 @@ Part of the [Simple Eiffel](https://github.com/simple-eiffel) ecosystem.
 
 ## Status
 
-**0.5.4, in use on Windows 11** (per-user installer: `installer/simple_prompter.iss`)
+**0.5.5, in use on Windows 11** (per-user installer: `installer/simple_prompter.iss`)
 - The pill is the whole program: a text pill under the webcam, hidden from screen captures,
   with Status lights, Script, Settings and Last take callouts beside it, a slide handle under
   it, tooltips on everything (and a switch to turn them off), and an icon in the notification
@@ -24,7 +24,7 @@ Part of the [Simple Eiffel](https://github.com/simple-eiffel) ecosystem.
 - Recording from a camera and microphone (OBS Virtual Camera works) with ffmpeg on one
   clock; the take studio analyzes the take, renders final.mp4, and keeps a per-take
   picture-to-sound sync that Measure can set from a clap.
-- 260 tests pass in the contract-checked build. The follower is verified against real
+- 261 tests pass in the contract-checked build. The follower is verified against real
   recordings: it stays within a line of the reader, holds still during an ad-lib, never
   jumps to an echo of a phrase, and never scrolls backward.
 
