@@ -206,6 +206,42 @@ feature -- Opening line (snapper, 0.5.0)
 			assert_true ("but not far before it", n.last_result.cut (1).span.t0 >= 1.9)
 		end
 
+	test_snapper_keeps_a_trailing_last_word
+			-- Reel 2, 2026-10-11: the analyzer put the last word "is." inside the phrase before it
+			-- (ending 5.94 here); Larry said it after a pause (6.36-7.03). The last cut must keep it.
+		local
+			l: PT_CUT_LIST
+			n: PT_SILENCE_SNAPPER
+			m: PT_SPEECH_MAP
+		do
+			create m.make (10.0)
+			m.extend_span (span (2.0, 5.94))
+			m.extend_span (span (6.36, 7.03))
+			create l.make
+			l.extend (create {PT_CUT}.make (0, span (2.1, 5.94), <<id (1)>>, 1, 1, 1, False))
+			create n.make (0.12, 0.20)
+			n.snap (l, m, create {PT_WORD_TIMELINE}.make)
+			assert_true ("ends after the last word", n.last_result.cut (1).span.t1 >= 7.03)
+			assert_true ("but not far after it", n.last_result.cut (1).span.t1 <= 7.03 + n.Max_tail)
+		end
+
+	test_snapper_leaves_late_speech_out
+			-- Speech after more than `Close_gap' of silence is not the closing (a remark after the read).
+		local
+			l: PT_CUT_LIST
+			n: PT_SILENCE_SNAPPER
+			m: PT_SPEECH_MAP
+		do
+			create m.make (10.0)
+			m.extend_span (span (2.0, 5.94))
+			m.extend_span (span (7.5, 8.0))
+			create l.make
+			l.extend (create {PT_CUT}.make (0, span (2.1, 5.94), <<id (1)>>, 1, 1, 1, False))
+			create n.make (0.12, 0.20)
+			n.snap (l, m, create {PT_WORD_TIMELINE}.make)
+			assert_true ("the late remark stays out", n.last_result.cut (1).span.t1 < 7.5)
+		end
+
 	test_snapper_leaves_far_speech_out
 			-- Speech more than a second of silence before the first matched word is not the opening.
 		local
