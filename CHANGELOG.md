@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.2] - 2026-10-12
+
+### Fixed
+- Publish took about seven clicks to start (Larry, on both Weak Jesus Publishes). The Last
+  take panel is painted on the Last take callout and on the control window (hidden in pill
+  mode, still repainted when its status changes), and both paints wrote the same button
+  list; a click on the callout was tested against the control window's buttons, 540 points
+  to the right, whenever that window had painted since. Every panel button had the same
+  miss. Each surface now keeps its own copy of the buttons it painted
+  (`PT_EDIT_FLOOR.press_on`). Live test `click_hits_the_surface_it_was_painted_on`: failed
+  before the fix, passes after.
+
 ## [0.7.1] - 2026-10-11
 
 ### Fixed
