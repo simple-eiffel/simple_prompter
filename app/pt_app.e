@@ -62,6 +62,8 @@ feature {NONE} -- Initialization
 			create speech_slot.make
 			ffmpeg_path := resolved_ffmpeg
 			create edit_floor.make (ffmpeg_path)
+			create take_rows.make (0)
+			create status_rows.make (0)
 			edit_floor.set_on_sync_changed (agent settings.set_video_delay)
 			geometry := new_geometry
 			create status_canvas.make (Window_height * theme.text_scale)
@@ -98,7 +100,7 @@ feature {NONE} -- Initialization
 
 feature -- Constants
 
-	Version: STRING_32 = "0.6.1"
+	Version: STRING_32 = "0.7.2"
 			-- Shown in the control window; keep in step with installer/simple_prompter.iss.
 
 	Tick_ms: INTEGER = 16
@@ -388,7 +390,7 @@ feature {NONE} -- Opening scripts
 			elseif is_settings_shown and then settings_page.hit (a_x, a_y) /= settings_page.Nothing_hit then
 				on_settings_press (settings_page.hit (a_x, a_y))
 			else
-				edit_floor.press (a_x, a_y)
+				edit_floor.press_on (status_rows, a_x, a_y)
 				last_status := {STRING_32} ""
 				refresh_status
 			end
@@ -665,7 +667,7 @@ feature {NONE} -- Callouts (0.4.0)
 				elseif a_callout = script_callout then
 					on_script_press (l_code)
 				elseif a_callout = take_callout then
-					edit_floor.press (a_x, a_y)
+					edit_floor.press_on (take_rows, a_x, a_y)
 				end
 				if a_callout.is_shown then
 					render_callout (a_callout)
@@ -965,6 +967,7 @@ feature {NONE} -- Callouts (0.4.0)
 		do
 			k := theme.text_scale
 			edit_floor.paint (p, c.padding, 0, c.width - 2 * c.padding - 30 * k, k)
+			take_rows := edit_floor.clickables.twin
 			from i := 1 until i > edit_floor.clickables.count loop
 				c.add_zone (1000 + i, edit_floor.clickables [i].x, edit_floor.clickables [i].y, edit_floor.clickables [i].w,
 					edit_floor.clickables [i].h, edit_floor.row_tip (edit_floor.clickables [i].action, edit_floor.clickables [i].index))
@@ -1129,6 +1132,7 @@ feature {NONE} -- Control window
 			p.set_color (theme.outline)
 			p.fill_rect (a_x + 520 * k, a_y + 16 * k, 1, Window_height * k - 32 * k)
 			edit_floor.paint (p, 540 * k, 0, 480 * k, k)
+			status_rows := edit_floor.clickables.twin
 		end
 
 	paint_overview (p: SW_PAINTER; a_x, a_y, a_from_y, k: REAL_64)
@@ -1551,6 +1555,10 @@ feature {NONE} -- Speech
 
 	edit_floor: PT_EDIT_FLOOR
 			-- The last take: cuts, things to check, preview, render (Step 4c).
+
+	take_rows, status_rows: ARRAYED_LIST [TUPLE [x, y, w, h: REAL_64; action, index: INTEGER]]
+			-- The Last take panel's buttons as last painted on the Last take callout and on the
+			-- control window: each surface's clicks are tested against its own.
 
 	resolved_ffmpeg: STRING_32
 			-- ffmpeg beside the program, else Chocolatey's, else ffmpeg.exe on PATH.

@@ -45,6 +45,7 @@ feature {NONE} -- Initialization
 			run_live_alignment_tests
 			run_sessions_tests
 			run_publish_tests
+			run_pictures_tests
 			say ("%N========================%N")
 			say ("Results: " + passed.out + " passed, " + failed.out + " failed%N")
 			if failed > 0 then
@@ -467,6 +468,20 @@ feature {NONE} -- Test sets
 			run_test (agent t.test_garbled_sound_raises_the_take_alarm, "garbled_sound_raises_the_take_alarm")
 			run_test (agent t.test_raw_recording_has_small_clusters, "raw_recording_has_small_clusters")
 			run_test (agent t.test_loader_reads_a_session_back, "loader_reads_a_session_back")
+		end
+
+	run_pictures_tests
+		local
+			t: TEST_PICTURES
+		do
+			section ("Publish pictures (0.7.0)")
+			create t
+			run_test (agent t.test_words_from_the_title, "words_from_the_title")
+			run_test (agent t.test_words_from_the_ai, "words_from_the_ai")
+			run_test (agent t.test_balanced_lines, "balanced_lines")
+			run_test (agent t.test_frame_plan, "frame_plan")
+			run_test (agent t.test_contact_sheet, "contact_sheet")
+			run_test (agent t.test_composer_thumbnails_and_cover, "composer_thumbnails_and_cover")
 		end
 
 	run_publish_tests

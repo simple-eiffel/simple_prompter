@@ -27,6 +27,8 @@ feature {NONE} -- Initialization
 			run_test (agent t.test_worker_records_a_take, "worker_records_a_take")
 			run_test (agent t.test_sync_measure_on_real_claps, "sync_measure_on_real_claps")
 			run_test (agent t.test_publish_job_on_a_copy, "publish_job_on_a_copy")
+			run_test (agent t.test_publish_makes_pictures, "publish_makes_pictures")
+			run_test (agent (create {TEST_LIVE_EDIT_FLOOR}).test_click_hits_the_surface_it_was_painted_on, "click_hits_the_surface_it_was_painted_on")
 			say ("%NResults: " + passed.out + " passed, " + failed.out + " failed%N")
 		end
 

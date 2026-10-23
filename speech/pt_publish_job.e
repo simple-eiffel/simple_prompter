@@ -18,7 +18,10 @@ note
 		8. reel.mp4 (0.5.9, PT_REEL_PLAN): the vertical Facebook Reel, 1080x1920, the title in the
 		   top band and the captions burned in below the picture, opening on cover.jpg when
 		   out\ has one.
-		Thumbnails and the reel cover are made outside the program (by Claude, on request).
+		Since 0.7.0, between 5 and 6: thumbnails A and B and cover.jpg (PT_PICTURE_COMPOSER) when
+		out\ has none: a frame picked by the local AI's vision from a contact sheet of the take
+		(else the one about 9 seconds in), the speaker cut out with BiRefNet-portrait (no chair),
+		the words from the AI's suggestions or the title. Hand-made pictures in out\ are kept.
 	]"
 	author: "Larry Rix"
 
@@ -149,7 +152,7 @@ feature {NONE} -- Steps
 			l_copy: PT_PUBLISH_COPY
 			l_words: ARRAYED_LIST [PT_HEARD_WORD]
 			l_thumbnail: detachable STRING_32
-			l_ai, l_utf_text: STRING_32
+			l_ai, l_utf_text, l_pictures: STRING_32
 			l_ok: BOOLEAN
 			i: INTEGER
 		do
@@ -195,10 +198,13 @@ feature {NONE} -- Steps
 				l_ok := file (a_out + {STRING_32} "\x.txt").set_content (l_copy.x_text)
 				l_ok := file (a_out + {STRING_32} "\transcript.txt").set_content (l_script.transcript)
 				tell_progress (0.40)
+				l_pictures := make_pictures (a_out, a_source, l_start, l_end, l_script.title, l_suggestions,
+					a_ollama_url, a_ollama_model, a_use_ollama)
+				tell_progress (0.48)
 				l_thumbnail := thumbnail_in (a_out)
 				tell ({STRING_32} "publishing: finishing the video")
 				l_ok := file (a_working).delete
-				if run_ffmpeg (l_plan.arguments (a_source, a_working, l_thumbnail), l_plan.length, 0.40, 0.80) and then file (a_working).exists then
+				if run_ffmpeg (l_plan.arguments (a_source, a_working, l_thumbnail), l_plan.length, 0.48, 0.82) and then file (a_working).exists then
 					l_ok := file (a_final).delete
 					l_ok := file (a_working).move_to (a_final)
 					succeeded := file (a_final).exists
@@ -210,6 +216,7 @@ feature {NONE} -- Steps
 						+ {STRING_32} "), " + reel_note (make_reel (a_out, a_final, l_script.title, l_plan.length, l_captions.last_cues), a_out)
 						+ {STRING_32} ", " + Captions_name + {STRING_32} " (" + l_captions.last_cues.count.out + {STRING_32} " captions), "
 						+ l_chapters.chapters.count.out + {STRING_32} " chapters, youtube.txt, facebook.txt, x.txt, transcript.txt; " + l_ai
+						+ {STRING_32} "; " + l_pictures
 				else
 					summary := {STRING_32} "publish: the words are written, but the video did not finish" + last_output
 				end
@@ -240,7 +247,7 @@ feature {NONE} -- Steps
 			end
 			l_ok := file (l_ass).set_content (l_plan.ass_text (a_cues))
 				and then file (l_filter).set_content (l_plan.filter_script (l_ass, l_cover /= Void))
-			if l_ok and then run_ffmpeg (l_plan.arguments (a_final, l_cover, l_filter, l_working), a_length, 0.80, 1.0) and then file (l_working).exists then
+			if l_ok and then run_ffmpeg (l_plan.arguments (a_final, l_cover, l_filter, l_working), a_length, 0.82, 1.0) and then file (l_working).exists then
 				l_ok := file (l_reel).delete
 				Result := file (l_working).move_to (l_reel) and file (l_reel).exists
 			end
@@ -320,6 +327,162 @@ feature {NONE} -- Steps
 				else
 					l_ok := file (a_out + {STRING_32} "\" + a_name).move_to (a_out + {STRING_32} "\" + a_kept)
 				end
+			end
+		end
+
+feature {NONE} -- Pictures (0.7.0)
+
+	make_pictures (a_out, a_source: STRING_32; a_start, a_end: REAL_64; a_title: STRING_32; a_suggestions: PT_PUBLISH_SUGGESTIONS;
+			a_ollama_url, a_ollama_model: READABLE_STRING_32; a_use_ollama: BOOLEAN): STRING_32
+			-- Thumbnails A and B and cover.jpg in `a_out' when it has none (hand-made ones are kept),
+			-- from the speech between `a_start' and `a_end' of `a_source'; what was done, for the summary.
+		local
+			l_need_thumbnails, l_need_cover, l_ok: BOOLEAN
+			l_ai: SIMPLE_IMAGE_AI
+			l_images: SIMPLE_IMAGE
+			l_model, l_work, l_png, l_how, l_name: STRING_32
+			l_plan: PT_FRAME_PLAN
+			l_frames: ARRAYED_LIST [IMG_IMAGE]
+			l_cutout: IMG_CUTOUT
+			l_composer: detachable PT_PICTURE_COMPOSER
+			l_sheet: PT_CONTACT_SHEET
+			l_writer: PT_OLLAMA_WRITER
+			l_words: PT_PICTURE_WORDS
+			l_picture: IMG_IMAGE
+			l_pick, i: INTEGER
+		do
+			l_need_thumbnails := thumbnail_in (a_out) = Void
+			l_need_cover := not file (a_out + {STRING_32} "\" + Cover_name).exists
+			create l_ai.make
+			l_model := l_ai.portrait_model_path
+			if not l_need_thumbnails and not l_need_cover then
+				Result := {STRING_32} "your thumbnails and cover kept"
+			elseif not file (l_model).exists then
+				Result := {STRING_32} "no pictures made: the cutout model is not at " + l_model
+			else
+				tell ({STRING_32} "publishing: picking a frame for the thumbnails")
+				l_work := a_out + {STRING_32} "\publish pictures"
+				remove_folder (l_work)
+				(create {DIRECTORY}.make_with_name (l_work)).create_dir
+				create l_plan.make (a_start, a_end)
+				create l_images.make
+				create l_frames.make (l_plan.times.count)
+				from i := 1 until i > l_plan.times.count loop
+					l_png := l_work + {STRING_32} "\frame " + i.out + {STRING_32} ".png"
+					if run_ffmpeg (l_plan.frame_arguments (a_source, l_plan.times [i], l_png), 0, 0.40, 0.40)
+						and then attached l_images.load (l_png) as al_frame then
+						l_frames.extend (al_frame)
+					else
+						l_frames.extend (create {IMG_IMAGE}.make (1, 1))
+					end
+					i := i + 1
+				end
+				tell ({STRING_32} "publishing: cutting the speaker out (about 10 seconds)")
+				l_cutout := l_ai.new_portrait_cutout (l_model)
+				l_pick := l_plan.fallback_index
+				l_how := {STRING_32} "the frame about 9 seconds in"
+				if not l_cutout.is_ready then
+					Result := {STRING_32} "no pictures made: " + l_cutout.last_error.to_string_32
+				elseif l_frames [l_pick].width < 2 then
+					Result := {STRING_32} "no pictures made: ffmpeg could not read the frames" + last_output
+				else
+					l_composer := composer_for (l_cutout, l_frames [l_pick])
+					if attached l_composer as al_first and then a_use_ollama and then not a_ollama_url.is_empty then
+						tell ({STRING_32} "publishing: asking the local AI to pick the thumbnail frame")
+						create l_sheet.make (l_frames, al_first.face_box)
+						l_png := l_work + {STRING_32} "\contact sheet.png"
+						if l_sheet.image.save_png (l_png) then
+							create l_writer.make (a_ollama_url, a_ollama_model)
+							i := l_writer.pick_frame (l_png, l_sheet.count)
+							if i > 0 and then l_frames [i].width > 1 then
+								l_how := {STRING_32} "frame " + i.out + {STRING_32} " of " + l_sheet.count.out
+									+ {STRING_32} ", picked by " + l_writer.last_model
+								if i /= l_pick then
+									l_pick := i
+									al_first.destroy
+									l_composer := composer_for (l_cutout, l_frames [l_pick])
+								end
+							else
+								l_how := l_how + {STRING_32} " (" + l_writer.last_error + {STRING_32} ")"
+							end
+						end
+						l_sheet.image.destroy
+					end
+					if attached l_composer as al_composer and then al_composer.has_person then
+						tell ({STRING_32} "publishing: making the thumbnails and the cover")
+						create l_words.make (a_title, a_suggestions)
+						l_name := file_safe (a_title)
+						create Result.make_empty
+						if l_need_thumbnails then
+							l_picture := al_composer.thumbnail (l_words, False)
+							l_ok := l_picture.save_jpg (a_out + {STRING_32} "\thumbnail_A - " + l_name + {STRING_32} " (yellow).jpg", 92)
+							l_picture.destroy
+							l_picture := al_composer.thumbnail (l_words, True)
+							l_ok := l_picture.save_jpg (a_out + {STRING_32} "\thumbnail_B - " + l_name + {STRING_32} " (white and yellow).jpg", 92) and l_ok
+							l_picture.destroy
+							Result.append ((if l_ok then {STRING_32} "thumbnails A and B made" else {STRING_32} "the thumbnails could not be saved" end))
+						end
+						if l_need_cover then
+							l_picture := al_composer.cover (l_words)
+							l_ok := l_picture.save_jpg (a_out + {STRING_32} "\" + Cover_name, 92)
+							l_picture.destroy
+							if not Result.is_empty then
+								Result.append ({STRING_32} " and ")
+							end
+							Result.append ((if l_ok then Cover_name + {STRING_32} " made" else Cover_name + {STRING_32} " could not be saved" end))
+						end
+						Result.append ({STRING_32} " (" + l_how + (if l_words.from_ai then {STRING_32} ", words by the local AI" else {STRING_32} ", words from the title" end) + {STRING_32} ")")
+						al_composer.destroy
+					else
+						Result := {STRING_32} "no pictures made: no one was found in the frame"
+					end
+				end
+				l_cutout.close
+				across l_frames as ic loop
+					ic.destroy
+				end
+				remove_folder (l_work)
+			end
+		ensure
+			explained: not Result.is_empty
+		end
+
+	composer_for (a_cutout: IMG_CUTOUT; a_frame: IMG_IMAGE): detachable PT_PICTURE_COMPOSER
+			-- A composer for `a_frame' with the speaker cut out by `a_cutout', or Void when the cut fails.
+		require
+			ready: a_cutout.is_ready
+			frame_usable: a_frame.is_usable
+		do
+			if attached a_cutout.mask_for (a_frame) as al_mask then
+				create Result.make (a_frame, al_mask)
+				al_mask.destroy
+			end
+		end
+
+	file_safe (a_title: STRING_32): STRING_32
+			-- `a_title' without the characters Windows forbids in a file name.
+		do
+			create Result.make (a_title.count)
+			across a_title as ic loop
+				if ic.code > 127 or else not ("<>:%"/\|?*").has (ic.to_character_8) then
+					Result.append_character (ic)
+				end
+			end
+			Result.left_adjust
+			Result.right_adjust
+			if Result.is_empty then
+				Result := {STRING_32} "video"
+			end
+		end
+
+	remove_folder (a_path: STRING_32)
+			-- Delete the folder `a_path' and what is in it, if it is there.
+		local
+			l_dir: DIRECTORY
+		do
+			create l_dir.make_with_name (a_path)
+			if l_dir.exists then
+				l_dir.recursive_delete
 			end
 		end
 

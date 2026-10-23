@@ -98,6 +98,93 @@ feature -- Basic operations
 			explained: not Result.has_any implies not last_error.is_empty
 		end
 
+	pick_frame (a_sheet: READABLE_STRING_32; a_count: INTEGER): INTEGER
+			-- Which of the `a_count' numbered faces on the contact sheet PNG `a_sheet' makes the best
+			-- thumbnail (1 to `a_count'), asked of the model's vision; 0 when it cannot see, does not
+			-- answer, or answers out of range (`last_error' says why). Larry 2026-10-11: the model
+			-- picked the frame he would have.
+		require
+			count_positive: a_count > 0
+		local
+			l_http: SIMPLE_HTTP
+			l_json: SIMPLE_JSON
+			l_body, l_options: SIMPLE_JSON_OBJECT
+			l_messages, l_images: SIMPLE_JSON_ARRAY
+			l_response: SIMPLE_HTTP_RESPONSE
+			l_utf: UTF_CONVERTER
+			l_file: RAW_FILE
+			l_png: STRING_8
+		do
+			last_error := {STRING_32} ""
+			last_model := chosen_model
+			create l_file.make_with_name (a_sheet)
+			if last_model.is_empty then
+				if last_error.is_empty then
+					last_error := {STRING_32} "no model installed in Ollama at " + url
+				end
+			elseif not has_vision (last_model) then
+				last_error := last_model + {STRING_32} " cannot see images"
+			elseif not l_file.exists then
+				last_error := {STRING_32} "no contact sheet"
+			else
+				l_file.open_read
+				l_file.read_stream (l_file.count)
+				l_png := l_file.last_string.twin
+				l_file.close
+				create l_json
+				l_options := l_json.new_object.put_integer (16384, "num_ctx").put_real (0.0, "temperature")
+				l_images := l_json.new_array.add_string ((create {SIMPLE_BASE64}.make).encode (l_png))
+				l_messages := l_json.new_array.add_object (l_json.new_object.put_string ("user", "role")
+					.put_string (frame_prompt (a_count), "content").put_array (l_images, "images"))
+				l_body := l_json.new_object.put_string (last_model, "model").put_boolean (False, "stream").put_boolean (False, "think")
+					.put_string ("json", "format").put_object (l_options, "options").put_array (l_messages, "messages")
+				create l_http.make
+				l_http.set_timeout (Timeout_s)
+				l_response := l_http.post_json (utf8 (url + {STRING_32} "/api/chat"), l_body)
+				if l_response.is_success and then attached l_response.body as al_body
+					and then attached l_json.parse (l_utf.utf_8_string_8_to_string_32 (al_body)) as al_value and then al_value.is_object
+					and then attached al_value.as_object.object_item ("message") as al_message
+					and then attached al_message.string_item ("content") as al_content
+					and then attached l_json.parse (al_content) as al_answer and then al_answer.is_object
+				then
+					Result := al_answer.as_object.integer_item ("best").to_integer_32
+					if Result < 1 or Result > a_count then
+						last_error := {STRING_32} "the model picked no frame on the sheet"
+						Result := 0
+					end
+				else
+					last_error := {STRING_32} "Ollama did not pick a frame (HTTP " + l_response.status.out + {STRING_32} ")"
+				end
+			end
+		ensure
+			in_range: Result >= 0 and Result <= a_count
+			explained: Result = 0 implies not last_error.is_empty
+		end
+
+	has_vision (a_model: READABLE_STRING_32): BOOLEAN
+			-- Does Ollama list "vision" among `a_model''s capabilities?
+		local
+			l_http: SIMPLE_HTTP
+			l_json: SIMPLE_JSON
+			l_response: SIMPLE_HTTP_RESPONSE
+			l_utf: UTF_CONVERTER
+			i: INTEGER
+		do
+			create l_json
+			create l_http.make
+			l_http.set_timeout (List_timeout_s)
+			l_response := l_http.post_json (utf8 (url + {STRING_32} "/api/show"), l_json.new_object.put_string (a_model, "model"))
+			if l_response.is_success and then attached l_response.body as al_body
+				and then attached l_json.parse (l_utf.utf_8_string_8_to_string_32 (al_body)) as al_value and then al_value.is_object
+				and then attached al_value.as_object.array_item ("capabilities") as al_caps
+			then
+				from i := 1 until i > al_caps.count or Result loop
+					Result := attached al_caps.string_item (i) as al_c and then al_c.same_string ({STRING_32} "vision")
+					i := i + 1
+				end
+			end
+		end
+
 	chosen_model: STRING_32
 			-- `model', or the first installed model that is not for OCR or embeddings.
 		local
@@ -162,7 +249,20 @@ feature -- Prompts
 			Result.append ({STRING_32} "  %"hashtags%": 6 to 8 hashtags, each starting with #, no spaces,%N")
 			Result.append ({STRING_32} "  %"chapters%": exactly " + a_openings.count.out.to_string_32 + {STRING_32} " chapter names in the same order, each 2 to 7 words,%N")
 			Result.append ({STRING_32} "  %"facebook_question%": one short question that invites viewers to comment,%N")
-			Result.append ({STRING_32} "  %"x_line%": the script's sharpest line as one sentence under 200 characters, with the Bible reference in parentheses%N}%N")
+			Result.append ({STRING_32} "  %"x_line%": the script's sharpest line as one sentence under 200 characters, with the Bible reference in parentheses,%N")
+			Result.append ({STRING_32} "  %"thumbnail_struck%": the ONE word (at most two) naming the mistaken idea this video argues against, shown crossed out on the thumbnail; empty if there is none,%N")
+			Result.append ({STRING_32} "  %"thumbnail_a%": a complete punchy phrase of 2 to 5 words for a YouTube thumbnail, taken from this script, that answers or teases the title without repeating its words,%N")
+			Result.append ({STRING_32} "  %"thumbnail_b%": a different complete phrase of 2 to 5 words for a second thumbnail that states the video's tension or surprise in this script's own terms,%N")
+			Result.append ({STRING_32} "  %"reference%": the main Bible reference the script turns on, as Book Chapter:Verse, e.g. John 5:19; empty if none%N}%N")
+		end
+
+	frame_prompt (a_count: INTEGER): STRING_32
+			-- The request for `pick_frame'.
+		do
+			Result := {STRING_32} "This contact sheet shows " + a_count.out.to_string_32 + {STRING_32} " frames of a man speaking to camera, %
+				%each labeled with a number in yellow. Pick the ONE frame that would make the best YouTube thumbnail: %
+				%an expressive, engaged face, eyes open and toward the camera, mouth not caught mid-word in an awkward shape, %
+				%not blurred. Answer with JSON only: {%"best%": <number>, %"runner_up%": <number>, %"why%": %"<10 words>%"}."
 		end
 
 feature {NONE} -- Implementation

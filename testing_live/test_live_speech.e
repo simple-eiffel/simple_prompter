@@ -350,6 +350,40 @@ feature -- Analysis (Step 4b)
 			assert_true ("the samples cleaned up", not (create {SIMPLE_FILE}.make (l_out + {STRING_32} "\publish.f32")).exists)
 		end
 
+	test_publish_makes_pictures
+			-- 0.7.0: Publish on a copy of "Jesus Was Helpless" with no thumbnails or cover: it picks a
+			-- frame (the local AI's vision when running), cuts the speaker out with BiRefNet-portrait,
+			-- and writes thumbnails A and B and cover.jpg; the video and the reel open on them.
+		local
+			l_root, l_out: STRING_32
+			l_job: PT_PUBLISH_JOB
+			l_t0: REAL_64
+			l_ok: BOOLEAN
+		do
+			l_root := tee_path + {STRING_32} ".pictures"
+			l_out := l_root + {STRING_32} "\out"
+			l_ok := (create {SIMPLE_FILE}.make (l_root)).delete_directory_recursive
+			l_ok := (create {SIMPLE_FILE}.make (l_out)).create_directory_recursive
+			l_ok := (create {SIMPLE_FILE}.make (l_root + {STRING_32} "\script")).create_directory_recursive
+			l_ok := (create {SIMPLE_FILE}.make (Helpless + {STRING_32} "\script\r1.md")).copy_to (l_root + {STRING_32} "\script\r1.md")
+			l_ok := (create {SIMPLE_FILE}.make (Helpless + {STRING_32} "\out\final (before cleanup).mp4")).copy_to (l_out + {STRING_32} "\final.mp4")
+			create l_job.make (create {PT_WHISPER_TRANSCRIBER}.make (vad.detector, decoder.recognizer), Ffmpeg_path)
+			l_job.set_on_stage (agent (a_text: STRING_32) do print ("    [stage] " + a_text.to_string_8 + "%N") end)
+			l_t0 := now_ms
+			l_job.run (l_root, {STRING_32} "larryrix.substack.com", {STRING_32} "#Jesus #Faith #BibleStudy", {STRING_32} "http://localhost:11435", {STRING_32} "", True)
+			print ("    [publish] " + (create {UTF_CONVERTER}).string_32_to_utf_8_string_8 (l_job.summary) + " in " + ((now_ms - l_t0) / 1000).truncated_to_integer.out + " s%N")
+			print ("    [folder] " + l_root.to_string_8 + "%N")
+			assert_true ({STRING_32} "succeeded: " + l_job.summary, l_job.succeeded)
+			assert_true ("thumbnail A", (create {SIMPLE_FILE}.make (l_out + {STRING_32} "\thumbnail_A - Jesus Was Helpless (yellow).jpg")).exists)
+			assert_true ("thumbnail B", (create {SIMPLE_FILE}.make (l_out + {STRING_32} "\thumbnail_B - Jesus Was Helpless (white and yellow).jpg")).exists)
+			assert_true ("cover", (create {SIMPLE_FILE}.make (l_out + {STRING_32} "\cover.jpg")).exists)
+			assert_true ("the video opens on the thumbnail", l_job.summary.has_substring ({STRING_32} "opens on the thumbnail"))
+			assert_true ("the reel opens on the cover", l_job.summary.has_substring ({STRING_32} "opens on cover.jpg"))
+			assert_true ("the working frames cleaned up", not (create {SIMPLE_FILE}.make (l_out + {STRING_32} "\publish pictures")).exists)
+		end
+
+	Helpless: STRING_32 = "C:\Users\LJR19\Videos\simple_prompter\2026-10-11 152240 - Reel 1 - Jesus Was Helpless"
+
 	Reel_3: STRING_32 = "C:\Users\LJR19\Videos\simple_prompter\2026-10-10 141925 - Reel 3 - Woman 1, Disciples 0"
 
 	test_analysis_job_on_a_real_take

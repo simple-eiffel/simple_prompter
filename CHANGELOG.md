@@ -7,6 +7,51 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.2] - 2026-10-12
+
+### Fixed
+- Publish took about seven clicks to start (Larry, on both Weak Jesus Publishes). The Last
+  take panel is painted on the Last take callout and on the control window (hidden in pill
+  mode, still repainted when its status changes), and both paints wrote the same button
+  list; a click on the callout was tested against the control window's buttons, 540 points
+  to the right, whenever that window had painted since. Every panel button had the same
+  miss. Each surface now keeps its own copy of the buttons it painted
+  (`PT_EDIT_FLOOR.press_on`). Live test `click_hits_the_surface_it_was_painted_on`: failed
+  before the fix, passes after.
+
+## [0.7.1] - 2026-10-11
+
+### Fixed
+- The program closed during Publish (take "2026-10-11 175521 - Reel 2 - Weak Jesus", 6:01 PM):
+  while Publish drew the contact sheet's numbers on its worker, the window's own text
+  drawing failed (CAIRO_CONTEXT.text_extents, precondition `valid`). cairo's Windows font
+  backend shares one device context across threads with no lock; simple_cairo 1.5.0 locks
+  every font use process-wide.
+- The window froze for 5 seconds while the cutout model loaded and 10 while it ran (a
+  collection waited for the ONNX Runtime call). simple_onnx 1.1.0 marks those calls
+  `C blocking`; measured stall 12,785 ms before, under 650 ms after.
+
+## [0.7.0] - 2026-10-11
+
+### Added
+- Publish makes the pictures (Larry: "get the simple_prompter to do this thumbnail and builder
+  work through the Publish process"): thumbnails A and B (1280x720) and cover.jpg (1080x1920),
+  after the words and before the video, so final.mp4 opens on thumbnail A and reel.mp4 on the
+  cover. Only when out\ has none: hand-made pictures are kept.
+  - The frame: 24 candidates across the speech; the local AI's vision picks the best face
+    from a numbered contact sheet (PT_CONTACT_SHEET, PT_OLLAMA_WRITER.pick_frame), else the
+    frame about 9 seconds in (PT_FRAME_PLAN).
+  - The cutout: BiRefNet-portrait on simple_image_ai, which leaves the chair out (chosen by
+    measurement on three takes; u2net kept it, and a symmetry rule and a stillness rule both
+    failed), unloaded after use.
+  - The words: the AI's suggestions now include a word to strike out, two thumbnail lines and
+    the main Bible reference; without the AI, the script's title (PT_PICTURE_WORDS).
+  - The layout: PT_PICTURE_COMPOSER on simple_image, the one Claude used by hand.
+- Ships onnxruntime.dll 1.17.3. The cutout model is read from where rembg keeps it
+  (%USERPROFILE%\.rembg\models\birefnet-portrait); without it Publish says so and goes on.
+- Tests: words, frame plan, contact sheet, composer on a drawn frame (278 in all); a live test
+  runs Publish on a copy of a real take and checks the pictures and what opens on them.
+
 ## [0.6.1] - 2026-10-11
 
 ### Changed

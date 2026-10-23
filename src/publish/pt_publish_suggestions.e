@@ -1,7 +1,9 @@
 note
 	description: "[
 		What the local AI suggests for a published video (0.5.0): a title, a description,
-		hashtags, a name for each chapter, a question for the Facebook post, and a line for X.
+		hashtags, a name for each chapter, a question for the Facebook post, and a line for X;
+		since 0.7.0 also the thumbnail words (a word to strike out, and two short lines) and the
+		main Bible reference, for the pictures Publish makes (PT_PICTURE_WORDS).
 		Read from the JSON object the model answers with; anything missing, empty or too long
 		is left empty, and PT_PUBLISH_COPY then writes that part from the script instead.
 	]"
@@ -24,6 +26,10 @@ feature {NONE} -- Initialization
 			create chapter_labels.make (8)
 			create facebook_question.make_empty
 			create x_line.make_empty
+			create thumbnail_struck.make_empty
+			create thumbnail_a.make_empty
+			create thumbnail_b.make_empty
+			create bible_reference.make_empty
 		ensure
 			nothing: not has_any
 		end
@@ -45,6 +51,9 @@ feature -- Constants
 	Max_label: INTEGER = 60
 	Max_x: INTEGER = 250
 	Max_question: INTEGER = 160
+	Max_struck: INTEGER = 18
+	Max_thumbnail_line: INTEGER = 34
+	Max_reference: INTEGER = 30
 
 feature -- Access
 
@@ -55,6 +64,14 @@ feature -- Access
 	chapter_labels: ARRAYED_LIST [STRING_32]
 	facebook_question: STRING_32
 	x_line: STRING_32
+	thumbnail_struck: STRING_32
+			-- The word the video argues against, shown struck out on thumbnail A (or empty).
+	thumbnail_a: STRING_32
+			-- Thumbnail A's words, answering the title (2 to 5 words, or empty).
+	thumbnail_b: STRING_32
+			-- Thumbnail B's words, framing the question differently (2 to 5 words, or empty).
+	bible_reference: STRING_32
+			-- The main Bible reference, such as "John 5:19" (or empty).
 
 	has_any: BOOLEAN
 			-- Did anything usable come back?
@@ -74,6 +91,10 @@ feature {NONE} -- Implementation
 			description := text_item (o, "description", Max_description)
 			facebook_question := text_item (o, "facebook_question", Max_question)
 			x_line := text_item (o, "x_line", Max_x)
+			thumbnail_struck := text_item (o, "thumbnail_struck", Max_struck)
+			thumbnail_a := text_item (o, "thumbnail_a", Max_thumbnail_line)
+			thumbnail_b := text_item (o, "thumbnail_b", Max_thumbnail_line)
+			bible_reference := text_item (o, "reference", Max_reference)
 			if attached o.array_item ("hashtags") as al_a then
 				from i := 1 until i > al_a.count or hashtags.count >= 10 loop
 					if attached al_a.string_item (i) as al_s then

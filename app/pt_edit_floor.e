@@ -164,7 +164,8 @@ feature -- Access
 			-- Where the last `paint' ended (its height, from its top).
 
 	clickables: ARRAYED_LIST [TUPLE [x, y, w, h: REAL_64; action, index: INTEGER]]
-			-- What the last `paint' made clickable (for tooltips; `press' acts on them).
+			-- What the last `paint' made clickable (for tooltips; a copy taken right after it is what
+			-- `press_on' tests a click on that surface against).
 		do
 			Result := rows
 		end
@@ -179,7 +180,7 @@ feature -- Access
 			when Action_render then
 				Result := {STRING_32} "Render final.mp4 with captions and chapters, using this take's sync"
 			when Action_publish then
-				Result := {STRING_32} "Publish: finish final.mp4 (opens on the thumbnail in out, fades to black, YouTube loudness), captions as spoken (captions.en_US.SRT), chapters, youtube.txt, facebook.txt, x.txt, transcript.txt, and reel.mp4: the vertical Facebook Reel with the title and captions drawn in, opening on cover.jpg when out has one"
+				Result := {STRING_32} "Publish: captions as spoken (captions.en_US.SRT), chapters, youtube.txt, facebook.txt, x.txt, transcript.txt; thumbnails A and B and cover.jpg when out has none (the local AI picks the frame and the words; yours are kept); then final.mp4 (opens on the thumbnail, fades to black, YouTube loudness) and reel.mp4, the vertical Facebook Reel opening on cover.jpg with the title and captions drawn in"
 			when Action_play_final then
 				Result := {STRING_32} "Play final.mp4 in Windows' video player"
 			when Action_open_folder then
@@ -364,12 +365,15 @@ feature -- Display
 			bottom := l_y + 12 * k
 		end
 
-	press (a_x, a_y: REAL_64)
-			-- A click at (`a_x', `a_y') (canvas coordinates).
+	press_on (a_rows: like clickables; a_x, a_y: REAL_64)
+			-- A click at (`a_x', `a_y') on the surface whose last `paint' left `a_rows' (a copy of
+			-- `clickables' taken right after that paint). Two surfaces paint this panel, the Last
+			-- take callout and the control window, so `clickables' belongs to whichever painted
+			-- last; tested against it, Publish took about seven clicks (Larry, 2026-10-12).
 		local
 			l_done: BOOLEAN
 		do
-			across rows as ic until l_done loop
+			across a_rows as ic until l_done loop
 				if a_x >= ic.x and a_x <= ic.x + ic.w and a_y >= ic.y and a_y <= ic.y + ic.h then
 					act (ic.action, ic.index)
 					l_done := True
