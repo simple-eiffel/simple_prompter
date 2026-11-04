@@ -12,7 +12,7 @@
 | My reads | P1-raw: `pt_app.e:57-75,468-487,536-552,612-648`; `pt_speech_worker.e:74-262`; `speech_gpu.h:40-70`; `whisper.h:566-575`; spec A-105, NFR table. **Spike S2** run by me (below) |
 | S6 | I read BLUE and RED before my raw reads, so the reads were aimed at their cruxes (sequence-led). S2 could have failed: a live footprint under ~830 MiB would have let A and D pass C3. It did not |
 
-**Spike S2** (P1-raw; JACKJACK, RTX 5070 Ti; installed simple_prompter 0.2.1; `nvidia-smi` every 0.5 s for 55 s). Baseline 2051-2077 MiB. GPU jumped at **35.5 s** after launch; tee file at 36.6 s. Then steady **3144 MiB**, so the **resident live worker = +1067 to +1093 MiB**. After the kill it was back to 2077. Gather row 12 (a different exe, same model) measured +1071. Two runs agree.
+**Spike S2** (P1-raw; the reference PC, RTX 5070 Ti; installed simple_prompter 0.2.1; `nvidia-smi` every 0.5 s for 55 s). Baseline 2051-2077 MiB. GPU jumped at **35.5 s** after launch; tee file at 36.6 s. Then steady **3144 MiB**, so the **resident live worker = +1067 to +1093 MiB**. After the kill it was back to 2077. Gather row 12 (a different exe, same model) measured +1071. Two runs agree.
 
 ## 1. Procedural rulings
 

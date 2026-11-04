@@ -4,7 +4,7 @@ All URLs below were fetched or returned in search results during research on 202
 Items marked [snippet] were seen only in search-result text.
 
 ## Source material
-- `C:\Users\LJR19\Videos\simple_prompter.mp4`: Moody reel; analysis in `../evidence/video-analysis.md`.
+- `C:\Users\user\Videos\simple_prompter.mp4`: Moody reel; analysis in `../evidence/video-analysis.md`.
 
 ## Products
 - https://moody.mjarosz.com: Moody features, $39, macOS 15+, "only you can see the prompter", noise caveat.

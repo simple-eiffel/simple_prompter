@@ -20,7 +20,7 @@ Declared: GR-20 discovery first; spec leaned A, orchestrator suspected B/D. Rows
 
 ## Spikes
 
-Harness: RTX 5070 Ti host JACKJACK, Windows 11, F_code exe `D:\prod\simple_speech\gpu\EIFGENs\simple_speech_gpu_tests\F_code\simple_speech_gpu.exe`, run from `simple_speech\gpu`, bash, warm OS file cache likely (exe built the day before; not cold-disk).
+Harness: RTX 5070 Ti host the reference PC, Windows 11, F_code exe `D:\prod\simple_speech\gpu\EIFGENs\simple_speech_gpu_tests\F_code\simple_speech_gpu.exe`, run from `simple_speech\gpu`, bash, warm OS file cache likely (exe built the day before; not cold-disk).
 ```
 s=$(date +%s%N); timeout 300 $E | tail; e=$(date +%s%N); echo $(( (e-s)/1000000 )) ms
   [gpu] 54.34 ms: This is a test of simple promises.

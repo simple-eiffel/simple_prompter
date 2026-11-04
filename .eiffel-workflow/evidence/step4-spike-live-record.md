@@ -1,7 +1,7 @@
 # Step 4a spike S-R1: live camera + mic recording, killed mid-take (2026-10-07)
 
 Approved by Larry ("Yes, run it now"). Files deleted after checking; no ffmpeg left running.
-**Harness:** JACKJACK, RTX 5070 Ti, ffmpeg 8.0 (Chocolatey), dshow "FHD Camera" 1920x1080 mjpeg @30 +
+**Harness:** the reference PC, RTX 5070 Ti, ffmpeg 8.0 (Chocolatey), dshow "FHD Camera" 1920x1080 mjpeg @30 +
 "Microphone (FHD Camera Microphone)". Arguments exactly as PT_CAPTURE_PLAN.make_recording builds them
 (h264_nvenc p5 cq18 g30 + pcm_s16le into raw.mkv; 16 kHz mono f32le tee with -flush_packets 1).
 

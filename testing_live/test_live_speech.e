@@ -382,9 +382,15 @@ feature -- Analysis (Step 4b)
 			assert_true ("the working frames cleaned up", not (create {SIMPLE_FILE}.make (l_out + {STRING_32} "\publish pictures")).exists)
 		end
 
-	Helpless: STRING_32 = "C:\Users\LJR19\Videos\simple_prompter\2026-10-11 152240 - Reel 1 - Jesus Was Helpless"
+	Helpless: STRING_32
+		do
+			Result := home_path + {STRING_32} "\Videos\simple_prompter\2026-10-11 152240 - Reel 1 - Jesus Was Helpless"
+		end
 
-	Reel_3: STRING_32 = "C:\Users\LJR19\Videos\simple_prompter\2026-10-10 141925 - Reel 3 - Woman 1, Disciples 0"
+	Reel_3: STRING_32
+		do
+			Result := home_path + {STRING_32} "\Videos\simple_prompter\2026-10-10 141925 - Reel 3 - Woman 1, Disciples 0"
+		end
 
 	test_analysis_job_on_a_real_take
 			-- The read-test recording as a session (script, tee, journal) analyzed by the job the worker
@@ -655,10 +661,10 @@ feature -- Sync measured from claps (0.3.6)
 			-- Two clap recordings measured by hand on 2026-10-10: the two-input take (picture
 			-- 0.31-0.35 s behind) and the one-clock test (0.09-0.13 s behind). Skipped when absent.
 		do
-			measure_claps ("C:\Users\LJR19\Videos\simple_prompter\2026-10-10 072135 - Reel 1 - You Ain't Got This!\raw.mkv",
-				"C:\Users\LJR19\Videos\simple_prompter\2026-10-10 072135 - Reel 1 - You Ain't Got This!\tee.f32", 290, 370)
-			measure_claps ("C:\Users\LJR19\AppData\Local\Temp\claude\D--prod\62c845fc-cdc6-4eeb-8e64-b4148a3b683a\scratchpad\spike.mkv",
-				"C:\Users\LJR19\AppData\Local\Temp\claude\D--prod\62c845fc-cdc6-4eeb-8e64-b4148a3b683a\scratchpad\spike_tee.f32", 70, 150)
+			measure_claps (home_path + {STRING_32} "\Videos\simple_prompter\2026-10-10 072135 - Reel 1 - You Ain't Got This!\raw.mkv",
+				home_path + {STRING_32} "\Videos\simple_prompter\2026-10-10 072135 - Reel 1 - You Ain't Got This!\tee.f32", 290, 370)
+			measure_claps (home_path + {STRING_32} "\AppData\Local\Temp\claude\D--prod\62c845fc-cdc6-4eeb-8e64-b4148a3b683a\scratchpad\spike.mkv",
+				home_path + {STRING_32} "\AppData\Local\Temp\claude\D--prod\62c845fc-cdc6-4eeb-8e64-b4148a3b683a\scratchpad\spike_tee.f32", 70, 150)
 		end
 
 	measure_claps (a_raw, a_tee: STRING_32; a_low, a_high: INTEGER)
@@ -668,7 +674,7 @@ feature -- Sync measured from claps (0.3.6)
 		do
 			if (create {SIMPLE_FILE}.make (a_raw)).exists and (create {SIMPLE_FILE}.make (a_tee)).exists then
 				create m.make ({STRING_32} "C:\ProgramData\chocolatey\lib\ffmpeg\tools\ffmpeg\bin\ffmpeg.exe")
-				l_dir := {STRING_32} "C:\Users\LJR19\AppData\Local\Temp\claude\D--prod\62c845fc-cdc6-4eeb-8e64-b4148a3b683a\scratchpad"
+				l_dir := home_path + {STRING_32} "\AppData\Local\Temp\claude\D--prod\62c845fc-cdc6-4eeb-8e64-b4148a3b683a\scratchpad"
 				m.run (a_raw, a_tee, l_dir)
 				print ("    [live] " + m.summary.to_string_8 + "; claps heard at")
 				across m.measure.claps as ic loop
@@ -978,6 +984,18 @@ feature {NONE} -- Fixtures
 			"C inline use <windows.h>"
 		alias
 			"LARGE_INTEGER f, c; QueryPerformanceFrequency (&f); QueryPerformanceCounter (&c); return (EIF_REAL_64) c.QuadPart * 1000.0 / (EIF_REAL_64) f.QuadPart;"
+		end
+
+feature {NONE} -- Paths
+
+	home_path: STRING_32
+			-- This user's home folder.
+		do
+			if attached (create {EXECUTION_ENVIRONMENT}).item ("USERPROFILE") as al_home then
+				create Result.make_from_string_general (al_home)
+			else
+				create Result.make_empty
+			end
 		end
 
 end

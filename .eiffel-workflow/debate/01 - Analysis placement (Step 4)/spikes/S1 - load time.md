@@ -1,7 +1,7 @@
 # Spike S1 - model load time, measured on the installed app (answers RED Challenge 1)
 
 **Run by:** the orchestrator, 2026-10-07, after RED filed Challenge 1. **Provenance:** P1-raw (executed this cycle; screenshot in this folder).
-**Harness:** JACKJACK, RTX 5070 Ti, installed simple_prompter 0.2.1 (finalized F_code, contracts on), ggml-large-v3-turbo-q5_0 on the GPU, Silero on the CPU; models read from D:\prod\simple_speech\models.
+**Harness:** the reference PC, RTX 5070 Ti, installed simple_prompter 0.2.1 (finalized F_code, contracts on), ggml-large-v3-turbo-q5_0 on the GPU, Silero on the CPU; models read from D:\prod\simple_speech\models.
 
 | Measurement | Value | How |
 |---|---|---|

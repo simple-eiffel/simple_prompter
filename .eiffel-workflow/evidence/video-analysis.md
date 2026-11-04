@@ -1,6 +1,6 @@
 # Source Video Analysis
 
-Source: `C:\Users\LJR19\Videos\simple_prompter.mp4`, analyzed 2026-10-05.
+Source: `C:\Users\user\Videos\simple_prompter.mp4`, analyzed 2026-10-05.
 
 ## Media facts (ffprobe)
 - H.264 806x506 @ 30 fps, AAC 48 kHz stereo, duration 73.8 s, 16.8 MB.

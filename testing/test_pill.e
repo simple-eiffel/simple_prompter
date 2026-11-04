@@ -244,7 +244,7 @@ feature -- Tests: transport bar (0.3.2)
 feature -- Tests: Settings page (0.3.5)
 
 	test_device_list_reads_ffmpeg_listing
-			-- JACKJACK's listing, 2026-10-10 (ffmpeg 8.0 -list_devices true -f dshow -i dummy).
+			-- the reference PC's listing, 2026-10-10 (ffmpeg 8.0 -list_devices true -f dshow -i dummy).
 		local
 			d: PT_DEVICE_LIST
 		do

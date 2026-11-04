@@ -2,7 +2,7 @@ note
 	description: "[
 		Camera and recording health (2026-10-08): PT_CAMERA_CHECK judges a camera probe's log,
 		PT_CAPTURE_PROGRESS follows a recording's -progress output. The logs below are ffmpeg's
-		own output, captured on JACKJACK 2026-10-08 (trimmed to the lines that matter).
+		own output, captured on the reference PC 2026-10-08 (trimmed to the lines that matter).
 	]"
 	author: "Larry Rix"
 	testing: "covers"

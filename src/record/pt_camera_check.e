@@ -4,7 +4,7 @@ note
 		frames through signalstats, nothing written) and reads its log into a verdict for the
 		control window's Camera line.
 
-		Measured on JACKJACK 2026-10-08 (ffmpeg dshow): with OBS closed, OBS Virtual Camera still
+		Measured on the reference PC 2026-10-08 (ffmpeg dshow): with OBS closed, OBS Virtual Camera still
 		delivers 1080p60 frames - OBS's "camera off" card - and they never change (YDIF = 0 on
 		every frame, YAVG 55, YMAX 235), while the live FHD Camera in a dark room changes by ~1.4
 		per frame from sensor noise alone (YAVG 18, YMAX 157). So frames arriving is not enough:

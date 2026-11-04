@@ -1,5 +1,5 @@
 # Step 4 - V1 (debate 01 verification queue): full-file decode time
-# Date: 2026-10-07   Harness: JACKJACK, RTX 5070 Ti, simple_speech_gpu tests (F_code), ggml-large-v3-turbo-q5_0
+# Date: 2026-10-07   Harness: the reference PC, RTX 5070 Ti, simple_speech_gpu tests (F_code), ggml-large-v3-turbo-q5_0
 # Method: fixed 24 s passages, each decode_passage-prompted with the previous passage's text
 
   PASS: decode_a_window_on_the_gpu
