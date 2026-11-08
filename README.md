@@ -7,6 +7,7 @@
 ![Eiffel 25.02](https://img.shields.io/badge/Eiffel-25.02-purple.svg)
 ![DBC: Contracts](https://img.shields.io/badge/DBC-Contracts-green.svg)
 ![SCOOP](https://img.shields.io/badge/Concurrency-SCOOP-orange.svg)
+![Windows only](https://img.shields.io/badge/platform-Windows%20only-0078D6?logo=windows&logoColor=white)
 
 A teleprompter that follows your voice, plus a take studio that edits your recording for you.
 Written in Eiffel for Windows, with speech recognition on the local GPU.
@@ -14,7 +15,6 @@ Written in Eiffel for Windows, with speech recognition on the local GPU.
 Part of the [Simple Eiffel](https://github.com/simple-eiffel) ecosystem.
 
 > **Windows only.** It is built on Windows audio, video and windowing APIs. There is no macOS or Linux version, and none is planned.
-
 
 ## Status
 
