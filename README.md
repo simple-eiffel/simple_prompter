@@ -13,6 +13,9 @@ Written in Eiffel for Windows, with speech recognition on the local GPU.
 
 Part of the [Simple Eiffel](https://github.com/simple-eiffel) ecosystem.
 
+> **Windows only.** It is built on Windows audio, video and windowing APIs. There is no macOS or Linux version, and none is planned.
+
+
 ## Status
 
 **0.7.2, in use on Windows 11** (per-user installer: `installer/simple_prompter.iss`)
