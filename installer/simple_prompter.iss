@@ -22,7 +22,7 @@
 #define AppPublisher   "Larry Rix"
 #define AppExeName     "simple_prompter.exe"
 #define BuildDir       "..\EIFGENs\simple_prompter_app\F_code"
-#define CairoDll       GetEnv("SIMPLE_EIFFEL") + "\simple_cairo\cairo.dll"
+#define CairoDir       GetEnv("SIMPLE_EIFFEL") + "\simple_cairo\runtime\windows"
 #define WhisperBin     GetEnv("SIMPLE_EIFFEL") + "\whisper_cpp_build\build_cuda\bin"
 #define SileroModel    GetEnv("SIMPLE_EIFFEL") + "\simple_speech\models\ggml-silero-v6.2.0.bin"
 ; 0.7.0: Publish's person cutout runs on ONNX Runtime (simple_onnx's own 1.17.3, never Windows' copy)
@@ -61,7 +61,10 @@ Name: "desktopicon"; Description: "Create a &desktop shortcut"; GroupDescription
 
 [Files]
 Source: "{#BuildDir}\{#AppExeName}"; DestDir: "{app}"; Flags: ignoreversion
-Source: "{#CairoDll}"; DestDir: "{app}"; Flags: ignoreversion
+; cairo 1.18.0 and the six libraries it loads: the fleet's one set, owned by simple_cairo
+; (BUILD_STANDARDS section 9), with their licenses. Never a copy from F_code or elsewhere.
+Source: "{#CairoDir}\*.dll"; DestDir: "{app}"; Flags: ignoreversion
+Source: "{#CairoDir}\licenses\*"; DestDir: "{app}\licenses\cairo"; Flags: ignoreversion
 Source: "{#OnnxDll}"; DestDir: "{app}"; Flags: ignoreversion
 Source: "{#WhisperBin}\whisper.dll"; DestDir: "{app}"; Flags: ignoreversion
 Source: "{#WhisperBin}\ggml.dll"; DestDir: "{app}"; Flags: ignoreversion
