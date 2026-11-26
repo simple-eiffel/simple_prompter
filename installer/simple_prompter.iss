@@ -4,7 +4,7 @@
 ;  Ships the finalized Eiffel binary (contract-checked build: a broken promise
 ;  stops the program and leaves exception_trace.log beside it, which is what
 ;  a tester wants), cairo.dll (the 2D engine), whisper.cpp 1.8.2 built for CUDA
-;  (whisper.dll, ggml*.dll), onnxruntime.dll 1.17.3 (Publish's person cutout, 0.7.0),
+;  (whisper.dll, ggml*.dll), onnxruntime.dll 1.32.0 (Publish's person cutout, 0.7.0),
 ;  the Silero voice model, two sample scripts and a README. NOT shipped (too large,
 ;  or the machine's own): the whisper model (ggml-large-v3-turbo-q5_0.bin, 574 MB -
 ;  found in {app}\models or D:\prod\simple_speech\models), the cutout model
@@ -25,7 +25,7 @@
 #define CairoDir       GetEnv("SIMPLE_EIFFEL") + "\simple_cairo\runtime\windows"
 #define WhisperBin     GetEnv("SIMPLE_EIFFEL") + "\whisper_cpp_build\build_cuda\bin"
 #define SileroModel    GetEnv("SIMPLE_EIFFEL") + "\simple_speech\models\ggml-silero-v6.2.0.bin"
-; 0.7.0: Publish's person cutout runs on ONNX Runtime (simple_onnx's own 1.17.3, never Windows' copy)
+; 0.7.0: Publish's person cutout runs on ONNX Runtime (simple_onnx's own 1.32.0 since 2026-11-26, never Windows' copy)
 #define OnnxDll        GetEnv("SIMPLE_EIFFEL") + "\simple_onnx\lib\onnxruntime\bin\onnxruntime.dll"
 
 [Setup]
